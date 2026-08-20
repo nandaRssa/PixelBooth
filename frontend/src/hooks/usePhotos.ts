@@ -13,11 +13,7 @@ export function usePhotos(folderId?: number | null) {
   return useInfiniteQuery({
     queryKey: PHOTO_KEYS.list(folderId),
     queryFn: ({ pageParam = 1 }) =>
-      photoApi.list({
-        folder_id: folderId ?? undefined,
-        uncategorized: folderId ? undefined : true,
-        page: pageParam,
-      }),
+      photoApi.list({ folder_id: folderId ?? null, page: pageParam }),
     initialPageParam: 1,
     getNextPageParam: (lastPage) =>
       lastPage.current_page < lastPage.last_page ? lastPage.current_page + 1 : undefined,
@@ -40,33 +36,8 @@ export function useMovePhoto() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: ({ id, folderId }: { id: number; folderId: number | null }) =>
+    mutationFn: ({ id, folderId }: { id: number; folderId: number }) =>
       photoApi.move(id, folderId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['photos'] })
-      queryClient.invalidateQueries({ queryKey: ['folders'] })
-    },
-  })
-}
-
-export function useBulkDeletePhotos() {
-  const queryClient = useQueryClient()
-
-  return useMutation({
-    mutationFn: (photoIds: number[]) => photoApi.bulkRemove(photoIds),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['photos'] })
-      queryClient.invalidateQueries({ queryKey: ['folders'] })
-    },
-  })
-}
-
-export function useBulkMovePhotos() {
-  const queryClient = useQueryClient()
-
-  return useMutation({
-    mutationFn: ({ photoIds, folderId }: { photoIds: number[]; folderId: number | null }) =>
-      photoApi.bulkMove(photoIds, folderId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['photos'] })
       queryClient.invalidateQueries({ queryKey: ['folders'] })

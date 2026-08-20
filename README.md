@@ -277,21 +277,28 @@ SESSION_DOMAIN=localhost
 
 ## Database Setup
 
+Development lokal memakai **SQLite** (tanpa instalasi server tambahan).
+Untuk production, gunakan **PostgreSQL** seperti pada plan awal.
+
 ```bash
-# Buat database
-psql -U postgres -c "CREATE DATABASE pixelbooth;"
-
-# Jalankan migrasi
+# === Opsi A — Development (SQLite) ===
 cd backend
-php artisan migrate
+# Pastikan DB_CONNECTION=sqlite pada .env (sudah default di .env.example)
+php artisan migrate --seed
+php artisan storage:link
 
-# Jalankan seeder (membuat admin default)
-php artisan db:seed
-
-# Default admin credentials:
-# Email: admin@pixelbooth.com
-# Password: admin123
+# === Opsi B — Production (PostgreSQL) ===
+psql -U postgres -c "CREATE DATABASE pixelbooth;"
+# Set DB_CONNECTION=pgsql dan isi kredensial di .env
+php artisan migrate --seed
 ```
+
+Seeder otomatis membuat:
+- **Admin default** — Email: `admin@pixelbooth.com` · Password: `admin123`
+- **3 template demo**
+- **Demo galeri** (folder + foto placeholder) untuk keperluan development
+
+> ⚠️ Ganti password admin setelah pertama kali login.
 
 ---
 

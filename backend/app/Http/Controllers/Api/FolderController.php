@@ -4,9 +4,11 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Folder;
+use App\Models\Photo;
 use App\Services\QrCodeService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 
 class FolderController extends Controller
 {
@@ -86,7 +88,7 @@ class FolderController extends Controller
     }
 
     /**
-     * Hapus folder beserta semua isinya.
+     * Hapus folder beserta semua foto di dalamnya.
      */
     public function destroy(Folder $folder): JsonResponse
     {
@@ -97,8 +99,25 @@ class FolderController extends Controller
             ], 422);
         }
 
+        // Hapus foto beserta file-nya di dalam folder ini
+        $photos = Photo::where('folder_id', $folder->id)->get();
+
+        foreach ($photos as $photo) {
+            Storage::disk('public')->delete(array_filter([
+                $photo->storage_path,
+                $photo->thumbnail_path,
+                $photo->qr_path,
+            ]));
+            $photo->delete();
+        }
+
+        // Hapus QR code folder
+        Storage::disk('public')->delete(array_filter([$folder->qr_path]));
+
         $folder->delete();
 
-        return response()->json(['message' => 'Folder berhasil dihapus.']);
+        return response()->json([
+            'message' => 'Folder beserta isinya berhasil dihapus.',
+        ]);
     }
 }

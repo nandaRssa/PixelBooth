@@ -37,11 +37,11 @@ class PhotoController extends Controller
     public function destroy(Photo $photo): JsonResponse
     {
         // Hapus file dari storage
-        \Illuminate\Support\Facades\Storage::disk('public')->delete([
+        \Illuminate\Support\Facades\Storage::disk('public')->delete(array_filter([
             $photo->storage_path,
             $photo->thumbnail_path,
             $photo->qr_path,
-        ]);
+        ]));
 
         $photo->delete();
 
@@ -79,11 +79,11 @@ class PhotoController extends Controller
         $photos = Photo::whereIn('id', $request->photo_ids)->get();
 
         foreach ($photos as $photo) {
-            \Illuminate\Support\Facades\Storage::disk('public')->delete([
+            \Illuminate\Support\Facades\Storage::disk('public')->delete(array_filter([
                 $photo->storage_path,
                 $photo->thumbnail_path,
                 $photo->qr_path,
-            ]);
+            ]));
             $photo->delete();
         }
 

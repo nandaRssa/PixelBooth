@@ -54,11 +54,9 @@ const FolderFormModal: React.FC<FolderFormModalProps> = ({
   }, [isOpen, folder, reset])
 
   const handleFormSubmit = async (data: FolderForm) => {
-    try {
-      await onSubmit(data.name)
+    await onSubmit(data.name)
+    if (!isSubmitting) {
       onClose()
-    } catch {
-      // Gagal — biarkan modal tetap terbuka agar user bisa memperbaiki
     }
   }
 
@@ -71,14 +69,14 @@ const FolderFormModal: React.FC<FolderFormModalProps> = ({
     >
       <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-4">
         <div>
-          <label className="block text-pb-text-secondary text-xs font-medium mb-1.5">
+          <label className="block text-[#A0A0A0] text-xs font-medium mb-1.5">
             Nama Folder
           </label>
           <div className="relative">
             {isEdit ? (
-              <Pencil size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-pb-text-muted" />
+              <Pencil size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#606060]" />
             ) : (
-              <FolderPlus size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-pb-text-muted" />
+              <FolderPlus size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#606060]" />
             )}
             <input
               {...register('name')}
@@ -86,12 +84,12 @@ const FolderFormModal: React.FC<FolderFormModalProps> = ({
               placeholder="contoh: Pernikahan Andi & Sari"
               autoFocus
               className={`
-                w-full bg-pb-bg border rounded-lg pl-9 pr-4 py-3
-                text-pb-text text-sm placeholder:text-pb-faint
+                w-full bg-[#0A0A0A] border rounded-lg pl-9 pr-4 py-3
+                text-white text-sm placeholder:text-[#404040]
                 focus:outline-none focus:ring-1 transition-colors
                 ${errors.name
                   ? 'border-red-500/50 focus:ring-red-500/30'
-                  : 'border-pb-border focus:border-pb-border-strong focus:ring-white/10'
+                  : 'border-[#2A2A2A] focus:border-[#404040] focus:ring-white/10'
                 }
               `}
             />
