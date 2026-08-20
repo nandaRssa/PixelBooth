@@ -191,8 +191,9 @@ const GalleryPage: React.FC = () => {
       await movePhoto.mutateAsync({ id: moveTarget.id, folderId })
       toast.success('Foto berhasil dipindahkan.')
       setMoveTarget(null)
-    } catch {
-      toast.error('Gagal memindahkan foto.')
+    } catch (err: unknown) {
+      const error = err as { response?: { data?: { message?: string } } }
+      toast.error(error.response?.data?.message || 'Gagal memindahkan foto. Coba lagi.')
     }
   }
 
@@ -233,8 +234,9 @@ const GalleryPage: React.FC = () => {
       setSelectedIds(new Set())
       setSelectionMode(false)
       setBulkMoveOpen(false)
-    } catch {
-      toast.error('Gagal memindahkan foto.')
+    } catch (err: unknown) {
+      const error = err as { response?: { data?: { message?: string } } }
+      toast.error(error.response?.data?.message || 'Gagal memindahkan foto. Coba lagi.')
     }
   }
 
@@ -365,7 +367,7 @@ const GalleryPage: React.FC = () => {
       <div className={activeFolderId ? '' : 'mt-8'}>
         <h2 className="text-white text-sm font-semibold mb-3 flex items-center gap-2">
           <ImageIcon size={16} className="text-[#A0A0A0]" />
-          {activeFolderId ? 'Foto' : 'Semua Foto'}
+          {activeFolderId ? 'Foto' : 'Tanpa Folder'}
           <span className="text-[#606060] font-normal">
             {photosQuery.isLoading ? '' : photos.length}
           </span>

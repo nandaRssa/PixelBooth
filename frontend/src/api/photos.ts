@@ -7,6 +7,7 @@ import type { ApiResponse, PaginatedResponse, Photo } from '@/types'
 
 export interface PhotoListParams {
   folder_id?: number | null
+  uncategorized?: boolean
   page?: number
 }
 

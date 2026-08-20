@@ -16,6 +16,7 @@ class PhotoController extends Controller
     {
         $photos = Photo::final()
             ->when($request->folder_id, fn($q) => $q->where('folder_id', $request->folder_id))
+            ->when($request->boolean('uncategorized'), fn($q) => $q->whereNull('folder_id'))
             ->with(['folder'])
             ->orderBy('created_at', 'desc')
             ->paginate(24);

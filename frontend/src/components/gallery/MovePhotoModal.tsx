@@ -30,7 +30,19 @@ const MovePhotoModal: React.FC<MovePhotoModalProps> = ({
 }) => {
   const [query, setQuery] = useState('')
 
-  const filtered = folders.filter((folder) =>
+  const flatItems = React.useMemo(() => {
+    const items: { folder: Folder; depth: number }[] = []
+    const walk = (list: Folder[], depth: number) => {
+      for (const folder of list) {
+        items.push({ folder, depth })
+        if (folder.children?.length) walk(folder.children, depth + 1)
+      }
+    }
+    walk(folders, 0)
+    return items
+  }, [folders])
+
+  const filtered = flatItems.filter(({ folder }) =>
     folder.name.toLowerCase().includes(query.toLowerCase())
   )
 
@@ -65,7 +77,7 @@ const MovePhotoModal: React.FC<MovePhotoModalProps> = ({
             {query ? 'Folder tidak ditemukan.' : 'Belum ada folder.'}
           </p>
         ) : (
-          filtered.map((folder) => (
+          filtered.map(({ folder, depth }) => (
             <button
               key={folder.id}
               type="button"
@@ -74,6 +86,7 @@ const MovePhotoModal: React.FC<MovePhotoModalProps> = ({
               className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg
                 text-left text-sm text-[#A0A0A0] hover:text-white hover:bg-white/5
                 transition-colors disabled:opacity-50"
+              style={{ paddingLeft: `${12 + depth * 20}px` }}
             >
               <FolderIcon size={16} className="text-[#606060]" />
               <span className="flex-1 truncate">{folder.name}</span>

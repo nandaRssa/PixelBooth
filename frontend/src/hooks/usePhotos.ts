@@ -13,7 +13,11 @@ export function usePhotos(folderId?: number | null) {
   return useInfiniteQuery({
     queryKey: PHOTO_KEYS.list(folderId),
     queryFn: ({ pageParam = 1 }) =>
-      photoApi.list({ folder_id: folderId ?? null, page: pageParam }),
+      photoApi.list({
+        folder_id: folderId ?? undefined,
+        uncategorized: folderId ? undefined : true,
+        page: pageParam,
+      }),
     initialPageParam: 1,
     getNextPageParam: (lastPage) =>
       lastPage.current_page < lastPage.last_page ? lastPage.current_page + 1 : undefined,
