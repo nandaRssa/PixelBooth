@@ -31,6 +31,11 @@ const statusConfig: Record<CameraStatus, { label: string; dotClass: string; text
     dotClass: 'bg-amber-400 shadow-[0_0_6px_rgba(251,191,36,0.6)] animate-pulse',
     textClass: 'text-amber-400',
   },
+  checking: {
+    label: 'Memeriksa Kamera...',
+    dotClass: 'bg-[#A0A0A0] animate-pulse',
+    textClass: 'text-[#A0A0A0]',
+  },
 }
 
 export const CameraStatusBadge: React.FC<CameraStatusBadgeProps> = ({

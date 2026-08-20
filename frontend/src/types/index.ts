@@ -134,7 +134,7 @@ export interface CustomerFolder {
 }
 
 // ===== HARDWARE =====
-export type CameraStatus = 'connected' | 'disconnected' | 'error' | 'capturing'
+export type CameraStatus = 'connected' | 'disconnected' | 'error' | 'capturing' | 'checking'
 
 export interface HardwareStatus {
   camera: CameraStatus

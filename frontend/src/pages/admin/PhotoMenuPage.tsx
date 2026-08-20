@@ -1,17 +1,16 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
   AlertTriangle,
-  Battery,
   Camera,
   Check,
   ImageIcon,
   Layers,
   Play,
-  RefreshCw,
+  Video,
+  VideoOff,
   Wifi,
-  WifiOff,
 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { CameraStatusBadge, Spinner } from '@/components/ui/StatusBadge'
@@ -22,8 +21,42 @@ import type { Template } from '@/types'
 
 // ==========================================
 // Photo / Photobooth Menu Page
-// Pilih template secara live + status kamera via polling
+// Pilih template + mulai sesi.
+// Sumber kamera utama: webcam device (browser).
+// DSLR via hardware bridge bersifat opsional.
 // ==========================================
+
+// Hook sederhana untuk memeriksa ketersediaan kamera device
+function useWebcamAvailability() {
+  const [available, setAvailable] = useState<boolean | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+
+    const check = async () => {
+      try {
+        if (!navigator.mediaDevices?.enumerateDevices) {
+          if (!cancelled) setAvailable(false)
+          return
+        }
+        const devices = await navigator.mediaDevices.enumerateDevices()
+        if (!cancelled) {
+          setAvailable(devices.some((d) => d.kind === 'videoinput'))
+        }
+      } catch {
+        if (!cancelled) setAvailable(false)
+      }
+    }
+
+    check()
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  return available
+}
 
 const PhotoMenuPage: React.FC = () => {
   const navigate = useNavigate()
@@ -33,10 +66,11 @@ const PhotoMenuPage: React.FC = () => {
   const hardwareQuery = useHardwareStatus()
   const createSession = useCreateSession()
 
+  const webcamAvailable = useWebcamAvailability()
   const templates = templatesQuery.data ?? []
   const hardware = hardwareQuery.data
 
-  const cameraConnected = hardware?.camera === 'connected'
+  const dslrConnected = hardware?.camera === 'connected'
 
   const handleStartSession = async () => {
     if (!selectedTemplate) return
@@ -61,73 +95,56 @@ const PhotoMenuPage: React.FC = () => {
           <h1 className="text-white text-2xl font-bold">Photo</h1>
           <p className="text-[#606060] text-sm mt-1">Mulai sesi pemotretan photobooth</p>
         </div>
-        <div className="flex items-center gap-3">
-          {hardware && (
-            <CameraStatusBadge status={hardware.camera} />
-          )}
-          <Button
-            variant="secondary"
-            size="md"
-            onClick={() => hardwareQuery.refetch()}
-            disabled={hardwareQuery.isFetching}
-            leftIcon={<RefreshCw size={16} />}
-          >
-            Segarkan Status
-          </Button>
-        </div>
+        <CameraStatusBadge
+          status={
+            webcamAvailable === null ? 'checking' : webcamAvailable ? 'connected' : 'disconnected'
+          }
+        />
       </div>
 
-      {/* ===== Status Kamera ===== */}
-      {hardwareQuery.isLoading ? (
-        <div className="flex items-center gap-3 bg-[#141414] border border-[#2A2A2A] rounded-xl p-4 mb-6">
-          <Spinner size="sm" className="text-white" />
-          <p className="text-[#A0A0A0] text-sm">Memeriksa status kamera...</p>
-        </div>
-      ) : !hardware?.bridge_online ? (
-        <motion.div
-          initial={{ opacity: 0, y: 4 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-amber-500/5 border border-amber-500/15 rounded-xl p-4 mb-6 flex items-start gap-3"
-        >
-          <WifiOff size={18} className="text-amber-400 flex-shrink-0 mt-0.5" />
-          <div className="flex-1">
-            <p className="text-amber-400 text-sm font-medium">Hardware bridge tidak terhubung</p>
-            <p className="text-[#A0A0A0] text-xs mt-0.5">
-              Pastikan hardware bridge berjalan (default port 5000) dan kamera DSLR terhubung.
-              Status diperbarui otomatis setiap 5 detik.
+      {/* ===== Status Sumber Kamera ===== */}
+      <div className="bg-[#141414] border border-[#2A2A2A] rounded-xl p-4 mb-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-white text-sm font-medium flex items-center gap-2">
+              {webcamAvailable === false ? (
+                <VideoOff size={16} className="text-amber-400" />
+              ) : (
+                <Video size={16} className="text-green-400" />
+              )}
+              Webcam Device (Utama)
+            </p>
+            <p className="text-[#606060] text-xs mt-1">
+              {webcamAvailable === null
+                ? 'Memeriksa kamera device...'
+                : webcamAvailable
+                  ? 'Kamera device terdeteksi. Capture berjalan langsung di browser.'
+                  : 'Tidak ada kamera device terdeteksi. Periksa izin akses kamera.'}
             </p>
           </div>
-        </motion.div>
-      ) : (
-        <motion.div
-          initial={{ opacity: 0, y: 4 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-green-500/5 border border-green-500/20 rounded-xl p-4 mb-6 flex items-start gap-3"
-        >
-          <Wifi size={18} className="text-green-400 flex-shrink-0 mt-0.5" />
-          <div className="flex-1">
-            <p className="text-green-400 text-sm font-medium">Bridge online</p>
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1 text-xs text-[#A0A0A0]">
-              <span className="flex items-center gap-1.5">
-                <Camera size={13} className="text-[#606060]" />
-                {hardware.camera_model ?? 'Kamera terhubung'}
-              </span>
-              {typeof hardware.battery_level === 'number' && (
-                <span className="flex items-center gap-1.5">
-                  <Battery size={13} className="text-[#606060]" />
-                  {hardware.battery_level}%
-                </span>
-              )}
-              {hardware.bluetooth_connected && (
-                <span className="text-green-400">Bluetooth aktif</span>
-              )}
-            </div>
+          <span className="text-xs text-[#606060]">Sumber default</span>
+        </div>
+
+        {/* DSLR opsional */}
+        {hardwareQuery.isLoading ? (
+          <div className="flex items-center gap-3 mt-3 pt-3 border-t border-[#2A2A2A]">
+            <Spinner size="sm" className="text-white" />
+            <p className="text-[#A0A0A0] text-xs">Memeriksa hardware bridge (DSLR)...</p>
           </div>
-          {!cameraConnected && (
-            <span className="text-amber-400 text-xs flex-shrink-0">Kamera belum siap</span>
-          )}
-        </motion.div>
-      )}
+        ) : hardware?.bridge_online ? (
+          <div className="flex items-center justify-between mt-3 pt-3 border-t border-[#2A2A2A]">
+            <p className="text-green-400 text-xs flex items-center gap-2">
+              <Wifi size={14} />
+              {dslrConnected
+                ? `DSLR terhubung via bridge: ${hardware.camera_model ?? 'kamera'}${
+                    typeof hardware.battery_level === 'number' ? ` · baterai ${hardware.battery_level}%` : ''
+                  }`
+                : 'Bridge online, kamera DSLR belum siap'}
+            </p>
+            <span className="text-xs text-[#606060]">Opsional</span>
+          </div>
+        ) : null}
+      </div>
 
       {/* ===== Pilih Template ===== */}
       <h2 className="text-white text-sm font-semibold mb-3 flex items-center gap-2">
@@ -235,10 +252,16 @@ const PhotoMenuPage: React.FC = () => {
               <p className="text-[#606060] text-xs mt-0.5">Pilih template untuk memulai sesi baru.</p>
             </>
           )}
-          {!cameraConnected && selectedTemplate && (
+          {webcamAvailable === false && (
             <p className="flex items-center gap-1.5 text-amber-400 text-xs mt-1.5">
               <AlertTriangle size={12} />
-              Kamera belum terhubung — capture hanya berfungsi dengan hardware bridge.
+              Webcam tidak terdeteksi — izinkan akses kamera di browser.
+            </p>
+          )}
+          {dslrConnected && (
+            <p className="flex items-center gap-1.5 text-[#A0A0A0] text-xs mt-1.5">
+              <Camera size={12} />
+              Capture akan menggunakan webcam device.
             </p>
           )}
         </div>

@@ -1,5 +1,5 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { templateApi } from '@/api/templates'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { templateApi, type TemplatePayload } from '@/api/templates'
 import { hardwareApi } from '@/api/hardware'
 
 // ==========================================
@@ -14,9 +14,26 @@ export function useTemplates() {
   })
 }
 
-export function useInvalidateTemplates() {
+export function useCreateTemplate() {
   const queryClient = useQueryClient()
-  return () => queryClient.invalidateQueries({ queryKey: ['templates'] })
+
+  return useMutation({
+    mutationFn: (payload: TemplatePayload) => templateApi.create(payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['templates'] })
+    },
+  })
+}
+
+export function useDeleteTemplate() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (id: number) => templateApi.remove(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['templates'] })
+    },
+  })
 }
 
 // ==========================================
@@ -34,4 +51,4 @@ export function useHardwareStatus() {
   })
 }
 
-export { hardwareApi }
+export { templateApi, hardwareApi }
