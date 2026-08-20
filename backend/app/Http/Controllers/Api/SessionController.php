@@ -7,6 +7,7 @@ use App\Models\Photo;
 use App\Models\PhotoSession;
 use App\Models\SessionCapture;
 use App\Models\Template;
+use App\Services\PhotoRenderService;
 use App\Services\QrCodeService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -15,7 +16,8 @@ use Illuminate\Support\Facades\Storage;
 class SessionController extends Controller
 {
     public function __construct(
-        private readonly QrCodeService $qrCodeService
+        private readonly QrCodeService $qrCodeService,
+        private readonly PhotoRenderService $photoRenderService
     ) {}
 
     /**
@@ -163,16 +165,17 @@ class SessionController extends Controller
             'completed_at' => now(),
         ]);
 
-        // TODO Phase 4: Render template + captures menjadi foto final
-        // Untuk Phase 1, simpan placeholder final photo
+        // Render foto final: gabungkan capture frame ke template
+        [$finalPath, $fileSize] = $this->photoRenderService->renderFinal($session);
+
         $photo = Photo::create([
             'session_id' => $session->id,
             'folder_id' => $session->folder_id,
             'filename' => "final-{$session->session_token}.jpg",
-            'storage_path' => "sessions/{$session->session_token}/final.jpg",
+            'storage_path' => $finalPath,
             'is_final' => true,
             'is_temporary' => false,
-            'file_size' => 0,
+            'file_size' => $fileSize,
             'mime_type' => 'image/jpeg',
         ]);
 
@@ -213,7 +216,7 @@ class SessionController extends Controller
     public function setFolder(Request $request, PhotoSession $session): JsonResponse
     {
         $request->validate([
-            'folder_id' => ['required', 'exists:folders,id'],
+            'folder_id' => ['nullable', 'exists:folders,id'],
         ]);
 
         $session->update(['folder_id' => $request->folder_id]);

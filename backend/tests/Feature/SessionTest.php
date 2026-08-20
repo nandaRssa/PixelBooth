@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Folder;
 use App\Models\Template;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -28,8 +29,18 @@ class SessionTest extends TestCase
         return ['Authorization' => "Bearer {$this->token}"];
     }
 
-    private function makeTemplate(int $frames = 3): Template
+    private function makeTemplate(int $frames = 3, ?array $frameConfig = null): Template
     {
+        // Buat file template image nyata di storage
+        $img = imagecreatetruecolor(100, 100);
+        $white = imagecolorallocate($img, 200, 200, 200);
+        imagefill($img, 0, 0, $white);
+        ob_start();
+        imagepng($img);
+        $pngData = ob_get_clean();
+        imagedestroy($img);
+        Storage::disk('public')->put('templates/demo.png', $pngData);
+
         return Template::create([
             'name' => 'Template Demo',
             'slug' => 'template-demo',
@@ -37,7 +48,7 @@ class SessionTest extends TestCase
             'canvas_width' => 1080,
             'canvas_height' => 1920,
             'frame_count' => $frames,
-            'frame_configuration' => [],
+            'frame_configuration' => $frameConfig ?? [],
             'status' => 'active',
         ]);
     }
@@ -100,9 +111,12 @@ class SessionTest extends TestCase
     public function test_complete_menghasilkan_foto_final_dan_qr(): void
     {
         $template = $this->makeTemplate(1);
+        $folder = Folder::create(['name' => 'Folder Tes', 'unique_token' => 'folder-token-1']);
 
-        $session = $this->postJson('/api/sessions', ['template_id' => $template->id], $this->headers())
-            ->json('data');
+        $session = $this->postJson('/api/sessions', [
+            'template_id' => $template->id,
+            'folder_id' => $folder->id,
+        ], $this->headers())->json('data');
 
         $this->postJson("/api/sessions/{$session['id']}/capture", [
             'image_base64' => $this->base64Png(),
@@ -118,12 +132,59 @@ class SessionTest extends TestCase
         $response->assertOk()
             ->assertJsonPath('data.photo.is_final', true);
 
+        // QR code digenerate
         $this->assertNotNull($response->json('data.photo.qr_path'));
+
+        // File final benar-benar tersimpan (bukan placeholder)
+        $storagePath = $response->json('data.photo.storage_path');
+        Storage::disk('public')->assertExists($storagePath);
+        $this->assertGreaterThan(0, $response->json('data.photo.file_size'));
+        $this->assertSame('image/jpeg', $response->json('data.photo.mime_type'));
+
+        // Foto tersimpan ke folder yang dipilih
+        $this->assertDatabaseHas('photos', [
+            'id' => $response->json('data.photo.id'),
+            'folder_id' => $folder->id,
+        ]);
 
         $this->assertDatabaseHas('photo_sessions', [
             'id' => $session['id'],
             'status' => 'complete',
         ]);
+    }
+
+    public function test_complete_merender_frame_ke_template(): void
+    {
+        $template = $this->makeTemplate(3, [
+            ['id' => 1, 'x' => 60, 'y' => 150, 'width' => 960, 'height' => 500, 'order' => 1],
+            ['id' => 2, 'x' => 60, 'y' => 700, 'width' => 960, 'height' => 500, 'order' => 2],
+            ['id' => 3, 'x' => 60, 'y' => 1250, 'width' => 960, 'height' => 500, 'order' => 3],
+        ]);
+
+        $session = $this->postJson('/api/sessions', [
+            'template_id' => $template->id,
+        ], $this->headers())->json('data');
+
+        // Capture & approve semua 3 frame
+        for ($i = 1; $i <= 3; $i++) {
+            $this->postJson("/api/sessions/{$session['id']}/capture", [
+                'image_base64' => $this->base64Png(),
+            ], $this->headers())->assertOk();
+
+            $this->postJson("/api/sessions/{$session['id']}/next-frame", [], $this->headers())->assertOk();
+        }
+
+        $response = $this->postJson("/api/sessions/{$session['id']}/complete", [], $this->headers());
+        $response->assertOk();
+
+        // Verifikasi ukuran file final sesuai dimensi canvas template
+        $finalPath = Storage::disk('public')->path($response->json('data.photo.storage_path'));
+        $this->assertFileExists($finalPath);
+
+        $info = getimagesize($finalPath);
+        $this->assertNotFalse($info);
+        $this->assertSame($template->canvas_width, $info[0]);
+        $this->assertSame($template->canvas_height, $info[1]);
     }
 
     public function test_complete_ditolak_jika_frame_belum_lengkap(): void

@@ -5,6 +5,7 @@ import {
   AlertTriangle,
   Camera,
   Check,
+  FolderPlus,
   ImageIcon,
   Layers,
   Play,
@@ -16,6 +17,7 @@ import { Button } from '@/components/ui/Button'
 import { CameraStatusBadge, Spinner } from '@/components/ui/StatusBadge'
 import { toast } from '@/components/ui/Toast'
 import { useTemplates, useHardwareStatus } from '@/hooks/useTemplates'
+import { useFolders } from '@/hooks/useFolders'
 import { useCreateSession } from '@/hooks/useSessions'
 import type { Template } from '@/types'
 
@@ -61,13 +63,16 @@ function useWebcamAvailability() {
 const PhotoMenuPage: React.FC = () => {
   const navigate = useNavigate()
   const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null)
+  const [selectedFolderId, setSelectedFolderId] = useState<number | null>(null)
 
   const templatesQuery = useTemplates()
+  const foldersQuery = useFolders(null)
   const hardwareQuery = useHardwareStatus()
   const createSession = useCreateSession()
 
   const webcamAvailable = useWebcamAvailability()
   const templates = templatesQuery.data ?? []
+  const folders = foldersQuery.data ?? []
   const hardware = hardwareQuery.data
 
   const dslrConnected = hardware?.camera === 'connected'
@@ -78,7 +83,7 @@ const PhotoMenuPage: React.FC = () => {
     try {
       const session = await createSession.mutateAsync({
         templateId: selectedTemplate.id,
-        folderId: null,
+        folderId: selectedFolderId,
       })
       toast.success(`Sesi dimulai dengan template "${selectedTemplate.name}".`)
       navigate(`/photo/session/${session.id}`)
@@ -235,46 +240,81 @@ const PhotoMenuPage: React.FC = () => {
       )}
 
       {/* ===== Aksi Mulai Sesi ===== */}
-      <div className="flex items-center justify-between mt-8 bg-[#141414] border border-[#2A2A2A] rounded-2xl p-5">
-        <div className="flex-1 min-w-0">
-          {selectedTemplate ? (
-            <>
-              <p className="text-white font-medium text-sm">
-                Template terpilih: {selectedTemplate.name}
+      <div className="mt-8 bg-[#141414] border border-[#2A2A2A] rounded-2xl p-5">
+        <div className="flex flex-col lg:flex-row lg:items-center gap-4">
+          <div className="flex-1 min-w-0">
+            {selectedTemplate ? (
+              <>
+                <p className="text-white font-medium text-sm">
+                  Template terpilih: {selectedTemplate.name}
+                </p>
+                <p className="text-[#606060] text-xs mt-0.5">
+                  {selectedTemplate.frame_count} frame · {selectedTemplate.canvas_width} x {selectedTemplate.canvas_height}
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="text-white font-medium text-sm">Siap memotret?</p>
+                <p className="text-[#606060] text-xs mt-0.5">Pilih template untuk memulai sesi baru.</p>
+              </>
+            )}
+
+            {webcamAvailable === false && (
+              <p className="flex items-center gap-1.5 text-amber-400 text-xs mt-1.5">
+                <AlertTriangle size={12} />
+                Webcam tidak terdeteksi — izinkan akses kamera di browser.
               </p>
-              <p className="text-[#606060] text-xs mt-0.5">
-                {selectedTemplate.frame_count} frame · {selectedTemplate.canvas_width} x {selectedTemplate.canvas_height}
+            )}
+            {dslrConnected && (
+              <p className="flex items-center gap-1.5 text-[#A0A0A0] text-xs mt-1.5">
+                <Camera size={12} />
+                Capture akan menggunakan webcam device.
               </p>
-            </>
-          ) : (
-            <>
-              <p className="text-white font-medium text-sm">Siap memotret?</p>
-              <p className="text-[#606060] text-xs mt-0.5">Pilih template untuk memulai sesi baru.</p>
-            </>
-          )}
-          {webcamAvailable === false && (
-            <p className="flex items-center gap-1.5 text-amber-400 text-xs mt-1.5">
-              <AlertTriangle size={12} />
-              Webcam tidak terdeteksi — izinkan akses kamera di browser.
-            </p>
-          )}
-          {dslrConnected && (
-            <p className="flex items-center gap-1.5 text-[#A0A0A0] text-xs mt-1.5">
-              <Camera size={12} />
-              Capture akan menggunakan webcam device.
-            </p>
-          )}
+            )}
+          </div>
+
+          {/* Pilihan folder penyimpanan */}
+          <div className="w-full lg:w-72">
+            <label className="block text-[#A0A0A0] text-xs font-medium mb-1.5 flex items-center gap-1.5">
+              <FolderPlus size={13} />
+              Simpan Hasil ke Folder
+            </label>
+            {foldersQuery.isLoading ? (
+              <div className="flex items-center gap-2 bg-[#0A0A0A] border border-[#2A2A2A] rounded-lg px-4 py-2.5">
+                <Spinner size="sm" className="text-white" />
+                <span className="text-[#606060] text-sm">Memuat folder...</span>
+              </div>
+            ) : (
+              <select
+                value={selectedFolderId ?? ''}
+                onChange={(e) =>
+                  setSelectedFolderId(e.target.value === '' ? null : Number(e.target.value))
+                }
+                className="w-full bg-[#0A0A0A] border border-[#2A2A2A] rounded-lg px-3 py-2.5
+                  text-white text-sm focus:outline-none focus:ring-1 focus:border-[#404040] focus:ring-white/10
+                  [&>option]:bg-[#0A0A0A]"
+              >
+                <option value="">Galeri (Tanpa Folder)</option>
+                {folders.map((folder) => (
+                  <option key={folder.id} value={folder.id}>
+                    {folder.name}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+
+          <Button
+            variant="primary"
+            size="lg"
+            onClick={handleStartSession}
+            disabled={!selectedTemplate || createSession.isPending}
+            loading={createSession.isPending}
+            leftIcon={<Play size={18} />}
+          >
+            Mulai Sesi Baru
+          </Button>
         </div>
-        <Button
-          variant="primary"
-          size="lg"
-          onClick={handleStartSession}
-          disabled={!selectedTemplate || createSession.isPending}
-          loading={createSession.isPending}
-          leftIcon={<Play size={18} />}
-        >
-          Mulai Sesi Baru
-        </Button>
       </div>
     </div>
   )

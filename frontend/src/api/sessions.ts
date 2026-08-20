@@ -59,4 +59,11 @@ export const sessionApi = {
   cancel: async (id: number): Promise<void> => {
     await apiClient.post(`/sessions/${id}/cancel`)
   },
+
+  setFolder: async (id: number, folderId: number | null): Promise<PhotoSession> => {
+    const response = await apiClient.post<ApiResponse<PhotoSession>>(`/sessions/${id}/set-folder`, {
+      folder_id: folderId,
+    })
+    return response.data.data
+  },
 }

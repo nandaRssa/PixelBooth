@@ -6,6 +6,7 @@ import {
   Camera as CameraIcon,
   Check,
   ExternalLink,
+  FolderPlus,
   ImageIcon,
   RotateCcw,
   Video,
@@ -16,6 +17,7 @@ import { Button } from '@/components/ui/Button'
 import { Spinner, CameraStatusBadge } from '@/components/ui/StatusBadge'
 import { toast } from '@/components/ui/Toast'
 import { sessionApi } from '@/api/sessions'
+import { useFolders } from '@/hooks/useFolders'
 import type { PhotoSession } from '@/types'
 
 // ==========================================
@@ -42,6 +44,12 @@ const PhotoCapturePage: React.FC = () => {
   const [isCapturing, setIsCapturing] = useState(false)
   const [resultPhoto, setResultPhoto] = useState<{ url?: string; qr_url?: string } | null>(null)
 
+  // ===== Folder tujuan penyimpanan =====
+  const [folderId, setFolderId] = useState<number | null>(null)
+  const [folderName, setFolderName] = useState<string | null>(null)
+  const [isSavingFolder, setIsSavingFolder] = useState(false)
+  const foldersQuery = useFolders(null)
+
   const videoRef = useRef<HTMLVideoElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const countdownRef = useRef<number | null>(null)
@@ -55,6 +63,8 @@ const PhotoCapturePage: React.FC = () => {
       .then((data) => {
         if (!cancelled) {
           setSession(data)
+          setFolderId(data.folder_id)
+          setFolderName(data.folder?.name ?? null)
           setStatus('ready')
         }
       })
@@ -209,6 +219,25 @@ const PhotoCapturePage: React.FC = () => {
     }
   }
 
+  // ===== Ubah folder tujuan penyimpanan =====
+  const handleChangeFolder = async (value: number | null) => {
+    if (!session) return
+    setIsSavingFolder(true)
+    try {
+      const updated = await sessionApi.setFolder(session.id, value)
+      setSession((prev) =>
+        prev ? { ...prev, folder_id: updated.folder_id, folder: updated.folder } : prev
+      )
+      setFolderId(updated.folder_id)
+      setFolderName(updated.folder?.name ?? null)
+      toast.success(value ? 'Folder tujuan diubah.' : 'Disimpan ke galeri tanpa folder.')
+    } catch {
+      toast.error('Gagal mengubah folder tujuan.')
+    } finally {
+      setIsSavingFolder(false)
+    }
+  }
+
   // ===== Batal sesi =====
   const handleCancel = async () => {
     if (!session) return
@@ -262,12 +291,20 @@ const PhotoCapturePage: React.FC = () => {
         </div>
 
         <div className="bg-[#141414] border border-[#2A2A2A] rounded-2xl p-8 flex flex-col items-center text-center">
-          <div className="w-20 h-20 bg-green-500/10 border border-green-500/20 rounded-2xl flex items-center justify-center mb-4">
-            <Check size={36} className="text-green-400" />
-          </div>
+          {resultPhoto.url ? (
+            <img
+              src={resultPhoto.url}
+              alt="Foto final"
+              className="max-h-80 w-auto max-w-full rounded-xl mb-5 border border-[#2A2A2A]"
+            />
+          ) : (
+            <div className="w-20 h-20 bg-green-500/10 border border-green-500/20 rounded-2xl flex items-center justify-center mb-4">
+              <Check size={36} className="text-green-400" />
+            </div>
+          )}
           <h2 className="text-white font-semibold text-lg mb-1">Sesi Selesai!</h2>
           <p className="text-[#A0A0A0] text-sm mb-6 max-w-sm">
-            {totalFrames} frame telah diambil. Foto final disimpan di galeri dan siap dibagikan via QR.
+            {totalFrames} frame telah diambil. Foto final disimpan di galeri{folderName ? ` dalam folder "${folderName}"` : ''} dan siap dibagikan via QR.
           </p>
 
           <div className="flex flex-col gap-2 w-full max-w-xs mb-6">
@@ -501,6 +538,43 @@ const PhotoCapturePage: React.FC = () => {
           )}
 
           <div className="flex-1" />
+
+          {/* Pilihan folder penyimpanan */}
+          <div className="mt-6 pt-4 border-t border-[#2A2A2A]">
+            <label className="block text-[#A0A0A0] text-xs font-medium mb-1.5 flex items-center gap-1.5">
+              <FolderPlus size={13} />
+              Simpan Hasil ke Folder
+            </label>
+            {foldersQuery.isLoading ? (
+              <div className="flex items-center gap-2 bg-[#0A0A0A] border border-[#2A2A2A] rounded-lg px-3 py-2.5">
+                <Spinner size="sm" className="text-white" />
+                <span className="text-[#606060] text-xs">Memuat folder...</span>
+              </div>
+            ) : (
+              <select
+                value={folderId ?? ''}
+                onChange={(e) =>
+                  handleChangeFolder(e.target.value === '' ? null : Number(e.target.value))
+                }
+                disabled={isSavingFolder}
+                className="w-full bg-[#0A0A0A] border border-[#2A2A2A] rounded-lg px-3 py-2.5
+                  text-white text-sm focus:outline-none focus:ring-1 focus:border-[#404040] focus:ring-white/10
+                  disabled:opacity-50 [&>option]:bg-[#0A0A0A]"
+              >
+                <option value="">Galeri (Tanpa Folder)</option>
+                {(foldersQuery.data ?? []).map((folder) => (
+                  <option key={folder.id} value={folder.id}>
+                    {folder.name}
+                  </option>
+                ))}
+              </select>
+            )}
+            {folderName && (
+              <p className="text-green-400 text-xs mt-1.5">
+                Hasil foto akan disimpan ke: {folderName}
+              </p>
+            )}
+          </div>
 
           {/* Template info */}
           {template && (
