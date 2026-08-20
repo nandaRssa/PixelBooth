@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { ChevronRight, FolderOpen, Home, Plus, RefreshCw } from 'lucide-react'
+import { ChevronRight, FolderOpen, Home, ImageIcon, Plus, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { ConfirmModal } from '@/components/ui/Modal'
 import { EmptyState, Spinner } from '@/components/ui/StatusBadge'
@@ -179,9 +179,9 @@ const GalleryPage: React.FC = () => {
       await deletePhoto.mutateAsync(deletePhotoTarget.id)
       toast.success('Foto berhasil dihapus.')
       setDeletePhotoTarget(null)
-    } catch {
-      toast.error('Gagal menghapus foto.')
-      setDeletePhotoTarget(null)
+    } catch (err: unknown) {
+      const error = err as { response?: { data?: { message?: string } } }
+      toast.error(error.response?.data?.message || 'Gagal menghapus foto. Coba lagi.')
     }
   }
 
@@ -219,9 +219,9 @@ const GalleryPage: React.FC = () => {
       setSelectedIds(new Set())
       setSelectionMode(false)
       setBulkDeleteOpen(false)
-    } catch {
-      toast.error('Gagal menghapus foto.')
-      setBulkDeleteOpen(false)
+    } catch (err: unknown) {
+      const error = err as { response?: { data?: { message?: string } } }
+      toast.error(error.response?.data?.message || 'Gagal menghapus foto.')
     }
   }
 
@@ -361,35 +361,34 @@ const GalleryPage: React.FC = () => {
         </motion.div>
       )}
 
-      {/* ===== Photo grid — hanya saat berada di dalam folder ===== */}
-      {activeFolderId && (
-        <div>
-          <h2 className="text-white text-sm font-semibold mb-3 flex items-center gap-2">
-            Foto
-            <span className="text-[#606060] font-normal">
-              {photosQuery.isLoading ? '' : photos.length}
-            </span>
-          </h2>
-          <PhotoGrid
-            photos={photos}
-            isLoading={photosQuery.isLoading}
-            isFetchingMore={photosQuery.isFetchingNextPage}
-            hasMore={hasMore}
-            onLoadMore={() => photosQuery.fetchNextPage()}
-            onPreview={setPreviewTarget}
-            onMove={setMoveTarget}
-            onDelete={setDeletePhotoTarget}
-            selectionMode={selectionMode}
-            setSelectionMode={setSelectionMode}
-            selectedIds={selectedIds}
-            onToggleSelect={handleToggleSelect}
-            onSelectAll={handleSelectAll}
-            onBulkMove={() => setBulkMoveOpen(true)}
-            onBulkDelete={() => setBulkDeleteOpen(true)}
-            isBulkActionPending={bulkDeletePhotos.isPending || bulkMovePhotos.isPending}
-          />
-        </div>
-      )}
+      {/* ===== Photo grid — semua foto di root, atau foto dalam folder ===== */}
+      <div className={activeFolderId ? '' : 'mt-8'}>
+        <h2 className="text-white text-sm font-semibold mb-3 flex items-center gap-2">
+          <ImageIcon size={16} className="text-[#A0A0A0]" />
+          {activeFolderId ? 'Foto' : 'Semua Foto'}
+          <span className="text-[#606060] font-normal">
+            {photosQuery.isLoading ? '' : photos.length}
+          </span>
+        </h2>
+        <PhotoGrid
+          photos={photos}
+          isLoading={photosQuery.isLoading}
+          isFetchingMore={photosQuery.isFetchingNextPage}
+          hasMore={hasMore}
+          onLoadMore={() => photosQuery.fetchNextPage()}
+          onPreview={setPreviewTarget}
+          onMove={setMoveTarget}
+          onDelete={setDeletePhotoTarget}
+          selectionMode={selectionMode}
+          setSelectionMode={setSelectionMode}
+          selectedIds={selectedIds}
+          onToggleSelect={handleToggleSelect}
+          onSelectAll={handleSelectAll}
+          onBulkMove={() => setBulkMoveOpen(true)}
+          onBulkDelete={() => setBulkDeleteOpen(true)}
+          isBulkActionPending={bulkDeletePhotos.isPending || bulkMovePhotos.isPending}
+        />
+      </div>
 
       {/* ===== Modals ===== */}
       <FolderFormModal

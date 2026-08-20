@@ -85,6 +85,44 @@ class PhotoRenderService
     }
 
     /**
+     * Render thumbnail foto final dan simpan ke storage.
+     *
+     * @return string path thumbnail
+     */
+    public function renderThumbnail(PhotoSession $session, string $finalPath): string
+    {
+        $sourcePath = Storage::disk('public')->path($finalPath);
+        if (! is_file($sourcePath)) {
+            return '';
+        }
+
+        $src = $this->loadImage($sourcePath);
+        if (! $src) {
+            return '';
+        }
+
+        $srcW = imagesx($src);
+        $srcH = imagesy($src);
+        $thumbW = 480;
+        $thumbH = max(1, (int) round($thumbW * $srcH / $srcW));
+
+        $thumb = imagecreatetruecolor($thumbW, $thumbH);
+        imagecopyresampled($thumb, $src, 0, 0, 0, 0, $thumbW, $thumbH, $srcW, $srcH);
+
+        $storagePath = "sessions/{$session->session_token}/thumb.jpg";
+        $tmpPath = tempnam(sys_get_temp_dir(), 'pixthumb');
+
+        imagejpeg($thumb, $tmpPath, 80);
+        Storage::disk('public')->put($storagePath, (string) file_get_contents($tmpPath));
+
+        unlink($tmpPath);
+        imagedestroy($thumb);
+        imagedestroy($src);
+
+        return $storagePath;
+    }
+
+    /**
      * Gambar dasar canvas — template bila file-nya ada, selain itu background gelap.
      */
     private function drawBase($canvas, Template $template): void

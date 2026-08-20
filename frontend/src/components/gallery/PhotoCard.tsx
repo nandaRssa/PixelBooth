@@ -51,9 +51,9 @@ const PhotoCard: React.FC<PhotoCardProps> = ({
       `}
       onClick={handleClick}
     >
-      {photo.thumbnail_url ? (
+      {(photo.thumbnail_url || photo.url) ? (
         <img
-          src={photo.thumbnail_url}
+          src={photo.thumbnail_url ?? photo.url}
           alt={photo.filename}
           loading="lazy"
           className={`absolute inset-0 w-full h-full object-cover transition-all duration-200 ${

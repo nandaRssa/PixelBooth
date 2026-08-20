@@ -167,12 +167,14 @@ class SessionController extends Controller
 
         // Render foto final: gabungkan capture frame ke template
         [$finalPath, $fileSize] = $this->photoRenderService->renderFinal($session);
+        $thumbnailPath = $this->photoRenderService->renderThumbnail($session, $finalPath);
 
         $photo = Photo::create([
             'session_id' => $session->id,
             'folder_id' => $session->folder_id,
             'filename' => "final-{$session->session_token}.jpg",
             'storage_path' => $finalPath,
+            'thumbnail_path' => $thumbnailPath ?: null,
             'is_final' => true,
             'is_temporary' => false,
             'file_size' => $fileSize,
