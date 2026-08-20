@@ -1,5 +1,4 @@
 import React from 'react'
-import { QRCodeSVG } from 'qrcode.react'
 import { Download, ExternalLink, Share2 } from 'lucide-react'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
@@ -22,9 +21,9 @@ const PhotoQrModal: React.FC<PhotoQrModalProps> = ({ isOpen, onClose, photo }) =
   const photoUrl = `${window.location.origin}/photo/${photo.unique_token}`
 
   const handleDownloadQr = () => {
-    // SVG QR — unduh sebagai file SVG
+    if (!photo.qr_url) return
     const link = document.createElement('a')
-    link.href = photo.qr_url ?? `${window.location.origin}/api/qr/photo/${photo.unique_token}`
+    link.href = photo.qr_url
     link.download = `qr-${photo.unique_token.slice(0, 8)}.svg`
     link.click()
   }
@@ -45,20 +44,17 @@ const PhotoQrModal: React.FC<PhotoQrModalProps> = ({ isOpen, onClose, photo }) =
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="QR Code Foto" size="sm">
       <div className="flex flex-col items-center text-center">
-        <div className="w-32 h-40 rounded-xl overflow-hidden border border-[#2A2A2A] mb-5">
-          {photo.thumbnail_url ? (
-            <img src={photo.thumbnail_url} alt={photo.filename} className="w-full h-full object-cover" />
+        <div className="w-52 rounded-xl overflow-hidden border border-[#2A2A2A] shadow-lg bg-white mb-5">
+          {photo.qr_url ? (
+            <img src={photo.qr_url} alt="QR Code foto" className="w-full h-auto" />
           ) : (
-            <div className="w-full h-full bg-[#1A1A1A]" />
+            <div className="w-full h-72 bg-[#1A1A1A]" />
           )}
         </div>
 
-        <div className="bg-white p-4 rounded-xl mb-5">
-          <QRCodeSVG value={photoUrl} size={180} fgColor="#0A0A0A" />
-        </div>
-
         <p className="text-[#606060] text-xs leading-relaxed mb-5 max-w-xs">
-          Scan QR ini untuk membuka foto via perangkat customer.
+          Scan QR ini untuk membuka foto via perangkat customer. Gambar QR yang diunduh sudah
+          dilengkapi desain kartu.
         </p>
 
         <div className="w-full flex flex-col gap-2">

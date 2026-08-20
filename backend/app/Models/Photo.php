@@ -50,20 +50,20 @@ class Photo extends Model
 
     public function getUrlAttribute(): string
     {
-        return asset('storage/' . $this->storage_path);
+        return '/storage/' . ltrim((string) $this->storage_path, '/');
     }
 
     public function getThumbnailUrlAttribute(): ?string
     {
         return $this->thumbnail_path
-            ? asset('storage/' . $this->thumbnail_path)
+            ? '/storage/' . ltrim($this->thumbnail_path, '/')
             : null;
     }
 
     public function getQrUrlAttribute(): ?string
     {
         return $this->qr_path
-            ? asset('storage/' . $this->qr_path)
+            ? '/storage/' . ltrim($this->qr_path, '/')
             : null;
     }
 

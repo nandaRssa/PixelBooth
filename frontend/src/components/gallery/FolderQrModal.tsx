@@ -1,5 +1,4 @@
 import React from 'react'
-import { QRCodeSVG } from 'qrcode.react'
 import { Download, ExternalLink, Folder as FolderIcon, Share2 } from 'lucide-react'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
@@ -22,8 +21,9 @@ const FolderQrModal: React.FC<FolderQrModalProps> = ({ isOpen, onClose, folder }
   const folderUrl = `${window.location.origin}/folder/${folder.unique_token}`
 
   const handleDownloadQr = () => {
+    if (!folder.qr_url) return
     const link = document.createElement('a')
-    link.href = folder.qr_url ?? `${window.location.origin}/api/qr/folder/${folder.unique_token}`
+    link.href = folder.qr_url
     link.download = `qr-${folder.unique_token.slice(0, 8)}.svg`
     link.click()
   }
@@ -49,11 +49,15 @@ const FolderQrModal: React.FC<FolderQrModalProps> = ({ isOpen, onClose, folder }
           <span className="font-medium text-white">{folder.name}</span>
         </div>
 
-        <div className="bg-white p-4 rounded-xl mb-5">
-          <QRCodeSVG value={folderUrl} size={180} fgColor="#0A0A0A" />
+        <div className="w-52 rounded-xl overflow-hidden border border-[#2A2A2A] shadow-lg bg-white mb-5">
+          {folder.qr_url ? (
+            <img src={folder.qr_url} alt="QR Code folder" className="w-full h-auto" />
+          ) : (
+            <div className="w-full h-72 bg-[#1A1A1A]" />
+          )}
         </div>
 
-        <p className="text-[#606060] text-xs leading-relaxed mb-5">
+        <p className="text-[#606060] text-xs leading-relaxed mb-5 max-w-xs">
           Scan QR ini untuk mengakses galeri folder via perangkat customer.
         </p>
 

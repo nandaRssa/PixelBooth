@@ -37,7 +37,7 @@ class Folder extends Model
     public function getQrUrlAttribute(): ?string
     {
         return $this->qr_path
-            ? asset('storage/' . $this->qr_path)
+            ? '/storage/' . ltrim($this->qr_path, '/')
             : null;
     }
 

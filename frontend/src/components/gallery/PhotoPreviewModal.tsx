@@ -83,7 +83,9 @@ const PhotoPreviewModal: React.FC<PhotoPreviewModalProps> = ({
                   const a = document.createElement('a')
                   a.href = photo.url
                   a.download = photo.filename
+                  document.body.appendChild(a)
                   a.click()
+                  a.remove()
                 }}
                 leftIcon={<Download size={16} />}
               >
