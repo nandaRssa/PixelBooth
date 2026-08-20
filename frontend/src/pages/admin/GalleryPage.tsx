@@ -8,11 +8,18 @@ import { EmptyState, Spinner } from '@/components/ui/StatusBadge'
 import { toast } from '@/components/ui/Toast'
 import { folderApi } from '@/api/folders'
 import { useFolders, useCreateFolder, useUpdateFolder, useDeleteFolder } from '@/hooks/useFolders'
-import { usePhotos, useDeletePhoto, useMovePhoto } from '@/hooks/usePhotos'
+import {
+  usePhotos,
+  useDeletePhoto,
+  useMovePhoto,
+  useBulkDeletePhotos,
+  useBulkMovePhotos,
+} from '@/hooks/usePhotos'
 import FolderCard from '@/components/gallery/FolderCard'
 import PhotoGrid from '@/components/gallery/PhotoGrid'
 import FolderFormModal from '@/components/gallery/FolderFormModal'
 import FolderQrModal from '@/components/gallery/FolderQrModal'
+import PhotoQrModal from '@/components/gallery/PhotoQrModal'
 import PhotoPreviewModal from '@/components/gallery/PhotoPreviewModal'
 import MovePhotoModal from '@/components/gallery/MovePhotoModal'
 import type { Folder, Photo } from '@/types'
@@ -43,6 +50,8 @@ const GalleryPage: React.FC = () => {
   const deleteFolder = useDeleteFolder()
   const deletePhoto = useDeletePhoto()
   const movePhoto = useMovePhoto()
+  const bulkDeletePhotos = useBulkDeletePhotos()
+  const bulkMovePhotos = useBulkMovePhotos()
 
   // ===== Breadcrumb navigation =====
   const [breadcrumb, setBreadcrumb] = useState<Crumb[]>([])
@@ -85,12 +94,16 @@ const GalleryPage: React.FC = () => {
     const crumbs = [...breadcrumbRef.current, { id: folder.id, name: folder.name }]
     breadcrumbRef.current = crumbs
     setBreadcrumb(crumbs)
+    setSelectionMode(false)
+    setSelectedIds(new Set())
     setSearchParams({ folder_id: String(folder.id) })
   }
 
   const goToRoot = () => {
     breadcrumbRef.current = []
     setBreadcrumb([])
+    setSelectionMode(false)
+    setSelectedIds(new Set())
     setSearchParams({})
   }
 
@@ -99,6 +112,8 @@ const GalleryPage: React.FC = () => {
     const crumbs = breadcrumbRef.current.slice(0, index + 1)
     breadcrumbRef.current = crumbs
     setBreadcrumb(crumbs)
+    setSelectionMode(false)
+    setSelectedIds(new Set())
     if (target) {
       setSearchParams({ folder_id: String(target.id) })
     } else {
@@ -114,6 +129,13 @@ const GalleryPage: React.FC = () => {
   const [previewTarget, setPreviewTarget] = useState<Photo | null>(null)
   const [moveTarget, setMoveTarget] = useState<Photo | null>(null)
   const [deletePhotoTarget, setDeletePhotoTarget] = useState<Photo | null>(null)
+  const [photoQrTarget, setPhotoQrTarget] = useState<Photo | null>(null)
+
+  // ===== Seleksi massal =====
+  const [selectionMode, setSelectionMode] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
+  const [bulkMoveOpen, setBulkMoveOpen] = useState(false)
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false)
 
   // ===== Handlers =====
   const handleCreateFolder = async (name: string) => {
@@ -167,6 +189,48 @@ const GalleryPage: React.FC = () => {
       await movePhoto.mutateAsync({ id: moveTarget.id, folderId })
       toast.success('Foto berhasil dipindahkan.')
       setMoveTarget(null)
+    } catch {
+      toast.error('Gagal memindahkan foto.')
+    }
+  }
+
+  const handleToggleSelect = (photo: Photo) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(photo.id)) next.delete(photo.id)
+      else next.add(photo.id)
+      return next
+    })
+  }
+
+  const handleSelectAll = () => {
+    setSelectedIds((prev) =>
+      prev.size === photos.length ? new Set() : new Set(photos.map((p) => p.id))
+    )
+  }
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0) return
+    try {
+      await bulkDeletePhotos.mutateAsync([...selectedIds])
+      toast.success(`${selectedIds.size} foto berhasil dihapus.`)
+      setSelectedIds(new Set())
+      setSelectionMode(false)
+      setBulkDeleteOpen(false)
+    } catch {
+      toast.error('Gagal menghapus foto.')
+      setBulkDeleteOpen(false)
+    }
+  }
+
+  const handleBulkMove = async (folderId: number) => {
+    if (selectedIds.size === 0) return
+    try {
+      await bulkMovePhotos.mutateAsync({ photoIds: [...selectedIds], folderId })
+      toast.success(`${selectedIds.size} foto berhasil dipindahkan.`)
+      setSelectedIds(new Set())
+      setSelectionMode(false)
+      setBulkMoveOpen(false)
     } catch {
       toast.error('Gagal memindahkan foto.')
     }
@@ -313,6 +377,14 @@ const GalleryPage: React.FC = () => {
             onPreview={setPreviewTarget}
             onMove={setMoveTarget}
             onDelete={setDeletePhotoTarget}
+            selectionMode={selectionMode}
+            setSelectionMode={setSelectionMode}
+            selectedIds={selectedIds}
+            onToggleSelect={handleToggleSelect}
+            onSelectAll={handleSelectAll}
+            onBulkMove={() => setBulkMoveOpen(true)}
+            onBulkDelete={() => setBulkDeleteOpen(true)}
+            isBulkActionPending={bulkDeletePhotos.isPending || bulkMovePhotos.isPending}
           />
         </div>
       )}
@@ -370,6 +442,13 @@ const GalleryPage: React.FC = () => {
         onClose={() => setPreviewTarget(null)}
         onMove={setMoveTarget}
         onDelete={setDeletePhotoTarget}
+        onShowQr={setPhotoQrTarget}
+      />
+
+      <PhotoQrModal
+        isOpen={Boolean(photoQrTarget)}
+        onClose={() => setPhotoQrTarget(null)}
+        photo={photoQrTarget}
       />
 
       <MovePhotoModal
@@ -379,6 +458,27 @@ const GalleryPage: React.FC = () => {
         folders={allFoldersQuery.data ?? []}
         isLoadingFolders={allFoldersQuery.isLoading}
         isMoving={movePhoto.isPending}
+      />
+
+      <MovePhotoModal
+        isOpen={bulkMoveOpen}
+        onClose={() => setBulkMoveOpen(false)}
+        onConfirm={handleBulkMove}
+        folders={allFoldersQuery.data ?? []}
+        isLoadingFolders={allFoldersQuery.isLoading}
+        isMoving={bulkMovePhotos.isPending}
+        count={selectedIds.size}
+      />
+
+      <ConfirmModal
+        isOpen={bulkDeleteOpen}
+        onClose={() => setBulkDeleteOpen(false)}
+        onConfirm={handleBulkDelete}
+        title="Hapus Foto"
+        message={`${selectedIds.size} foto akan dihapus permanen dari galeri. Lanjutkan?`}
+        confirmLabel="Ya, Hapus"
+        loading={bulkDeletePhotos.isPending}
+        danger
       />
     </div>
   )

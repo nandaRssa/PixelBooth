@@ -1,12 +1,13 @@
 import React from 'react'
 import { QRCodeSVG } from 'qrcode.react'
-import { ExternalLink, Folder as FolderIcon } from 'lucide-react'
+import { Download, ExternalLink, Folder as FolderIcon, Share2 } from 'lucide-react'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
+import { toast } from '@/components/ui/Toast'
 import type { Folder } from '@/types'
 
 // ==========================================
-// Folder QR Modal — tampilkan QR code folder
+// Folder QR Modal — tampilkan, unduh, dan bagikan QR folder
 // ==========================================
 
 interface FolderQrModalProps {
@@ -19,6 +20,26 @@ const FolderQrModal: React.FC<FolderQrModalProps> = ({ isOpen, onClose, folder }
   if (!folder) return null
 
   const folderUrl = `${window.location.origin}/folder/${folder.unique_token}`
+
+  const handleDownloadQr = () => {
+    const link = document.createElement('a')
+    link.href = folder.qr_url ?? `${window.location.origin}/api/qr/folder/${folder.unique_token}`
+    link.download = `qr-${folder.unique_token.slice(0, 8)}.svg`
+    link.click()
+  }
+
+  const handleShare = async () => {
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: `Galeri ${folder.name}`, url: folderUrl })
+      } catch {
+        // User membatalkan share
+      }
+    } else {
+      await navigator.clipboard?.writeText(folderUrl)
+      toast.success('Link folder disalin ke clipboard.')
+    }
+  }
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="QR Code Folder" size="sm">
@@ -36,15 +57,33 @@ const FolderQrModal: React.FC<FolderQrModalProps> = ({ isOpen, onClose, folder }
           Scan QR ini untuk mengakses galeri folder via perangkat customer.
         </p>
 
-        <div className="w-full">
+        <div className="w-full flex flex-col gap-2">
           <Button
             variant="secondary"
             fullWidth
-            onClick={() => window.open(folderUrl, '_blank')}
-            leftIcon={<ExternalLink size={16} />}
+            onClick={handleDownloadQr}
+            leftIcon={<Download size={16} />}
           >
-            Buka Halaman Customer
+            Unduh QR
           </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="secondary"
+              fullWidth
+              onClick={handleShare}
+              leftIcon={<Share2 size={16} />}
+            >
+              Bagikan
+            </Button>
+            <Button
+              variant="secondary"
+              fullWidth
+              onClick={() => window.open(folderUrl, '_blank')}
+              leftIcon={<ExternalLink size={16} />}
+            >
+              Buka Halaman Customer
+            </Button>
+          </div>
         </div>
       </div>
     </Modal>

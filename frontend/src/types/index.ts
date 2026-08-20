@@ -44,12 +44,14 @@ export interface Template {
   name: string
   slug: string
   template_file: string
-  preview_file: string
+  preview_file: string | null
   canvas_width: number
   canvas_height: number
   frame_count: number
-  frame_configuration: FrameConfig[]
+  frame_configuration: FrameConfig[] | null
   status: 'active' | 'inactive'
+  template_url: string | null
+  preview_url: string | null
   created_at: string
   updated_at: string
 }
@@ -61,6 +63,7 @@ export interface Folder {
   parent_folder_id: number | null
   unique_token: string
   qr_path: string | null
+  qr_url: string | null
   google_drive_id: string | null
   photo_count?: number
   children?: Folder[]
@@ -78,6 +81,7 @@ export interface Photo {
   thumbnail_path: string | null
   unique_token: string
   qr_path: string | null
+  qr_url: string | null
   is_final: boolean
   is_temporary: boolean
   google_drive_id: string | null
@@ -128,6 +132,32 @@ export interface QrCode {
   token: string
   qr_path: string
   qr_url: string
+}
+
+// ===== CUSTOMER / PUBLIC =====
+export interface CustomerPhoto {
+  id: string
+  url: string
+  thumbnail_url: string | null
+  qr_url: string | null
+  folder: { name: string; token: string } | null
+  created_at: string
+}
+
+export interface CustomerFolderPhoto {
+  token: string
+  url: string
+  thumbnail_url: string | null
+  qr_url: string | null
+  created_at: string
+}
+
+export interface CustomerFolder {
+  id: string
+  name: string
+  qr_url: string | null
+  photo_count: number
+  photos: CustomerFolderPhoto[]
 }
 
 // ===== HARDWARE =====

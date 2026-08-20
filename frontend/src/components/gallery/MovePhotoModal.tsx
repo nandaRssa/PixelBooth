@@ -16,6 +16,7 @@ interface MovePhotoModalProps {
   folders: Folder[]
   isLoadingFolders: boolean
   isMoving: boolean
+  count?: number
 }
 
 const MovePhotoModal: React.FC<MovePhotoModalProps> = ({
@@ -25,6 +26,7 @@ const MovePhotoModal: React.FC<MovePhotoModalProps> = ({
   folders,
   isLoadingFolders,
   isMoving,
+  count = 1,
 }) => {
   const [query, setQuery] = useState('')
 
@@ -35,7 +37,7 @@ const MovePhotoModal: React.FC<MovePhotoModalProps> = ({
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Pindahkan Foto" size="sm">
       <p className="text-[#A0A0A0] text-sm mb-4">
-        Pilih folder tujuan untuk foto ini.
+        Pilih folder tujuan untuk {count > 1 ? `${count} foto` : 'foto ini'}.
       </p>
 
       {/* Search */}

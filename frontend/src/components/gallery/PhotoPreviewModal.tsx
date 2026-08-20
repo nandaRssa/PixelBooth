@@ -1,5 +1,5 @@
 import React from 'react'
-import { Download, ExternalLink, FolderInput, Trash2, X } from 'lucide-react'
+import { Download, ExternalLink, FolderInput, QrCode, Trash2, X } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Button } from '@/components/ui/Button'
 import type { Photo } from '@/types'
@@ -13,6 +13,7 @@ interface PhotoPreviewModalProps {
   onClose: () => void
   onMove: (photo: Photo) => void
   onDelete: (photo: Photo) => void
+  onShowQr: (photo: Photo) => void
 }
 
 const PhotoPreviewModal: React.FC<PhotoPreviewModalProps> = ({
@@ -20,6 +21,7 @@ const PhotoPreviewModal: React.FC<PhotoPreviewModalProps> = ({
   onClose,
   onMove,
   onDelete,
+  onShowQr,
 }) => {
   return (
     <AnimatePresence>
@@ -88,6 +90,17 @@ const PhotoPreviewModal: React.FC<PhotoPreviewModalProps> = ({
                 Unduh
               </Button>
               <div className="flex-1" />
+              <Button
+                variant="secondary"
+                size="md"
+                onClick={() => {
+                  onShowQr(photo)
+                  onClose()
+                }}
+                leftIcon={<QrCode size={16} />}
+              >
+                QR
+              </Button>
               <Button
                 variant="secondary"
                 size="md"

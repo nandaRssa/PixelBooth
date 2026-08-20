@@ -45,4 +45,29 @@ export function useMovePhoto() {
   })
 }
 
+export function useBulkDeletePhotos() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (photoIds: number[]) => photoApi.bulkRemove(photoIds),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['photos'] })
+      queryClient.invalidateQueries({ queryKey: ['folders'] })
+    },
+  })
+}
+
+export function useBulkMovePhotos() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({ photoIds, folderId }: { photoIds: number[]; folderId: number }) =>
+      photoApi.bulkMove(photoIds, folderId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['photos'] })
+      queryClient.invalidateQueries({ queryKey: ['folders'] })
+    },
+  })
+}
+
 export type { PhotoListParams }

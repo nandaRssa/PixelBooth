@@ -11,6 +11,7 @@ import LoginPage from '@/pages/admin/LoginPage'
 import DashboardPage from '@/pages/admin/DashboardPage'
 import GalleryPage from '@/pages/admin/GalleryPage'
 import PhotoMenuPage from '@/pages/admin/PhotoMenuPage'
+import PhotoCapturePage from '@/pages/admin/PhotoCapturePage'
 import TemplatesPage from '@/pages/admin/TemplatesPage'
 
 // Customer Pages
@@ -81,6 +82,7 @@ const App: React.FC = () => {
                 <Route path="/" element={<DashboardPage />} />
                 <Route path="/gallery" element={<GalleryPage />} />
                 <Route path="/photo" element={<PhotoMenuPage />} />
+                <Route path="/photo/session/:id" element={<PhotoCapturePage />} />
                 <Route path="/templates" element={<TemplatesPage />} />
                 {/* Placeholder routes untuk phase selanjutnya */}
                 <Route path="/settings" element={
