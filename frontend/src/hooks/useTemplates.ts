@@ -36,6 +36,17 @@ export function useDeleteTemplate() {
   })
 }
 
+export function useDetectTemplateFrames() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (id: number) => templateApi.detectFrames(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['templates'] })
+    },
+  })
+}
+
 // ==========================================
 // Hardware Status Hook — polling berkala
 // ==========================================

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Template;
+use App\Services\TemplateFrameDetector;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -60,6 +61,17 @@ class TemplateController extends Controller
             ? json_decode($request->frame_configuration, true)
             : null;
 
+        // Deteksi otomatis bingkai bila konfigurasi tidak diberikan manual
+        $detected = null;
+        if (! is_array($frameConfig) || count($frameConfig) === 0) {
+            $detector = new TemplateFrameDetector();
+            $detected = $detector->detect(
+                Storage::disk('public')->path($templatePath),
+                (int) $request->canvas_width,
+                (int) $request->canvas_height
+            );
+        }
+
         $template = Template::create([
             'name' => $request->name,
             'slug' => $slug,
@@ -67,15 +79,53 @@ class TemplateController extends Controller
             'preview_file' => $previewPath,
             'canvas_width' => $request->canvas_width,
             'canvas_height' => $request->canvas_height,
-            'frame_count' => $request->frame_count,
-            'frame_configuration' => $frameConfig,
+            'frame_count' => $detected['frame_count'] ?? $request->frame_count,
+            'frame_configuration' => $detected['frame_configuration'] ?? $frameConfig,
             'status' => 'active',
         ]);
 
         return response()->json([
-            'message' => 'Template berhasil diunggah.',
+            'message' => $detected
+                ? "Template berhasil diunggah. {$detected['frame_count']} bingkai terdeteksi otomatis."
+                : 'Template berhasil diunggah.',
             'data' => $template,
         ], 201);
+    }
+
+    /**
+     * Deteksi ulang bingkai pada template yang sudah ada.
+     */
+    public function detectFrames(Template $template): JsonResponse
+    {
+        if (! $template->template_file || ! Storage::disk('public')->exists($template->template_file)) {
+            return response()->json([
+                'message' => 'File template tidak ditemukan.',
+            ], 404);
+        }
+
+        $detector = new TemplateFrameDetector();
+        $detected = $detector->detect(
+            Storage::disk('public')->path($template->template_file),
+            $template->canvas_width,
+            $template->canvas_height
+        );
+
+        if (! $detected) {
+            return response()->json([
+                'message' => 'Tidak ada bingkai foto yang terdeteksi pada template ini.',
+                'data' => $template->fresh(),
+            ]);
+        }
+
+        $template->update([
+            'frame_count' => $detected['frame_count'],
+            'frame_configuration' => $detected['frame_configuration'],
+        ]);
+
+        return response()->json([
+            'message' => "Deteksi selesai: {$detected['frame_count']} bingkai ditemukan.",
+            'data' => $template->fresh(),
+        ]);
     }
 
     /**

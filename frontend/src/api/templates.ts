@@ -45,4 +45,9 @@ export const templateApi = {
   remove: async (id: number): Promise<void> => {
     await apiClient.delete(`/templates/${id}`)
   },
+
+  detectFrames: async (id: number): Promise<Template> => {
+    const response = await apiClient.post<ApiResponse<Template>>(`/templates/${id}/detect-frames`)
+    return response.data.data
+  },
 }

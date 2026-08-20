@@ -1,11 +1,11 @@
 import React, { useRef, useState } from 'react'
 import { motion } from 'framer-motion'
-import { Layers, Plus, Trash2, Upload, ImageIcon, FileImage, X } from 'lucide-react'
+import { Layers, Plus, Trash2, Upload, ImageIcon, FileImage, X, Scan } from 'lucide-react'
 import { Modal, ConfirmModal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { EmptyState, Spinner } from '@/components/ui/StatusBadge'
 import { toast } from '@/components/ui/Toast'
-import { useTemplates, useCreateTemplate, useDeleteTemplate } from '@/hooks/useTemplates'
+import { useTemplates, useCreateTemplate, useDeleteTemplate, useDetectTemplateFrames } from '@/hooks/useTemplates'
 import type { Template } from '@/types'
 
 // ==========================================
@@ -33,6 +33,7 @@ const TemplatesPage: React.FC = () => {
   const templatesQuery = useTemplates()
   const createTemplate = useCreateTemplate()
   const deleteTemplate = useDeleteTemplate()
+  const detectFrames = useDetectTemplateFrames()
 
   const [isUploadOpen, setIsUploadOpen] = useState(false)
   const [form, setForm] = useState<UploadForm>(EMPTY_FORM)
@@ -98,7 +99,7 @@ const TemplatesPage: React.FC = () => {
     }
 
     try {
-      await createTemplate.mutateAsync({
+      const created = await createTemplate.mutateAsync({
         name: form.name.trim(),
         template_file: templateFile,
         preview_file: previewFile,
@@ -107,7 +108,7 @@ const TemplatesPage: React.FC = () => {
         frame_count: frames,
         frame_configuration: frameConfig,
       })
-      toast.success('Template berhasil diunggah.')
+      toast.success(`Template berhasil diunggah (${created.frame_count} bingkai).`)
       setIsUploadOpen(false)
     } catch (err: unknown) {
       const error = err as { response?: { data?: { message?: string } } }
@@ -124,6 +125,17 @@ const TemplatesPage: React.FC = () => {
     } catch {
       toast.error('Gagal menghapus template.')
       setDeleteTarget(null)
+    }
+  }
+
+  const handleDetectFrames = async (template: Template) => {
+    if (detectFrames.isPending) return
+    try {
+      const updated = await detectFrames.mutateAsync(template.id)
+      toast.success(`Deteksi selesai: ${updated.frame_count} bingkai ditemukan.`)
+    } catch (err: unknown) {
+      const error = err as { response?: { data?: { message?: string } } }
+      toast.error(error.response?.data?.message || 'Gagal mendeteksi bingkai.')
     }
   }
 
@@ -211,16 +223,28 @@ const TemplatesPage: React.FC = () => {
                 {template.frame_count} frame
               </span>
 
-              <button
-                type="button"
-                onClick={() => setDeleteTarget(template)}
-                className="absolute top-2 left-2 w-8 h-8 rounded-lg bg-black/60 backdrop-blur-sm
-                  text-[#A0A0A0] hover:text-red-400 hover:bg-black/80 transition-colors
-                  opacity-0 group-hover:opacity-100"
-                title="Hapus Template"
-              >
-                <Trash2 size={14} />
-              </button>
+              <div className="absolute top-2 left-2 flex flex-col gap-1.5
+                opacity-0 group-hover:opacity-100 transition-opacity">
+                <button
+                  type="button"
+                  onClick={() => handleDetectFrames(template)}
+                  className="w-8 h-8 rounded-lg bg-black/60 backdrop-blur-sm
+                    text-[#A0A0A0] hover:text-green-400 hover:bg-black/80 transition-colors flex items-center justify-center"
+                  title="Deteksi Ulang Bingkai"
+                  disabled={detectFrames.isPending}
+                >
+                  <Scan size={14} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDeleteTarget(template)}
+                  className="w-8 h-8 rounded-lg bg-black/60 backdrop-blur-sm
+                    text-[#A0A0A0] hover:text-red-400 hover:bg-black/80 transition-colors flex items-center justify-center"
+                  title="Hapus Template"
+                >
+                  <Trash2 size={14} />
+                </button>
+              </div>
 
               <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/90 to-transparent">
                 <p className="text-white text-sm font-medium truncate">{template.name}</p>
@@ -363,6 +387,16 @@ const TemplatesPage: React.FC = () => {
               />
             </div>
           </div>
+          <div className="flex items-start gap-2 bg-[#0E0E0E] border border-[#2A2A2A] rounded-lg px-3 py-2.5">
+            <Scan size={15} className="text-green-400 mt-0.5 shrink-0" />
+            <p className="text-[#A0A0A0] text-xs leading-relaxed">
+              Sistem mendeteksi <span className="text-white">bingkai foto putih otomatis</span> dari file
+              template saat diunggah — jumlah frame &amp; posisi tiap bingkai terisi otomatis. Nilai manual
+              akan diganti hasil deteksi bila <span className="text-white">Frame Configuration</span>{' '}
+              dikosongkan. Template yang sudah ada bisa dipindai ulang lewat tombol{' '}
+              <span className="text-white">Deteksi Ulang</span> pada kartu template.
+            </p>
+          </div>
 
           {/* Frame Configuration JSON (opsional) */}
           <div>
@@ -379,7 +413,7 @@ const TemplatesPage: React.FC = () => {
                 focus:outline-none focus:ring-1 focus:border-[#404040] focus:ring-white/10 transition-colors"
             />
             <p className="text-[#606060] text-xs mt-1">
-              Kosongkan jika ingin mengatur frame di editor nanti.
+              Kosongkan agar sistem mendeteksi bingkai putih secara otomatis.
             </p>
           </div>
         </div>
