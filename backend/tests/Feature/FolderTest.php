@@ -52,12 +52,9 @@ class FolderTest extends TestCase
             ->assertJsonPath('data.parent_folder_id', $parent->id);
     }
 
-    public function test_folder_dapat_dibuat_tanpa_autentikasi(): void
+    public function test_folder_tanpa_autentikasi_ditolak(): void
     {
-        // Fitur login dihapus — semua endpoint dapat diakses tanpa autentikasi
-        $this->postJson('/api/folders', ['name' => 'Tanpa Auth'])
-            ->assertStatus(201)
-            ->assertJsonPath('data.name', 'Tanpa Auth');
+        $this->postJson('/api/folders', ['name' => 'Tanpa Auth'])->assertStatus(401);
     }
 
     public function test_validasi_nama_folder_wajib(): void

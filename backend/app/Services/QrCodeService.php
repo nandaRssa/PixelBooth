@@ -10,13 +10,21 @@ use SimpleSoftwareIO\QrCode\Facades\QrCode;
 class QrCodeService
 {
     /**
+     * Base URL aplikasi frontend untuk halaman customer.
+     */
+    private function frontendUrl(): string
+    {
+        return rtrim(config('app.frontend_url', 'http://localhost:5173'), '/');
+    }
+
+    /**
      * Generate QR code untuk foto dan simpan ke storage.
      *
      * @return string path file QR code
      */
     public function generatePhotoQr(Photo $photo): string
     {
-        $url = url("/photo/{$photo->unique_token}");
+        $url = "{$this->frontendUrl()}/photo/{$photo->unique_token}";
         $path = "qr/photos/{$photo->unique_token}.svg";
 
         $qrContent = QrCode::format('svg')
@@ -36,7 +44,7 @@ class QrCodeService
      */
     public function generateFolderQr(Folder $folder): string
     {
-        $url = url("/folder/{$folder->unique_token}");
+        $url = "{$this->frontendUrl()}/folder/{$folder->unique_token}";
         $path = "qr/folders/{$folder->unique_token}.svg";
 
         $qrContent = QrCode::format('svg')

@@ -85,12 +85,22 @@ class TemplateController extends Controller
     {
         $request->validate([
             'name' => ['sometimes', 'string', 'max:255'],
-            'frame_configuration' => ['sometimes', 'array'],
+            'frame_configuration' => ['sometimes'],
             'frame_count' => ['sometimes', 'integer', 'min:1', 'max:10'],
             'status' => ['sometimes', 'in:active,inactive'],
         ]);
 
-        $template->update($request->only(['name', 'frame_configuration', 'frame_count', 'status']));
+        $data = $request->only(['name', 'frame_count', 'status']);
+
+        // frame_configuration bisa dikirim sebagai array atau JSON string
+        if ($request->has('frame_configuration')) {
+            $config = $request->input('frame_configuration');
+            $data['frame_configuration'] = is_string($config)
+                ? json_decode($config, true)
+                : $config;
+        }
+
+        $template->update($data);
 
         return response()->json([
             'message' => 'Template berhasil diperbarui.',

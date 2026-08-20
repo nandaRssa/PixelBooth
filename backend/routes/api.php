@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\FolderController;
 use App\Http\Controllers\Api\HardwareController;
 use App\Http\Controllers\Api\PhotoController;
+use App\Http\Controllers\Api\QrController;
 use App\Http\Controllers\Api\SessionController;
 use App\Http\Controllers\Api\TemplateController;
 use App\Http\Controllers\Public\CustomerController;
@@ -26,9 +27,9 @@ Route::get('/health', fn() => response()->json([
 ]));
 
 // ==========================================
-// Authentication (public)
+// Authentication (public, rate limited)
 // ==========================================
-Route::prefix('auth')->group(function () {
+Route::prefix('auth')->middleware('throttle:5,1')->group(function () {
     Route::post('/login', [AuthController::class, 'login'])->name('auth.login');
 });
 
@@ -36,15 +37,23 @@ Route::prefix('auth')->group(function () {
 // Public Routes — Customer QR Access
 // Tidak memerlukan autentikasi
 // ==========================================
-Route::prefix('public')->group(function () {
+Route::prefix('public')->middleware('throttle:60,1')->group(function () {
     Route::get('/photo/{token}', [CustomerController::class, 'showPhoto'])->name('public.photo');
     Route::get('/folder/{token}', [CustomerController::class, 'showFolder'])->name('public.folder');
 });
 
 // ==========================================
+// Public QR Info — detail QR untuk foto/folder
+// ==========================================
+Route::prefix('qr')->middleware('throttle:60,1')->group(function () {
+    Route::get('/photo/{token}', [QrController::class, 'photoQr'])->name('qr.photo');
+    Route::get('/folder/{token}', [QrController::class, 'folderQr'])->name('qr.folder');
+});
+
+// ==========================================
 // Protected Routes — Butuh login
 // ==========================================
-Route::middleware('auth:sanctum')->group(function () {
+Route::middleware(['auth:sanctum', 'throttle:120,1'])->group(function () {
 
     // Auth
     Route::post('/auth/logout', [AuthController::class, 'logout'])->name('auth.logout');
