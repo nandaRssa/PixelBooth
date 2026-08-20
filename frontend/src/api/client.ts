@@ -12,7 +12,6 @@ const apiClient = axios.create({
     'Accept': 'application/json',
     'X-Requested-With': 'XMLHttpRequest',
   },
-  withCredentials: true,
 })
 
 export default apiClient

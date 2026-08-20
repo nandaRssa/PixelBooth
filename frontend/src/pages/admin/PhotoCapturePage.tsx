@@ -70,15 +70,16 @@ const PhotoCapturePage: React.FC = () => {
   // ===== Mulai webcam =====
   const startCamera = async () => {
     try {
+      // Hentikan stream lama (jika ada) sebelum membuat yang baru
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop())
+      }
+
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } },
         audio: false,
       })
       streamRef.current = stream
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream
-        await videoRef.current.play().catch(() => {})
-      }
       setCameraActive(true)
       setCameraError(null)
     } catch {
@@ -96,6 +97,18 @@ const PhotoCapturePage: React.FC = () => {
       streamRef.current?.getTracks().forEach((track) => track.stop())
     }
   }, [status])
+
+  // ===== Lampirkan stream ke elemen video saat kamera aktif =====
+  useEffect(() => {
+    const video = videoRef.current
+    const stream = streamRef.current
+    if (cameraActive && video && stream) {
+      if (video.srcObject !== stream) {
+        video.srcObject = stream
+      }
+      video.play().catch(() => {})
+    }
+  }, [cameraActive])
 
   // ===== Countdown =====
   const startCountdown = () => {
@@ -333,21 +346,29 @@ const PhotoCapturePage: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Video / Captured */}
         <div className="lg:col-span-2 bg-[#0D0D0D] border border-[#2A2A2A] rounded-2xl overflow-hidden relative aspect-[4/3]">
-          {cameraActive && phase !== 'captured' ? (
-            <>
-              <video
-                ref={videoRef}
-                playsInline
-                muted
-                autoPlay
-                className="w-full h-full object-cover -scale-x-100"
-              />
-              {/* Frame overlay indicator */}
-              <div className="absolute inset-4 border-2 border-white/20 rounded-xl pointer-events-none" />
-            </>
-          ) : capturedUrl ? (
-            <img src={capturedUrl} alt="Frame terakhir" className="w-full h-full object-cover" />
-          ) : (
+          {/* Video selalu dirender agar stream tetap terpasang */}
+          <video
+            ref={videoRef}
+            playsInline
+            muted
+            autoPlay
+            className="w-full h-full object-cover -scale-x-100"
+          />
+
+          {/* Frame overlay indicator */}
+          <div className="absolute inset-4 border-2 border-white/20 rounded-xl pointer-events-none" />
+
+          {/* Hasil frame terakhir menutupi preview */}
+          {capturedUrl && phase === 'captured' && (
+            <img
+              src={capturedUrl}
+              alt="Frame terakhir"
+              className="absolute inset-0 w-full h-full object-cover"
+            />
+          )}
+
+          {/* Kamera tidak aktif */}
+          {!cameraActive && (
             <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-6">
               <VideoOff size={36} className="text-[#333] mb-3" />
               <p className="text-[#A0A0A0] text-sm mb-4">Kamera tidak aktif</p>

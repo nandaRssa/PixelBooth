@@ -54,9 +54,11 @@ const FolderFormModal: React.FC<FolderFormModalProps> = ({
   }, [isOpen, folder, reset])
 
   const handleFormSubmit = async (data: FolderForm) => {
-    await onSubmit(data.name)
-    if (!isSubmitting) {
+    try {
+      await onSubmit(data.name)
       onClose()
+    } catch {
+      // Gagal — biarkan modal tetap terbuka agar user bisa memperbaiki
     }
   }
 

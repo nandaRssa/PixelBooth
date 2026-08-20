@@ -142,8 +142,10 @@ const GalleryPage: React.FC = () => {
     try {
       await createFolder.mutateAsync({ name, parent_folder_id: activeFolderId })
       toast.success('Folder berhasil dibuat.')
-    } catch {
-      toast.error('Gagal membuat folder. Coba lagi.')
+    } catch (err: unknown) {
+      const error = err as { response?: { data?: { message?: string } } }
+      toast.error(error.response?.data?.message || 'Gagal membuat folder. Coba lagi.')
+      throw err
     }
   }
 
