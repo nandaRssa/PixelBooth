@@ -1,0 +1,79 @@
+# =====================
+# PIXELBOOTH - .gitignore
+# =====================
+
+# ===== ENVIRONMENT FILES =====
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# ===== NODE.JS / NPM =====
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.pnpm-store/
+
+# ===== VITE / BUILD OUTPUT =====
+frontend/dist/
+frontend/dist-ssr/
+frontend/*.local
+frontend/.vite/
+
+# ===== LARAVEL =====
+backend/vendor/
+backend/.env
+backend/.env.backup
+backend/storage/*.key
+backend/public/storage
+backend/storage/framework/cache/*
+backend/storage/framework/sessions/*
+backend/storage/framework/views/*
+backend/storage/logs/*.log
+backend/bootstrap/cache/*.php
+backend/public/hot
+
+# ===== PYTHON / HARDWARE BRIDGE =====
+hardware-bridge/__pycache__/
+hardware-bridge/*.pyc
+hardware-bridge/*.pyo
+hardware-bridge/.venv/
+hardware-bridge/venv/
+hardware-bridge/env/
+hardware-bridge/.env
+
+# ===== IDE & EDITOR =====
+.vscode/
+.idea/
+*.swp
+*.swo
+*.sublime-project
+*.sublime-workspace
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ===== LOGS =====
+*.log
+logs/
+
+# ===== TEMP / CACHE =====
+.cache/
+tmp/
+temp/
+
+# ===== UPLOADS (jangan commit media besar) =====
+backend/storage/app/public/photos/
+backend/storage/app/public/templates/
+backend/storage/app/public/qr/
+
+# ===== OS GENERATED =====
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db

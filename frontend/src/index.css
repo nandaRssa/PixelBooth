@@ -1,0 +1,194 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+@import "tailwindcss";
+
+/* ==========================================
+   PIXELBOOTH — Design System
+   ========================================== */
+
+@theme {
+  /* === Color Palette === */
+  --color-pb-bg: #0A0A0A;
+  --color-pb-surface: #141414;
+  --color-pb-elevated: #1E1E1E;
+  --color-pb-border: #2A2A2A;
+  --color-pb-border-light: #333333;
+  --color-pb-text: #FAFAFA;
+  --color-pb-text-secondary: #A0A0A0;
+  --color-pb-text-muted: #606060;
+  --color-pb-accent: #FFFFFF;
+  --color-pb-danger: #EF4444;
+  --color-pb-success: #22C55E;
+  --color-pb-warning: #F59E0B;
+
+  /* === Typography === */
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+
+  /* === Spacing === */
+  --spacing-touch: 44px; /* minimum touch target */
+
+  /* === Border Radius === */
+  --radius-card: 12px;
+  --radius-btn: 8px;
+  --radius-input: 8px;
+}
+
+/* ==========================================
+   BASE STYLES
+   ========================================== */
+
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html {
+  font-family: var(--font-sans);
+  background-color: #0A0A0A;
+  color: #FAFAFA;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+  background-color: #0A0A0A;
+  color: #FAFAFA;
+  overflow-x: hidden;
+}
+
+#root {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ==========================================
+   SCROLLBAR — Custom minimal dark scrollbar
+   ========================================== */
+
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #333;
+  border-radius: 100px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+/* ==========================================
+   UTILITY CLASSES
+   ========================================== */
+
+/* Glassmorphism surface */
+.glass {
+  background: rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* Touch-friendly click/tap */
+.touch-target {
+  min-height: 44px;
+  min-width: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Smooth transitions */
+.transition-all-smooth {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Fade in animation */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeInScale {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes pulse-ring {
+  0% { transform: scale(1); opacity: 0.8; }
+  100% { transform: scale(1.4); opacity: 0; }
+}
+
+@keyframes countdown {
+  0% { transform: scale(1.2); opacity: 0; }
+  20% { transform: scale(1); opacity: 1; }
+  80% { transform: scale(1); opacity: 1; }
+  100% { transform: scale(0.8); opacity: 0; }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-out forwards;
+}
+
+.animate-fade-in-scale {
+  animation: fadeInScale 0.25s ease-out forwards;
+}
+
+.animate-countdown {
+  animation: countdown 1s ease-out forwards;
+}
+
+/* Status indicator */
+.status-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.status-dot.connected {
+  background-color: #22C55E;
+  box-shadow: 0 0 6px #22C55E80;
+}
+
+.status-dot.disconnected {
+  background-color: #606060;
+}
+
+.status-dot.error {
+  background-color: #EF4444;
+  box-shadow: 0 0 6px #EF444480;
+}
+
+/* Card hover effect */
+.card-hover {
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.card-hover:hover {
+  border-color: rgba(255, 255, 255, 0.15);
+  background-color: rgba(255, 255, 255, 0.05);
+  transform: translateY(-1px);
+}
+
+.card-hover:active {
+  transform: translateY(0);
+}
+
+/* Full-screen photobooth mode */
+.photobooth-mode {
+  position: fixed;
+  inset: 0;
+  background: #000;
+  z-index: 100;
+}

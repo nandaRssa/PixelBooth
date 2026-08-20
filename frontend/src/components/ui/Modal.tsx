@@ -1,0 +1,132 @@
+import React from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { X } from 'lucide-react'
+import { Button } from './Button'
+
+// ==========================================
+// Modal Component
+// ==========================================
+
+interface ModalProps {
+  isOpen: boolean
+  onClose: () => void
+  title?: string
+  children: React.ReactNode
+  size?: 'sm' | 'md' | 'lg'
+  showClose?: boolean
+}
+
+const sizeMap = {
+  sm: 'max-w-sm',
+  md: 'max-w-md',
+  lg: 'max-w-lg',
+}
+
+export const Modal: React.FC<ModalProps> = ({
+  isOpen,
+  onClose,
+  title,
+  children,
+  size = 'md',
+  showClose = true,
+}) => {
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <>
+          {/* Backdrop */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50"
+            onClick={onClose}
+          />
+          {/* Modal */}
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: 10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 10 }}
+            transition={{ duration: 0.2 }}
+            className={`
+              fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50
+              w-[calc(100vw-2rem)] ${sizeMap[size]}
+              bg-[#141414] border border-[#2A2A2A] rounded-xl shadow-2xl
+            `}
+          >
+            {/* Header */}
+            {(title || showClose) && (
+              <div className="flex items-center justify-between px-6 py-4 border-b border-[#2A2A2A]">
+                {title && (
+                  <h3 className="text-white font-semibold text-base">{title}</h3>
+                )}
+                {showClose && (
+                  <button
+                    onClick={onClose}
+                    className="text-[#606060] hover:text-white transition-colors ml-auto"
+                  >
+                    <X size={18} />
+                  </button>
+                )}
+              </div>
+            )}
+            {/* Content */}
+            <div className="p-6">{children}</div>
+          </motion.div>
+        </>
+      )}
+    </AnimatePresence>
+  )
+}
+
+// ==========================================
+// Confirm Modal — untuk konfirmasi destructive action
+// ==========================================
+
+interface ConfirmModalProps {
+  isOpen: boolean
+  onClose: () => void
+  onConfirm: () => void
+  title: string
+  message: string
+  confirmLabel?: string
+  cancelLabel?: string
+  loading?: boolean
+  danger?: boolean
+}
+
+export const ConfirmModal: React.FC<ConfirmModalProps> = ({
+  isOpen,
+  onClose,
+  onConfirm,
+  title,
+  message,
+  confirmLabel = 'Ya, Lanjutkan',
+  cancelLabel = 'Tidak',
+  loading = false,
+  danger = false,
+}) => {
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} title={title} size="sm">
+      <p className="text-[#A0A0A0] text-sm leading-relaxed mb-6">{message}</p>
+      <div className="flex gap-3">
+        <Button
+          variant="secondary"
+          fullWidth
+          onClick={onClose}
+          disabled={loading}
+        >
+          {cancelLabel}
+        </Button>
+        <Button
+          variant={danger ? 'danger' : 'primary'}
+          fullWidth
+          onClick={onConfirm}
+          loading={loading}
+        >
+          {confirmLabel}
+        </Button>
+      </div>
+    </Modal>
+  )
+}
