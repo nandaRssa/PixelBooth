@@ -3,6 +3,7 @@ import { Download, ExternalLink, Folder as FolderIcon, Share2 } from 'lucide-rea
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { toast } from '@/components/ui/Toast'
+import { downloadSvgAsPng } from '@/utils/downloadQr'
 import type { Folder } from '@/types'
 
 // ==========================================
@@ -20,12 +21,13 @@ const FolderQrModal: React.FC<FolderQrModalProps> = ({ isOpen, onClose, folder }
 
   const folderUrl = `${window.location.origin}/folder/${folder.unique_token}`
 
-  const handleDownloadQr = () => {
+  const handleDownloadQr = async () => {
     if (!folder.qr_url) return
-    const link = document.createElement('a')
-    link.href = folder.qr_url
-    link.download = `qr-${folder.unique_token.slice(0, 8)}.svg`
-    link.click()
+    try {
+      await downloadSvgAsPng(folder.qr_url, `qr-${folder.unique_token.slice(0, 8)}.png`)
+    } catch {
+      toast.error('Gagal mengunduh QR.')
+    }
   }
 
   const handleShare = async () => {

@@ -309,14 +309,17 @@ const PhotoCapturePage: React.FC = () => {
             {totalFrames} frame telah diambil. Foto final disimpan di galeri{folderName ? ` dalam folder "${folderName}"` : ''} dan siap dibagikan via QR.
           </p>
 
-          <div className="flex flex-col gap-2 w-full max-w-xs mb-6">
+          <div className="flex flex-col items-center gap-2 w-full max-w-xs mb-6">
             {resultPhoto.qr_url && (
-              <div className="flex items-center justify-center gap-3 bg-white p-3 rounded-xl">
-                <img src={resultPhoto.qr_url} alt="QR" className="w-28 h-28" />
-                <div className="text-left">
-                  <p className="text-black font-medium text-sm">QR Foto</p>
-                  <p className="text-black/60 text-xs">Scan untuk akses foto</p>
-                </div>
+              <div className="flex flex-col items-center gap-2 bg-white rounded-xl p-4">
+                <img
+                  src={resultPhoto.qr_url}
+                  alt="QR Foto"
+                  className="w-44 h-auto rounded-lg"
+                />
+                <p className="text-black/60 text-xs text-center">
+                  Scan untuk akses foto
+                </p>
               </div>
             )}
           </div>

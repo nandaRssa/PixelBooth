@@ -3,6 +3,7 @@ import { Download, ExternalLink, Share2 } from 'lucide-react'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { toast } from '@/components/ui/Toast'
+import { downloadSvgAsPng } from '@/utils/downloadQr'
 import type { Photo } from '@/types'
 
 // ==========================================
@@ -20,12 +21,13 @@ const PhotoQrModal: React.FC<PhotoQrModalProps> = ({ isOpen, onClose, photo }) =
 
   const photoUrl = `${window.location.origin}/photo/${photo.unique_token}`
 
-  const handleDownloadQr = () => {
+  const handleDownloadQr = async () => {
     if (!photo.qr_url) return
-    const link = document.createElement('a')
-    link.href = photo.qr_url
-    link.download = `qr-${photo.unique_token.slice(0, 8)}.svg`
-    link.click()
+    try {
+      await downloadSvgAsPng(photo.qr_url, `qr-${photo.unique_token.slice(0, 8)}.png`)
+    } catch {
+      toast.error('Gagal mengunduh QR.')
+    }
   }
 
   const handleShare = async () => {
