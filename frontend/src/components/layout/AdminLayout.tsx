@@ -1,15 +1,12 @@
 import React from 'react'
-import { NavLink, Outlet, useNavigate } from 'react-router-dom'
+import { NavLink, Outlet } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
   LayoutGrid,
   Camera,
   Layers,
-  LogOut,
   Settings,
 } from 'lucide-react'
-import { useAuthStore } from '@/stores/authStore'
-import { authApi } from '@/api/auth'
 
 // ==========================================
 // Admin Layout — Sidebar + Main Content
@@ -28,22 +25,6 @@ const navItems: NavItem[] = [
 ]
 
 export const AdminLayout: React.FC = () => {
-  const { user, logout } = useAuthStore()
-  const navigate = useNavigate()
-  const [isLoggingOut, setIsLoggingOut] = React.useState(false)
-
-  const handleLogout = async () => {
-    setIsLoggingOut(true)
-    try {
-      await authApi.logout()
-    } catch {
-      // Silent fail — token mungkin sudah expired
-    } finally {
-      logout()
-      navigate('/login', { replace: true })
-    }
-  }
-
   return (
     <div className="min-h-screen bg-[#0A0A0A] flex">
       {/* Sidebar */}
@@ -78,13 +59,7 @@ export const AdminLayout: React.FC = () => {
         </nav>
 
         {/* Footer */}
-        <div className="px-3 py-4 border-t border-[#1A1A1A] space-y-1">
-          {/* User Info */}
-          <div className="px-3 py-2 mb-2">
-            <p className="text-white text-sm font-medium truncate">{user?.name}</p>
-            <p className="text-[#606060] text-xs truncate">{user?.email}</p>
-          </div>
-
+        <div className="px-3 py-4 border-t border-[#1A1A1A]">
           <NavLink
             to="/settings"
             className={({ isActive }) => `
@@ -96,17 +71,6 @@ export const AdminLayout: React.FC = () => {
             <Settings size={20} />
             Pengaturan
           </NavLink>
-
-          <button
-            onClick={handleLogout}
-            disabled={isLoggingOut}
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium
-              text-[#A0A0A0] hover:text-red-400 hover:bg-red-500/5
-              transition-all duration-150 disabled:opacity-50"
-          >
-            <LogOut size={20} />
-            {isLoggingOut ? 'Keluar...' : 'Keluar'}
-          </button>
         </div>
       </aside>
 

@@ -4,10 +4,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 
 // Layout
 import { AdminLayout } from '@/components/layout/AdminLayout'
-import { ProtectedRoute, PublicRoute } from '@/components/layout/RouteGuard'
 
 // Admin Pages
-import LoginPage from '@/pages/admin/LoginPage'
 import DashboardPage from '@/pages/admin/DashboardPage'
 import GalleryPage from '@/pages/admin/GalleryPage'
 import PhotoMenuPage from '@/pages/admin/PhotoMenuPage'
@@ -71,27 +69,19 @@ const App: React.FC = () => {
             <Route path="/photo/:token" element={<CustomerPhotoPage />} />
             <Route path="/folder/:token" element={<CustomerFolderPage />} />
 
-            {/* Auth Routes — Redirect ke gallery jika sudah login */}
-            <Route element={<PublicRoute />}>
-              <Route path="/login" element={<LoginPage />} />
-            </Route>
-
-            {/* Protected Admin Routes */}
-            <Route element={<ProtectedRoute />}>
-              <Route element={<AdminLayout />}>
-                <Route path="/" element={<DashboardPage />} />
-                <Route path="/gallery" element={<GalleryPage />} />
-                <Route path="/photo" element={<PhotoMenuPage />} />
-                <Route path="/photo/session/:id" element={<PhotoCapturePage />} />
-                <Route path="/templates" element={<TemplatesPage />} />
-                {/* Placeholder routes untuk phase selanjutnya */}
-                <Route path="/settings" element={
-                  <div className="text-white">
-                    <h1 className="text-2xl font-bold mb-2">Pengaturan</h1>
-                    <p className="text-[#606060]">Fitur akan tersedia di fase berikutnya.</p>
-                  </div>
-                } />
-              </Route>
+            {/* Admin Routes — tanpa autentikasi (fitur login dihapus) */}
+            <Route element={<AdminLayout />}>
+              <Route path="/" element={<DashboardPage />} />
+              <Route path="/gallery" element={<GalleryPage />} />
+              <Route path="/photo" element={<PhotoMenuPage />} />
+              <Route path="/photo/session/:id" element={<PhotoCapturePage />} />
+              <Route path="/templates" element={<TemplatesPage />} />
+              <Route path="/settings" element={
+                <div className="text-white">
+                  <h1 className="text-2xl font-bold mb-2">Pengaturan</h1>
+                  <p className="text-[#606060]">Fitur akan tersedia di fase berikutnya.</p>
+                </div>
+              } />
             </Route>
 
             {/* Catch all — redirect ke root */}

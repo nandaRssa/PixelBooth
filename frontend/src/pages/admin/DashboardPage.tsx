@@ -2,7 +2,6 @@ import React from 'react'
 import { motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import { LayoutGrid, Camera, Layers, ArrowRight } from 'lucide-react'
-import { useAuthStore } from '@/stores/authStore'
 
 // ==========================================
 // Dashboard / Home Page
@@ -37,7 +36,6 @@ const menuItems = [
 
 const DashboardPage: React.FC = () => {
   const navigate = useNavigate()
-  const { user } = useAuthStore()
 
   const hour = new Date().getHours()
   const greeting = hour < 12 ? 'Selamat Pagi' : hour < 17 ? 'Selamat Siang' : 'Selamat Malam'
@@ -52,7 +50,7 @@ const DashboardPage: React.FC = () => {
       >
         <p className="text-[#606060] text-sm mb-1">{greeting},</p>
         <h1 className="text-white text-3xl font-bold tracking-tight">
-          {user?.name ?? 'Admin'}
+          PixelBooth
         </h1>
         <p className="text-[#A0A0A0] text-base mt-2">
           Apa yang ingin Anda kelola hari ini?

@@ -89,8 +89,8 @@ Project ini dibangun sebagai **portfolio Full-Stack Software Engineering + Hardw
 - Real-time camera status di UI
 - Fallback ke webcam jika DSLR tidak tersambung
 
-### 🔐 Authentication & Security
-- Admin panel dengan Laravel Sanctum
+### 🔐 Security
+- Akses tanpa login — dioptimalkan untuk kios iPad operasional
 - Customer/public access via QR token
 - Rate limiting & file validation
 - Secure token untuk semua public links
@@ -411,28 +411,22 @@ Dokumentasi API lengkap tersedia di [`docs/api.md`](docs/api.md)
 http://localhost:8000/api
 ```
 
-### Authentication
-```
-Authorization: Bearer {token}
-```
-
 ### Endpoint Utama
 
-| Method | Endpoint | Auth | Deskripsi |
-|--------|----------|------|-----------|
-| POST | `/auth/login` | ❌ | Login admin |
-| POST | `/auth/logout` | ✅ | Logout |
-| GET | `/auth/me` | ✅ | Info user aktif |
-| GET | `/templates` | ✅ | List template |
-| POST | `/templates` | ✅ Admin | Upload template |
-| GET | `/folders` | ✅ | List folder |
-| POST | `/folders` | ✅ Admin | Buat folder |
-| GET | `/photos` | ✅ | List foto |
-| POST | `/sessions` | ✅ | Mulai sesi foto |
-| POST | `/sessions/{id}/capture` | ✅ | Trigger capture |
-| POST | `/sessions/{id}/complete` | ✅ | Selesaikan sesi |
-| GET | `/public/photo/{token}` | ❌ | Customer photo page |
-| GET | `/public/folder/{token}` | ❌ | Customer folder page |
+| Method | Endpoint | Deskripsi |
+|--------|----------|-----------|
+| GET | `/templates` | List template |
+| POST | `/templates` | Upload template |
+| GET | `/folders` | List folder |
+| POST | `/folders` | Buat folder |
+| GET | `/photos` | List foto |
+| POST | `/sessions` | Mulai sesi foto |
+| POST | `/sessions/{id}/capture` | Trigger capture |
+| POST | `/sessions/{id}/complete` | Selesaikan sesi |
+| GET | `/public/photo/{token}` | Customer photo page |
+| GET | `/public/folder/{token}` | Customer folder page |
+
+> Fitur login dihapus — seluruh endpoint dapat diakses tanpa autentikasi.
 
 ---
 

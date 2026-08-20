@@ -1,6 +1,6 @@
 # PixelBooth API Documentation
 
-Dokumentasi seluruh endpoint REST API backend PixelBooth (Laravel + Sanctum).
+Dokumentasi seluruh endpoint REST API backend PixelBooth (Laravel).
 
 ## Base URL
 
@@ -12,13 +12,9 @@ Frontend dev mengakses melalui proxy Vite: `http://localhost:5173/api` → `http
 
 ## Autentikasi
 
-Semua endpoint `admin`/`protected` membutuhkan token Bearer Sanctum:
+Fitur login **dihapus** — seluruh endpoint dapat diakses tanpa autentikasi (dioptimalkan untuk kios iPad operasional).
 
-```
-Authorization: Bearer {token}
-```
-
-Token diperoleh dari `POST /auth/login`. Selain header Bearer, request juga harus menyertakan:
+Semua request tetap harus menyertakan:
 
 ```
 Accept: application/json
@@ -29,9 +25,8 @@ X-Requested-With: XMLHttpRequest
 
 | Grup | Batas | Endpoint |
 |------|-------|----------|
-| `throttle:5,1` | 5 request / menit | `POST /auth/login` |
 | `throttle:60,1` | 60 request / menit | `/public/*` dan `/qr/*` |
-| `throttle:120,1` | 120 request / menit | Semua endpoint protected |
+| `throttle:120,1` | 120 request / menit | Endpoint core (template, folder, foto, sesi, hardware) |
 
 ## Format Respons
 
@@ -78,7 +73,7 @@ Error:
 
 ### `GET /health`
 
-Status layanan. Tanpa autentikasi.
+Status layanan.
 
 ```json
 {
@@ -91,60 +86,11 @@ Status layanan. Tanpa autentikasi.
 
 ---
 
-## Autentikasi
-
-### `POST /auth/login`
-
-Login admin. Rate limit `5/menit`. Tanpa autentikasi.
-
-Body:
-
-```json
-{
-  "email": "admin@pixelbooth.com",
-  "password": "admin123"
-}
-```
-
-Respons `200`:
-
-```json
-{
-  "user": { "id": 1, "name": "Admin", "email": "admin@pixelbooth.com", "role": "admin" },
-  "token": "1|abcdef...",
-  "message": "Login berhasil."
-}
-```
-
-Error `401`: kredensial salah.
-
-### `POST /auth/logout`
-
-Logout dan revoke token saat ini. Protected.
-
-Respons `200`:
-
-```json
-{ "message": "Logout berhasil." }
-```
-
-### `GET /auth/me`
-
-Detail user yang sedang login. Protected.
-
-```json
-{
-  "data": { "id": 1, "name": "Admin", "email": "admin@pixelbooth.com", "role": "admin" }
-}
-```
-
----
-
 ## Template
 
 ### `GET /templates`
 
-List semua template. Protected (semua user terautentikasi).
+List semua template. 
 
 Query params: `status` (`active` | `inactive`).
 
@@ -177,11 +123,11 @@ Query params: `status` (`active` | `inactive`).
 
 ### `GET /templates/{id}`
 
-Detail satu template. Protected.
+Detail satu template. 
 
 ### `POST /templates`
 
-Upload template baru. Admin only. `multipart/form-data`.
+Upload template baru.  `multipart/form-data`.
 
 Fields:
 
@@ -203,7 +149,7 @@ Respons `201`:
 
 ### `PUT /templates/{id}`
 
-Update konfigurasi template. Admin only.
+Update konfigurasi template. 
 
 Body (semua opsional):
 
@@ -220,7 +166,7 @@ Body (semua opsional):
 
 ### `DELETE /templates/{id}`
 
-Hapus template beserta file-nya. Admin only.
+Hapus template beserta file-nya. 
 
 ---
 
@@ -228,7 +174,7 @@ Hapus template beserta file-nya. Admin only.
 
 ### `GET /folders`
 
-List folder. Protected.
+List folder. 
 
 Query params: `parent_folder_id` (opsional). Jika tidak diberikan, mengembalikan folder root beserta `children`.
 
@@ -254,11 +200,11 @@ Query params: `parent_folder_id` (opsional). Jika tidak diberikan, mengembalikan
 
 ### `GET /folders/{id}`
 
-Detail folder. Protected.
+Detail folder. 
 
 ### `POST /folders`
 
-Buat folder baru. Protected.
+Buat folder baru. 
 
 Body:
 
@@ -273,13 +219,13 @@ Respons `201`: `{ "message": "Folder berhasil dibuat.", "data": { ... } }`
 
 ### `PUT /folders/{id}`
 
-Ubah nama folder. Protected.
+Ubah nama folder. 
 
 Body: `{ "name": "Nama Baru" }`
 
 ### `DELETE /folders/{id}`
 
-Hapus folder beserta seluruh sub-folder dan foto di dalamnya (cascade), termasuk file dari storage dan QR code. Protected.
+Hapus folder beserta seluruh sub-folder dan foto di dalamnya (cascade), termasuk file dari storage dan QR code. 
 
 ---
 
@@ -287,7 +233,7 @@ Hapus folder beserta seluruh sub-folder dan foto di dalamnya (cascade), termasuk
 
 ### `GET /photos`
 
-List foto. Protected, **paginated** (default 20/halaman).
+List foto. **paginated** (default 20/halaman).
 
 Query params: `folder_id`, `page`.
 
@@ -325,21 +271,21 @@ Query params: `folder_id`, `page`.
 
 ### `GET /photos/{id}`
 
-Detail satu foto. Protected.
+Detail satu foto. 
 
 ### `DELETE /photos/{id}`
 
-Hapus foto beserta file dan QR dari storage. Protected.
+Hapus foto beserta file dan QR dari storage. 
 
 ### `POST /photos/{id}/move`
 
-Pindahkan foto ke folder lain. `unique_token` tidak berubah. Protected.
+Pindahkan foto ke folder lain. `unique_token` tidak berubah. 
 
 Body: `{ "folder_id": 2 }` — kirim `null` untuk memindahkan ke root.
 
 ### `POST /photos/bulk-delete`
 
-Hapus banyak foto sekaligus. Protected.
+Hapus banyak foto sekaligus. 
 
 Body:
 
@@ -349,7 +295,7 @@ Body:
 
 ### `POST /photos/bulk-move`
 
-Pindahkan banyak foto sekaligus. Protected.
+Pindahkan banyak foto sekaligus. 
 
 Body:
 
@@ -363,7 +309,7 @@ Body:
 
 ### `POST /sessions`
 
-Mulai sesi foto baru. Protected.
+Mulai sesi foto baru. 
 
 Body:
 
@@ -395,11 +341,11 @@ Respons `201`:
 
 ### `GET /sessions/{id}`
 
-Detail sesi beserta `template`, `folder`, `captures`, dan `final_photo`. Protected.
+Detail sesi beserta `template`, `folder`, `captures`, dan `final_photo`. 
 
 ### `POST /sessions/{id}/capture`
 
-Simpan capture untuk frame aktif. Protected.
+Simpan capture untuk frame aktif. 
 
 Body (`multipart/form-data` atau JSON):
 
@@ -415,19 +361,19 @@ atau base64:
 
 ### `POST /sessions/{id}/next-frame`
 
-Lanjut ke frame berikutnya. Protected.
+Lanjut ke frame berikutnya. 
 
 ### `POST /sessions/{id}/complete`
 
-Selesaikan sesi, buat foto final sesuai template, dan generate QR. Protected.
+Selesaikan sesi, buat foto final sesuai template, dan generate QR. 
 
 ### `POST /sessions/{id}/cancel`
 
-Batalkan sesi dan hapus file sementara. Protected.
+Batalkan sesi dan hapus file sementara. 
 
 ### `POST /sessions/{id}/set-folder`
 
-Set folder tujuan untuk sesi. Protected.
+Set folder tujuan untuk sesi. 
 
 Body: `{ "folder_id": 2 }`
 
@@ -437,7 +383,7 @@ Body: `{ "folder_id": 2 }`
 
 ### `GET /hardware/status`
 
-Status hardware bridge dan kamera. Protected.
+Status hardware bridge dan kamera. 
 
 ```json
 {
@@ -455,11 +401,11 @@ Jika bridge tidak dapat dihubungi, `bridge_online` bernilai `false` dan `camera`
 
 ### `POST /hardware/capture`
 
-Trigger capture DSLR via hardware bridge. Protected.
+Trigger capture DSLR via hardware bridge. 
 
 ### `GET /hardware/latest-photo`
 
-Ambil foto terbaru dari hardware bridge. Protected.
+Ambil foto terbaru dari hardware bridge. 
 
 ---
 
@@ -467,7 +413,7 @@ Ambil foto terbaru dari hardware bridge. Protected.
 
 ### `GET /qr/photo/{token}`
 
-Info QR untuk sebuah foto. Tanpa autentikasi. Rate limit `60/menit`.
+Info QR untuk sebuah foto. Rate limit `60/menit`.
 
 ```json
 {
@@ -483,7 +429,7 @@ Info QR untuk sebuah foto. Tanpa autentikasi. Rate limit `60/menit`.
 
 ### `GET /qr/folder/{token}`
 
-Info QR untuk sebuah folder. Tanpa autentikasi. Rate limit `60/menit`.
+Info QR untuk sebuah folder. Rate limit `60/menit`.
 
 ```json
 {
@@ -497,7 +443,7 @@ Info QR untuk sebuah folder. Tanpa autentikasi. Rate limit `60/menit`.
 
 ---
 
-## Public / Customer (Tanpa Auth)
+## Public / Customer
 
 ### `GET /public/photo/{token}`
 
@@ -548,8 +494,6 @@ Detail folder beserta daftar foto untuk halaman customer. Rate limit `60/menit`.
 |------|------|
 | 200 | OK |
 | 201 | Created |
-| 401 | Tidak terautentikasi / token invalid |
-| 403 | Akses ditolak (bukan admin) |
 | 404 | Resource tidak ditemukan |
 | 422 | Validasi gagal / aturan bisnis |
 | 429 | Rate limit terlampaui |

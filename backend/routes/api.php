@@ -1,6 +1,5 @@
 <?php
 
-use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\FolderController;
 use App\Http\Controllers\Api\HardwareController;
 use App\Http\Controllers\Api\PhotoController;
@@ -14,6 +13,10 @@ use Illuminate\Support\Facades\Route;
 |--------------------------------------------------------------------------
 | PixelBooth API Routes
 |--------------------------------------------------------------------------
+|
+| Fitur login dihapus sesuai kebutuhan operasional kios iPad.
+| Semua endpoint dapat diakses tanpa autentikasi.
+| Rate limiting tetap aktif untuk mencegah penyalahgunaan.
 */
 
 // ==========================================
@@ -27,15 +30,7 @@ Route::get('/health', fn() => response()->json([
 ]));
 
 // ==========================================
-// Authentication (public, rate limited)
-// ==========================================
-Route::prefix('auth')->middleware('throttle:5,1')->group(function () {
-    Route::post('/login', [AuthController::class, 'login'])->name('auth.login');
-});
-
-// ==========================================
 // Public Routes — Customer QR Access
-// Tidak memerlukan autentikasi
 // ==========================================
 Route::prefix('public')->middleware('throttle:60,1')->group(function () {
     Route::get('/photo/{token}', [CustomerController::class, 'showPhoto'])->name('public.photo');
@@ -51,17 +46,17 @@ Route::prefix('qr')->middleware('throttle:60,1')->group(function () {
 });
 
 // ==========================================
-// Protected Routes — Butuh login
+// Core Routes — Tanpa autentikasi
+// Rate limit diterapkan untuk keamanan dasar
 // ==========================================
-Route::middleware(['auth:sanctum', 'throttle:120,1'])->group(function () {
+Route::middleware('throttle:120,1')->group(function () {
 
-    // Auth
-    Route::post('/auth/logout', [AuthController::class, 'logout'])->name('auth.logout');
-    Route::get('/auth/me', [AuthController::class, 'me'])->name('auth.me');
-
-    // Templates (semua user bisa lihat, hanya admin yang bisa CRUD)
+    // Templates
     Route::get('/templates', [TemplateController::class, 'index'])->name('templates.index');
     Route::get('/templates/{template}', [TemplateController::class, 'show'])->name('templates.show');
+    Route::post('/templates', [TemplateController::class, 'store'])->name('templates.store');
+    Route::put('/templates/{template}', [TemplateController::class, 'update'])->name('templates.update');
+    Route::delete('/templates/{template}', [TemplateController::class, 'destroy'])->name('templates.destroy');
 
     // Folders
     Route::get('/folders', [FolderController::class, 'index'])->name('folders.index');
@@ -91,13 +86,4 @@ Route::middleware(['auth:sanctum', 'throttle:120,1'])->group(function () {
     Route::get('/hardware/status', [HardwareController::class, 'status'])->name('hardware.status');
     Route::post('/hardware/capture', [HardwareController::class, 'capture'])->name('hardware.capture');
     Route::get('/hardware/latest-photo', [HardwareController::class, 'latestPhoto'])->name('hardware.latest');
-
-    // ========================================
-    // Admin Only Routes
-    // ========================================
-    Route::middleware('admin')->group(function () {
-        Route::post('/templates', [TemplateController::class, 'store'])->name('templates.store');
-        Route::put('/templates/{template}', [TemplateController::class, 'update'])->name('templates.update');
-        Route::delete('/templates/{template}', [TemplateController::class, 'destroy'])->name('templates.destroy');
-    });
 });
