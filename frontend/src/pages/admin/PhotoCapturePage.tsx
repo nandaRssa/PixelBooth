@@ -5,6 +5,7 @@ import {
   ArrowLeft,
   Camera as CameraIcon,
   Check,
+  Download,
   ExternalLink,
   FolderPlus,
   ImageIcon,
@@ -24,10 +25,11 @@ import type { PhotoSession } from '@/types'
 
 // ==========================================
 // Photo Capture Page — Webcam (device camera)
-// Kamera device langsung; DSLR bersifat opsional
+// Alur: Capture → Auto Advance → Capture → ... → Selesai
+// Kamera live hanya tampil di dalam bingkai frame yang aktif.
 // ==========================================
 
-type CapturePhase = 'idle' | 'countdown' | 'captured' | 'done'
+type CapturePhase = 'idle' | 'countdown'
 
 const COUNTDOWN_SECONDS = 3
 
@@ -42,8 +44,8 @@ const PhotoCapturePage: React.FC = () => {
 
   const [phase, setPhase] = useState<CapturePhase>('idle')
   const [countdown, setCountdown] = useState<number | null>(null)
-  const [capturedUrl, setCapturedUrl] = useState<string | null>(null)
   const [isCapturing, setIsCapturing] = useState(false)
+  const [allDone, setAllDone] = useState(false)
   const [resultPhoto, setResultPhoto] = useState<{ url?: string; qr_url?: string } | null>(null)
 
   // ===== Folder tujuan penyimpanan =====
@@ -53,7 +55,7 @@ const PhotoCapturePage: React.FC = () => {
   const foldersQuery = useFolders(null)
 
   const videoRef = useRef<HTMLVideoElement>(null)
-  const slotVideoRefs = useRef<(HTMLVideoElement | null)[]>([])
+  const activeVideoRef = useRef<HTMLVideoElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const countdownRef = useRef<number | null>(null)
   const captureFnRef = useRef<() => void>(() => {})
@@ -66,36 +68,63 @@ const PhotoCapturePage: React.FC = () => {
     return resolvePreviewSlots(tpl, session?.total_frames ?? 0)
   }, [session?.template, session?.total_frames])
 
-  const activeSlot = useMemo(() => {
-    if (previewSlots.length === 0) return null
-    const idx = (session?.current_frame ?? 1) - 1
-    return previewSlots[Math.min(Math.max(idx, 0), previewSlots.length - 1)] ?? null
-  }, [previewSlots, session?.current_frame])
+  const totalFrames = session?.total_frames ?? 0
+  const template = session?.template
+
+  // Frame aktif diambil dari pointer sesi (server). Setelah capture,
+  // server otomatis memajukan current_frame → kamera berpindah sendiri.
+  const activeFrameIndex = useMemo(() => {
+    if (totalFrames === 0) return 0
+    return Math.min(Math.max((session?.current_frame ?? 1) - 1, 0), totalFrames - 1)
+  }, [session?.current_frame, totalFrames])
+
+  const activeSlot = previewSlots[activeFrameIndex] ?? null
+
+  // Foto hasil tiap frame (dari capture terbaru yang disetujui server)
+  const frameImages = useMemo(() => {
+    const arr: (string | null)[] = Array(totalFrames).fill(null)
+    for (const cap of session?.captures ?? []) {
+      if (cap.status === 'retaken') continue
+      const idx = cap.frame_number - 1
+      if (idx >= 0 && idx < totalFrames) {
+        arr[idx] = cap.photo_url
+      }
+    }
+    return arr
+  }, [session?.captures, totalFrames])
+
+  const completedCount = frameImages.filter(Boolean).length
 
   // ===== Overlay template (desain di atas kamera, lubang foto transparan) =====
-  const [overlayUrl, setOverlayUrl] = useState<string | null>(null)
+  const [overlay, setOverlay] = useState<{ url: string; token: string } | null>(null)
+
+  const overlayToken = useMemo(() => {
+    const tpl = session?.template
+    if (!tpl || previewSlots.length === 0) return ''
+    return `${tpl.id}-${tpl.updated_at ?? ''}-${JSON.stringify(previewSlots)}`
+  }, [session?.template, previewSlots])
 
   useEffect(() => {
-    let cancelled = false
     const tpl = session?.template
-    if (!tpl || !tpl.template_url || previewSlots.length === 0) {
-      setOverlayUrl(null)
-      return
-    }
+    if (!tpl || !tpl.template_url || previewSlots.length === 0) return
 
+    let cancelled = false
     buildTemplateOverlay(tpl.template_url, previewSlots, tpl.canvas_width, tpl.canvas_height)
       .then((url) => {
-        if (!cancelled) setOverlayUrl(url)
+        if (!cancelled) setOverlay({ url, token: overlayToken })
       })
       .catch(() => {
         // Gagal membangun overlay -> fallback ke template mentah
-        if (!cancelled) setOverlayUrl(null)
+        if (!cancelled) setOverlay(null)
       })
 
     return () => {
       cancelled = true
     }
-  }, [session?.template, previewSlots])
+  }, [session?.template, previewSlots, overlayToken])
+
+  // Hanya tampilkan overlay yang dibangun untuk template & slot saat ini
+  const overlayUrl = overlay && overlay.token === overlayToken ? overlay.url : null
 
   // ===== Muat sesi =====
   useEffect(() => {
@@ -150,7 +179,7 @@ const PhotoCapturePage: React.FC = () => {
     }
   }, [status])
 
-  // ===== Lampirkan stream ke elemen video saat kamera aktif =====
+  // ===== Lampirkan stream ke video utama (sumber capture, tersembunyi) =====
   useEffect(() => {
     const video = videoRef.current
     const stream = streamRef.current
@@ -162,22 +191,21 @@ const PhotoCapturePage: React.FC = () => {
     }
   }, [cameraActive])
 
-  // ===== Lampirkan stream ke video tiap slot preview =====
+  // ===== Lampirkan stream ke video slot frame aktif =====
   useEffect(() => {
+    const video = activeVideoRef.current
     const stream = streamRef.current
-    if (cameraActive && stream) {
-      slotVideoRefs.current.forEach((el) => {
-        if (el && el.srcObject !== stream) {
-          el.srcObject = stream
-          el.play().catch(() => {})
-        }
-      })
+    if (cameraActive && video && stream) {
+      if (video.srcObject !== stream) {
+        video.srcObject = stream
+      }
+      video.play().catch(() => {})
     }
-  }, [cameraActive, phase, previewSlots])
+  }, [cameraActive, phase, activeFrameIndex, previewSlots])
 
   // ===== Countdown =====
   const startCountdown = () => {
-    if (phase !== 'idle' || !cameraActive) return
+    if (phase !== 'idle' || !cameraActive || allDone) return
     setPhase('countdown')
     setCountdown(COUNTDOWN_SECONDS)
 
@@ -208,9 +236,10 @@ const PhotoCapturePage: React.FC = () => {
     setIsCapturing(true)
 
     try {
+      const video = videoRef.current
       const canvas = document.createElement('canvas')
-      canvas.width = videoRef.current.videoWidth || 1280
-      canvas.height = videoRef.current.videoHeight || 720
+      canvas.width = video.videoWidth || 1280
+      canvas.height = video.videoHeight || 720
       const ctx = canvas.getContext('2d')
       if (!ctx) throw new Error('Canvas tidak tersedia')
 
@@ -218,16 +247,24 @@ const PhotoCapturePage: React.FC = () => {
       ctx.filter = 'brightness(1.45) contrast(1.1) saturate(1.1)'
       ctx.translate(canvas.width, 0)
       ctx.scale(-1, 1)
-      ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height)
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
       ctx.filter = 'none'
 
       const base64 = canvas.toDataURL('image/jpeg', 0.85)
 
       const result = await sessionApi.capture(session.id, base64)
       setSession(result.session)
-      setCapturedUrl(canvas.toDataURL('image/jpeg', 0.7))
-      setPhase('captured')
-      toast.success(`Frame ${result.capture.frame_number} berhasil diambil.`)
+      setPhase('idle')
+
+      if (result.all_done) {
+        // Semua frame selesai — matikan kamera, frame sudah tampil semua
+        streamRef.current?.getTracks().forEach((track) => track.stop())
+        setCameraActive(false)
+        setAllDone(true)
+        toast.success('Semua frame selesai!')
+      } else {
+        toast.success(`Foto ${result.capture.frame_number} berhasil diambil.`)
+      }
     } catch {
       toast.error('Gagal mengambil foto. Coba lagi.')
     } finally {
@@ -239,31 +276,24 @@ const PhotoCapturePage: React.FC = () => {
     captureFnRef.current = doCapture
   })
 
-  // ===== Lanjut ke frame berikutnya =====
-  const handleNextFrame = async () => {
-    if (!session) return
+  // ===== Retake frame tertentu =====
+  const handleRetakeFrame = async (frameIndex: number) => {
+    if (!session || phase === 'countdown' || isCapturing) return
     try {
-      const result = await sessionApi.nextFrame(session.id)
-      setSession(result.data)
-      setCapturedUrl(null)
-      if (result.all_done) {
-        setPhase('done')
-        toast.success('Semua frame selesai!')
-      } else {
-        setPhase('idle')
+      const updated = await sessionApi.retake(session.id, frameIndex + 1)
+      setSession(updated)
+      setAllDone(false)
+      setPhase('idle')
+      if (!cameraActive) {
+        startCamera()
       }
+      toast.info(`Kamera kembali ke Foto ${frameIndex + 1}.`)
     } catch {
-      toast.error('Gagal melanjutkan frame.')
+      toast.error('Gagal memulai pengambilan ulang.')
     }
   }
 
-  // ===== Retake frame =====
-  const handleRetake = () => {
-    setCapturedUrl(null)
-    setPhase('idle')
-  }
-
-  // ===== Selesaikan sesi =====
+  // ===== Selesaikan sesi (render final) =====
   const handleComplete = async () => {
     if (!session) return
     try {
@@ -332,10 +362,6 @@ const PhotoCapturePage: React.FC = () => {
     )
   }
 
-  const totalFrames = session.total_frames
-  const currentFrame = session.current_frame
-  const template = session.template
-
   // ===== Hasil akhir =====
   if (resultPhoto) {
     return (
@@ -379,7 +405,18 @@ const PhotoCapturePage: React.FC = () => {
             )}
           </div>
 
-          <div className="flex gap-3">
+          <div className="flex flex-wrap justify-center gap-3">
+            {resultPhoto.url && (
+              <a
+                href={resultPhoto.url}
+                download
+                className="inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium
+                  bg-white text-black hover:bg-gray-200 transition-colors"
+              >
+                <Download size={16} />
+                Download Foto
+              </a>
+            )}
             <Button
               variant="secondary"
               size="md"
@@ -389,7 +426,7 @@ const PhotoCapturePage: React.FC = () => {
               Buka Galeri
             </Button>
             <Button
-              variant="primary"
+              variant="secondary"
               size="md"
               onClick={() => navigate('/photo')}
               leftIcon={<CameraIcon size={16} />}
@@ -401,6 +438,16 @@ const PhotoCapturePage: React.FC = () => {
       </div>
     )
   }
+
+  const slotPosition = (slot: { x: number; y: number; width: number; height: number }) =>
+    template
+      ? {
+          left: `${(slot.x / template.canvas_width) * 100}%`,
+          top: `${(slot.y / template.canvas_height) * 100}%`,
+          width: `${(slot.width / template.canvas_width) * 100}%`,
+          height: `${(slot.height / template.canvas_height) * 100}%`,
+        }
+      : { inset: 0 }
 
   return (
     <div>
@@ -430,12 +477,12 @@ const PhotoCapturePage: React.FC = () => {
           <div
             className="h-full bg-white rounded-full transition-all duration-300"
             style={{
-              width: `${(phase === 'done' ? totalFrames : Math.min(currentFrame, totalFrames)) / totalFrames * 100}%`,
+              width: `${(allDone ? totalFrames : completedCount) / totalFrames * 100}%`,
             }}
           />
         </div>
         <span className="text-[#A0A0A0] text-sm whitespace-nowrap">
-          Frame {Math.min(currentFrame, totalFrames)} / {totalFrames}
+          Foto {allDone ? totalFrames : activeFrameIndex + 1} / {totalFrames}
         </span>
       </div>
 
@@ -456,7 +503,7 @@ const PhotoCapturePage: React.FC = () => {
             }}
           >
             {/* Video utama: sumber capture — selalu tersembunyi.
-                Kamera selama sesi hanya tampil di dalam bingkai foto. */}
+                Kamera selama sesi hanya tampil di dalam bingkai frame aktif. */}
             <video
               ref={videoRef}
               playsInline
@@ -479,58 +526,29 @@ const PhotoCapturePage: React.FC = () => {
               />
             )}
 
-            {/* Kamera di dalam tiap slot bingkai */}
-            {previewSlots.length > 0 && template && !(phase === 'captured' && capturedUrl) && (
+            {/* Lapisan slot: kamera live (frame aktif) / foto (selesai) / hitam (pending) */}
+            {previewSlots.length > 0 && template && (
               <div className="absolute inset-0 pointer-events-none">
                 {previewSlots.map((slot, i) => (
-                  <div
-                    key={i}
-                    className="absolute"
-                    style={{
-                      left: `${(slot.x / template.canvas_width) * 100}%`,
-                      top: `${(slot.y / template.canvas_height) * 100}%`,
-                      width: `${(slot.width / template.canvas_width) * 100}%`,
-                      height: `${(slot.height / template.canvas_height) * 100}%`,
-                    }}
-                  >
-                    {cameraActive ? (
+                  <div key={i} className="absolute overflow-hidden" style={slotPosition(slot)}>
+                    {i === activeFrameIndex && cameraActive && !allDone ? (
                       <video
-                        ref={(el) => {
-                          slotVideoRefs.current[i] = el
-                        }}
+                        ref={activeVideoRef}
                         playsInline
                         muted
                         autoPlay
                         className="w-full h-full object-cover -scale-x-100"
                         style={{ filter: 'brightness(1.45) contrast(1.1) saturate(1.1)' }}
                       />
+                    ) : frameImages[i] ? (
+                      <img
+                        src={frameImages[i]}
+                        alt={`Foto ${i + 1}`}
+                        className="w-full h-full object-cover"
+                      />
                     ) : (
-                      <div className="w-full h-full bg-[#0A0A0A]" />
+                      <div className="w-full h-full bg-black" />
                     )}
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Hasil capture tampil di dalam slot (preview final) */}
-            {phase === 'captured' && capturedUrl && template && (
-              <div className="absolute inset-0 pointer-events-none">
-                {previewSlots.map((slot, i) => (
-                  <div
-                    key={i}
-                    className="absolute overflow-hidden"
-                    style={{
-                      left: `${(slot.x / template.canvas_width) * 100}%`,
-                      top: `${(slot.y / template.canvas_height) * 100}%`,
-                      width: `${(slot.width / template.canvas_width) * 100}%`,
-                      height: `${(slot.height / template.canvas_height) * 100}%`,
-                    }}
-                  >
-                    <img
-                      src={capturedUrl}
-                      alt="Frame"
-                      className="w-full h-full object-cover"
-                    />
                   </div>
                 ))}
               </div>
@@ -546,13 +564,29 @@ const PhotoCapturePage: React.FC = () => {
               />
             )}
 
+            {/* Indikator frame aktif: outline + glow + label */}
+            {!allDone && activeSlot && template && (
+              <div
+                className="absolute pointer-events-none"
+                style={slotPosition(activeSlot)}
+              >
+                <div className="absolute inset-0 border-2 border-white/80 rounded-lg shadow-[0_0_24px_rgba(255,255,255,0.35)]" />
+                <span
+                  className="absolute -top-3 left-2 bg-white text-black text-[11px] font-semibold
+                    px-2 py-0.5 rounded-md shadow"
+                >
+                  Foto {activeFrameIndex + 1}
+                </span>
+              </div>
+            )}
+
             {/* Fallback darurat tanpa template: kamera penuh + bingkai */}
             {previewSlots.length === 0 && (
               <>
                 <div className="absolute inset-4 border-2 border-white/20 rounded-xl pointer-events-none" />
-                {capturedUrl && phase === 'captured' && (
+                {frameImages[0] && (
                   <img
-                    src={capturedUrl}
+                    src={frameImages[0]}
                     alt="Frame terakhir"
                     className="absolute inset-0 w-full h-full object-cover"
                   />
@@ -561,7 +595,7 @@ const PhotoCapturePage: React.FC = () => {
             )}
 
             {/* Kamera tidak aktif */}
-            {!cameraActive && (
+            {!cameraActive && !allDone && (
               <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-6">
                 <VideoOff size={36} className="text-[#333] mb-3" />
                 <p className="text-[#A0A0A0] text-sm mb-4">Kamera tidak aktif</p>
@@ -572,24 +606,15 @@ const PhotoCapturePage: React.FC = () => {
               </div>
             )}
 
-            {/* Countdown di dalam bingkai foto yang sedang diambil */}
+            {/* Countdown di dalam bingkai frame yang sedang diambil */}
             <AnimatePresence>
-              {phase === 'countdown' && countdown !== null && (
+              {phase === 'countdown' && countdown !== null && activeSlot && template && (
                 <motion.div
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
                   className="absolute z-10 flex items-center justify-center pointer-events-none"
-                  style={
-                    activeSlot && template
-                      ? {
-                          left: `${(activeSlot.x / template.canvas_width) * 100}%`,
-                          top: `${(activeSlot.y / template.canvas_height) * 100}%`,
-                          width: `${(activeSlot.width / template.canvas_width) * 100}%`,
-                          height: `${(activeSlot.height / template.canvas_height) * 100}%`,
-                        }
-                      : { inset: 0 }
-                  }
+                  style={slotPosition(activeSlot)}
                 >
                   <motion.div
                     key={countdown}
@@ -616,14 +641,32 @@ const PhotoCapturePage: React.FC = () => {
 
         {/* ===== Controls ===== */}
         <div className="bg-[#141414] border border-[#2A2A2A] rounded-2xl p-5 flex flex-col">
-          {phase === 'idle' && (
+          {allDone ? (
             <>
               <h3 className="text-white font-semibold text-base mb-1">
-                Siap untuk Frame {currentFrame}
+                Semua Frame Selesai
               </h3>
               <p className="text-[#606060] text-sm mb-6">
-                Kamera sudah berada di dalam bingkai template. Posisikan subjek sesuai bingkai, lalu
-                tekan tombol untuk memulai hitung mundur.
+                Foto final akan di-render sesuai template dan disimpan di galeri.
+              </p>
+              <Button
+                variant="primary"
+                size="xl"
+                fullWidth
+                onClick={handleComplete}
+                leftIcon={<Check size={20} />}
+              >
+                Generate Foto Final
+              </Button>
+            </>
+          ) : phase === 'idle' ? (
+            <>
+              <h3 className="text-white font-semibold text-base mb-1">
+                Siap untuk Foto {activeFrameIndex + 1}
+              </h3>
+              <p className="text-[#606060] text-sm mb-6">
+                Kamera sudah berada di dalam bingkai. Posisikan subjek sesuai bingkai, lalu tekan
+                tombol untuk memulai hitung mundur.
               </p>
               <Button
                 variant="primary"
@@ -633,7 +676,7 @@ const PhotoCapturePage: React.FC = () => {
                 disabled={!cameraActive}
                 leftIcon={<CameraIcon size={20} />}
               >
-                Tangkap Foto
+                Potret
               </Button>
               {!cameraActive && (
                 <p className="text-amber-400 text-xs text-center mt-3">
@@ -641,9 +684,7 @@ const PhotoCapturePage: React.FC = () => {
                 </p>
               )}
             </>
-          )}
-
-          {phase === 'countdown' && (
+          ) : (
             <>
               <h3 className="text-white font-semibold text-base mb-6 text-center">
                 Hitung Mundur...
@@ -654,58 +695,46 @@ const PhotoCapturePage: React.FC = () => {
             </>
           )}
 
-          {phase === 'captured' && (
-            <>
-              <h3 className="text-white font-semibold text-base mb-1">
-                Frame {currentFrame} Terambil
-              </h3>
-              <p className="text-[#606060] text-sm mb-6">
-                Foto terlihat bagus? Lanjutkan atau ulangi.
-              </p>
-              <div className="flex flex-col gap-3">
-                <Button
-                  variant="primary"
-                  size="lg"
-                  fullWidth
-                  onClick={handleNextFrame}
-                  leftIcon={<Check size={18} />}
-                >
-                  {currentFrame >= totalFrames ? 'Selesaikan Sesi' : 'Lanjut ke Frame Berikutnya'}
-                </Button>
-                <Button
-                  variant="secondary"
-                  size="lg"
-                  fullWidth
-                  onClick={handleRetake}
-                  leftIcon={<RotateCcw size={18} />}
-                >
-                  Ulangi Foto
-                </Button>
-              </div>
-            </>
-          )}
-
-          {phase === 'done' && (
-            <>
-              <h3 className="text-white font-semibold text-base mb-1">
-                Semua Frame Selesai
-              </h3>
-              <p className="text-[#606060] text-sm mb-6">
-                Foto final akan di-render sesuai template dan disimpan di galeri.
-              </p>
-              <Button
-                variant="primary"
-                size="lg"
-                fullWidth
-                onClick={handleComplete}
-                leftIcon={<Check size={18} />}
-              >
-                Simpan Foto Final
-              </Button>
-            </>
-          )}
-
           <div className="flex-1" />
+
+          {/* Status frame + retake */}
+          <div className="mt-6 pt-4 border-t border-[#2A2A2A]">
+            <p className="text-[#A0A0A0] text-xs font-medium mb-2">Status Frame</p>
+            <div className="flex flex-col gap-2">
+              {Array.from({ length: totalFrames }, (_, i) => {
+                const isActive = i === activeFrameIndex && !allDone
+                const hasPhoto = !!frameImages[i]
+                return (
+                  <div
+                    key={i}
+                    className="flex items-center justify-between bg-[#0A0A0A] border border-[#2A2A2A] rounded-lg px-3 py-2"
+                  >
+                    <div className="flex items-center gap-2">
+                      {isActive ? (
+                        <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+                      ) : hasPhoto ? (
+                        <Check size={14} className="text-green-400" />
+                      ) : (
+                        <span className="w-2 h-2 rounded-full bg-[#333]" />
+                      )}
+                      <span className="text-white text-sm">Foto {i + 1}</span>
+                    </div>
+                    {hasPhoto && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleRetakeFrame(i)}
+                        disabled={phase === 'countdown' || isCapturing}
+                        leftIcon={<RotateCcw size={13} />}
+                      >
+                        Ulangi
+                      </Button>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
 
           {/* Pilihan folder penyimpanan */}
           <div className="mt-6 pt-4 border-t border-[#2A2A2A]">
@@ -724,7 +753,7 @@ const PhotoCapturePage: React.FC = () => {
                 onChange={(e) =>
                   handleChangeFolder(e.target.value === '' ? null : Number(e.target.value))
                 }
-                disabled={isSavingFolder}
+                disabled={isSavingFolder || allDone}
                 className="w-full bg-[#0A0A0A] border border-[#2A2A2A] rounded-lg px-3 py-2.5
                   text-white text-sm focus:outline-none focus:ring-1 focus:border-[#404040] focus:ring-white/10
                   disabled:opacity-50 [&>option]:bg-[#0A0A0A]"

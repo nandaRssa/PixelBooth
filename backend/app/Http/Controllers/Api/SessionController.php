@@ -90,7 +90,7 @@ class SessionController extends Controller
         // Tandai retake capture sebelumnya jika ada
         SessionCapture::where('session_id', $session->id)
             ->where('frame_number', $frameNumber)
-            ->where('status', 'captured')
+            ->whereIn('status', ['captured', 'approved'])
             ->update(['status' => 'retaken']);
 
         // Simpan capture baru
@@ -101,46 +101,63 @@ class SessionController extends Controller
             'status' => 'captured',
         ]);
 
+        // Approve otomatis: capture langsung sah tanpa tombol "Lanjutkan"
+        SessionCapture::where('session_id', $session->id)
+            ->where('frame_number', $frameNumber)
+            ->where('status', 'captured')
+            ->update(['status' => 'approved']);
+
+        // Auto-advance: pindah ke frame berikutnya yang belum difoto.
+        // Jika semua frame sudah approved, tandai all_done (menunggu /complete).
+        $approvedFrames = SessionCapture::where('session_id', $session->id)
+            ->where('status', 'approved')
+            ->pluck('frame_number')
+            ->all();
+
+        $nextFrame = null;
+        for ($i = 1; $i <= $session->total_frames; $i++) {
+            if (! in_array($i, $approvedFrames, true)) {
+                $nextFrame = $i;
+                break;
+            }
+        }
+
+        if ($nextFrame === null) {
+            $session->update(['current_frame' => $session->total_frames]);
+            $allDone = true;
+        } else {
+            $session->update(['current_frame' => $nextFrame]);
+            $allDone = false;
+        }
+
         return response()->json([
             'message' => "Frame {$frameNumber} berhasil di-capture.",
             'data' => [
-                'capture' => $capture,
-                'session' => $session->fresh(),
+                'capture' => $capture->fresh(),
+                'session' => $session->fresh()->load('template', 'folder', 'captures'),
+                'all_done' => $allDone,
             ],
         ]);
     }
 
     /**
-     * Approve capture frame aktif dan lanjut ke frame berikutnya.
+     * Pindahkan kamera ke frame tertentu untuk mengambil ulang foto.
      */
-    public function nextFrame(Request $request, PhotoSession $session): JsonResponse
+    public function retake(Request $request, PhotoSession $session): JsonResponse
     {
         if ($session->status !== 'active') {
             return response()->json(['message' => 'Sesi tidak aktif.'], 422);
         }
 
-        // Approve capture frame saat ini
-        SessionCapture::where('session_id', $session->id)
-            ->where('frame_number', $session->current_frame)
-            ->where('status', 'captured')
-            ->update(['status' => 'approved']);
+        $request->validate([
+            'frame_number' => ['required', 'integer', 'min:1', "max:{$session->total_frames}"],
+        ]);
 
-        if ($session->current_frame >= $session->total_frames) {
-            // Semua frame selesai — tunggu complete()
-            return response()->json([
-                'message' => 'Semua frame selesai. Panggil /complete untuk mengakhiri sesi.',
-                'data' => $session->fresh()->load('captures'),
-                'all_done' => true,
-            ]);
-        }
-
-        // Lanjut ke frame berikutnya
-        $session->increment('current_frame');
+        $session->update(['current_frame' => (int) $request->frame_number]);
 
         return response()->json([
-            'message' => "Lanjut ke frame {$session->current_frame}.",
-            'data' => $session->fresh()->load('captures'),
-            'all_done' => false,
+            'message' => "Kamera kembali ke frame {$session->current_frame} untuk pengambilan ulang.",
+            'data' => $session->fresh()->load('template', 'folder', 'captures'),
         ]);
     }
 

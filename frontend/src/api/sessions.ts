@@ -15,10 +15,6 @@ export interface CaptureResult {
     status: string
   }
   session: PhotoSession
-}
-
-export interface NextFrameResult {
-  data: PhotoSession
   all_done: boolean
 }
 
@@ -44,9 +40,11 @@ export const sessionApi = {
     return response.data.data
   },
 
-  nextFrame: async (id: number): Promise<NextFrameResult> => {
-    const response = await apiClient.post<NextFrameResult>(`/sessions/${id}/next-frame`)
-    return response.data
+  retake: async (id: number, frameNumber: number): Promise<PhotoSession> => {
+    const response = await apiClient.post<ApiResponse<PhotoSession>>(`/sessions/${id}/retake`, {
+      frame_number: frameNumber,
+    })
+    return response.data.data
   },
 
   complete: async (id: number): Promise<{ session: PhotoSession; photo: unknown }> => {

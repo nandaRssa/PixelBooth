@@ -78,34 +78,57 @@ class SessionTest extends TestCase
             ->assertStatus(422);
     }
 
-    public function test_capture_dan_next_frame_berjalan(): void
+    public function test_capture_berjalan_dengan_auto_advance(): void
     {
         $template = $this->makeTemplate(2);
 
         $session = $this->postJson('/api/sessions', ['template_id' => $template->id], $this->headers())
             ->json('data');
 
-        // Capture frame 1
+        // Capture frame 1 → otomatis lanjut ke frame 2
         $this->postJson("/api/sessions/{$session['id']}/capture", [
             'image_base64' => $this->base64Png(),
         ], $this->headers())
-            ->assertOk();
+            ->assertOk()
+            ->assertJsonPath('data.session.current_frame', 2)
+            ->assertJsonPath('data.all_done', false)
+            ->assertJsonPath('data.session.template.id', $template->id);
 
-        // Lanjut ke frame 2
-        $this->postJson("/api/sessions/{$session['id']}/next-frame", [], $this->headers())
+        // Capture frame 2 → semua frame selesai
+        $this->postJson("/api/sessions/{$session['id']}/capture", [
+            'image_base64' => $this->base64Png(),
+        ], $this->headers())
+            ->assertOk()
+            ->assertJsonPath('data.all_done', true);
+    }
+
+    public function test_retake_mengembalikan_kamera_ke_frame_tertentu(): void
+    {
+        $template = $this->makeTemplate(3);
+
+        $session = $this->postJson('/api/sessions', ['template_id' => $template->id], $this->headers())
+            ->json('data');
+
+        // Capture semua frame (auto-advance)
+        for ($i = 1; $i <= 3; $i++) {
+            $this->postJson("/api/sessions/{$session['id']}/capture", [
+                'image_base64' => $this->base64Png(),
+            ], $this->headers())->assertOk();
+        }
+
+        // Retake frame 2 → kamera kembali ke frame 2
+        $this->postJson("/api/sessions/{$session['id']}/retake", [
+            'frame_number' => 2,
+        ], $this->headers())
             ->assertOk()
             ->assertJsonPath('data.current_frame', 2);
 
-        // Capture frame 2
+        // Capture ulang frame 2 → semua frame approved lagi → all_done
         $this->postJson("/api/sessions/{$session['id']}/capture", [
             'image_base64' => $this->base64Png(),
         ], $this->headers())
-            ->assertOk();
-
-        // Next-frame terakhir → all_done
-        $this->postJson("/api/sessions/{$session['id']}/next-frame", [], $this->headers())
             ->assertOk()
-            ->assertJsonPath('all_done', true);
+            ->assertJsonPath('data.all_done', true);
     }
 
     public function test_complete_menghasilkan_foto_final_dan_qr(): void
@@ -121,11 +144,8 @@ class SessionTest extends TestCase
         $this->postJson("/api/sessions/{$session['id']}/capture", [
             'image_base64' => $this->base64Png(),
         ], $this->headers())
-            ->assertOk();
-
-        $this->postJson("/api/sessions/{$session['id']}/next-frame", [], $this->headers())
             ->assertOk()
-            ->assertJsonPath('all_done', true);
+            ->assertJsonPath('data.all_done', true);
 
         $response = $this->postJson("/api/sessions/{$session['id']}/complete", [], $this->headers());
 
@@ -165,13 +185,11 @@ class SessionTest extends TestCase
             'template_id' => $template->id,
         ], $this->headers())->json('data');
 
-        // Capture & approve semua 3 frame
+        // Capture semua 3 frame (auto-advance)
         for ($i = 1; $i <= 3; $i++) {
             $this->postJson("/api/sessions/{$session['id']}/capture", [
                 'image_base64' => $this->base64Png(),
             ], $this->headers())->assertOk();
-
-            $this->postJson("/api/sessions/{$session['id']}/next-frame", [], $this->headers())->assertOk();
         }
 
         $response = $this->postJson("/api/sessions/{$session['id']}/complete", [], $this->headers());
