@@ -129,9 +129,9 @@ const TemplatesPage: React.FC = () => {
   };
 
   return (
-    <div>
+    <div className="flex flex-col h-[calc(100vh-4rem)]">
       {/* ===== Header ===== */}
-      <div className="flex items-center justify-between flex-wrap gap-3 mb-6">
+      <div className="flex items-center justify-between flex-wrap gap-3 mb-6 shrink-0">
         <div>
           <h1 className="text-pb-text text-2xl font-bold">Kelola Template</h1>
           <p className="text-pb-text-muted text-sm mt-1">
@@ -149,6 +149,8 @@ const TemplatesPage: React.FC = () => {
         </Button>
       </div>
 
+      {/* ===== Konten (scroll area) ===== */}
+      <div className="flex-1 min-h-0 overflow-y-auto pb-6">
       {/* ===== Info ===== */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         {[
@@ -277,6 +279,7 @@ const TemplatesPage: React.FC = () => {
           ))}
         </div>
       )}
+      </div>
 
       {/* ===== Upload Modal ===== */}
       <Modal

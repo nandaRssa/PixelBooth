@@ -245,9 +245,9 @@ const GalleryPage: React.FC = () => {
   const hasMore = Boolean(photosQuery.hasNextPage)
 
   return (
-    <div>
+    <div className="flex flex-col h-[calc(100vh-4rem)]">
       {/* ===== Header ===== */}
-      <div className="flex items-center justify-between flex-wrap gap-3 mb-6">
+      <div className="flex items-center justify-between flex-wrap gap-3 mb-6 shrink-0">
         <div className="min-w-0">
           {/* Breadcrumb */}
           <div className="flex items-center gap-1.5 text-sm text-pb-text-muted mb-1">
@@ -308,6 +308,8 @@ const GalleryPage: React.FC = () => {
         </div>
       </div>
 
+      {/* ===== Konten (scroll area) ===== */}
+      <div className="flex-1 min-h-0 overflow-y-auto pb-6">
       {/* ===== Sub-folders ===== */}
       {foldersQuery.isLoading ? (
         <div className="flex items-center justify-center py-20">
@@ -390,6 +392,7 @@ const GalleryPage: React.FC = () => {
           onBulkDelete={() => setBulkDeleteOpen(true)}
           isBulkActionPending={bulkDeletePhotos.isPending || bulkMovePhotos.isPending}
         />
+      </div>
       </div>
 
       {/* ===== Modals ===== */}

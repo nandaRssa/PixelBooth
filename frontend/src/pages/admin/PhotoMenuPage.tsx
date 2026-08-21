@@ -94,9 +94,9 @@ const PhotoMenuPage: React.FC = () => {
   }
 
   return (
-    <div>
+    <div className="flex flex-col h-[calc(100vh-4rem)]">
       {/* ===== Header ===== */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-6 shrink-0">
         <div>
           <h1 className="text-pb-text text-2xl font-bold">Photo</h1>
           <p className="text-pb-text-muted text-sm mt-1">Mulai sesi pemotretan photobooth</p>
@@ -108,6 +108,8 @@ const PhotoMenuPage: React.FC = () => {
         />
       </div>
 
+      {/* ===== Konten (scroll area) ===== */}
+      <div className="flex-1 min-h-0 overflow-y-auto pb-6">
       {/* ===== Status Sumber Kamera ===== */}
       <div className="bg-pb-surface border border-pb-border rounded-xl p-4 mb-6">
         <div className="flex items-center justify-between">
@@ -330,6 +332,7 @@ const PhotoMenuPage: React.FC = () => {
           })}
         </div>
       )}
+      </div>
     </div>
   )
 }
