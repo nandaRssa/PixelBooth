@@ -437,10 +437,12 @@ class FrameMaskService
 
         $remCov = [];
         $remSeq = [];
+        $maxRemSeq = 0;
         foreach ($f['remove_seeds'] as $s) {
             $pt = $seedToWork((float) $s['x'], (float) $s['y']);
             if ($pt !== null) {
                 $floodClaim($remCov, $remSeq, $protGrid, $pt[0], $pt[1], (int) ($s['s'] ?? 0));
+                $maxRemSeq = max($maxRemSeq, (int) ($s['s'] ?? 0));
             }
         }
         $keepCov = [];
@@ -455,6 +457,77 @@ class FrameMaskService
         }
         // Pulau terkurung dalam region keep ikut dipulihkan
         $claimEnclosed($keepCov, $keepSeq, $maxKeepSeq);
+
+        // Simetri un-keep: pulau terkurung dalam region remove yang
+        // sebelumnya di-KEEP ikut terhapus. Pulau tanpa keep tetap aman.
+        if ($remCov !== []) {
+            $outsideR = [];
+            $stackR = [];
+            foreach ($inside as $idx => $_) {
+                if (isset($remCov[$idx]) || isset($outsideR[$idx])) {
+                    continue;
+                }
+                $gx = $bx0 + ($idx % $bw);
+                $gy = $by0 + intdiv($idx, $bw);
+                $edge = $gx - 1 < $bx0 || $gx + 1 > $bx1 || $gy - 1 < $by0 || $gy + 1 > $by1
+                    || ! isset($inside[$idx - 1]) || ! isset($inside[$idx + 1])
+                    || ! isset($inside[$idx - $bw]) || ! isset($inside[$idx + $bw]);
+                if ($edge) {
+                    $outsideR[$idx] = 1;
+                    $stackR[] = $idx;
+                }
+            }
+            while ($stackR !== []) {
+                $idx = array_pop($stackR);
+                $gx = $bx0 + ($idx % $bw);
+                $gy = $by0 + intdiv($idx, $bw);
+                foreach ([[-1, 0], [1, 0], [0, -1], [0, 1]] as [$ox, $oy]) {
+                    $nx = $gx + $ox;
+                    $ny = $gy + $oy;
+                    if ($nx < $bx0 || $ny < $by0 || $nx > $bx1 || $ny > $by1) {
+                        continue;
+                    }
+                    $nidx = ($ny - $by0) * $bw + ($nx - $bx0);
+                    if (isset($outsideR[$nidx]) || isset($remCov[$nidx]) || ! isset($inside[$nidx])) {
+                        continue;
+                    }
+                    $outsideR[$nidx] = 1;
+                    $stackR[] = $nidx;
+                }
+            }
+            // Pulau = inside ∧ ¬remCov ∧ ¬outsideR. Klaim hanya yang overlap keep.
+            foreach ($keepCov as $idx => $_) {
+                if (! isset($inside[$idx]) || isset($remCov[$idx]) || isset($outsideR[$idx])) {
+                    continue;
+                }
+                $island = [$idx];
+                $seen = [$idx => true];
+                for ($qi = 0; $qi < count($island); $qi++) {
+                    $cur = $island[$qi];
+                    $gx = $bx0 + ($cur % $bw);
+                    $gy = $by0 + intdiv($cur, $bw);
+                    foreach ([[-1, 0], [1, 0], [0, -1], [0, 1]] as [$ox, $oy]) {
+                        $nx = $gx + $ox;
+                        $ny = $gy + $oy;
+                        if ($nx < $bx0 || $ny < $by0 || $nx > $bx1 || $ny > $by1) {
+                            continue;
+                        }
+                        $nidx = ($ny - $by0) * $bw + ($nx - $bx0);
+                        if (isset($seen[$nidx]) || ! isset($inside[$nidx]) || isset($remCov[$nidx]) || isset($outsideR[$nidx])) {
+                            continue;
+                        }
+                        $seen[$nidx] = true;
+                        $island[] = $nidx;
+                    }
+                }
+                foreach ($island as $iidx) {
+                    $remCov[$iidx] = 1;
+                    if (! isset($remSeq[$iidx]) || $maxRemSeq > $remSeq[$iidx]) {
+                        $remSeq[$iidx] = $maxRemSeq;
+                    }
+                }
+            }
+        }
 
         // Resolusi konflik per piksel antara region Remove dan Keep.
         $keepGrid = [];

@@ -420,9 +420,13 @@ export function computeHoleMask(
 
   const remCov = new Uint8Array(inside.length)
   const remSeq = new Int32Array(inside.length)
+  let maxRemSeq = 0
   for (const s of f.remove_seeds) {
     const pt = seedToWork(s.x, s.y)
-    if (pt) floodClaim(remCov, remSeq, protGrid, pt[0], pt[1], s.s ?? 0)
+    if (pt) {
+      floodClaim(remCov, remSeq, protGrid, pt[0], pt[1], s.s ?? 0)
+      maxRemSeq = Math.max(maxRemSeq, s.s ?? 0)
+    }
   }
   const keepCov = new Uint8Array(inside.length)
   const keepSeq = new Int32Array(inside.length)
@@ -436,6 +440,81 @@ export function computeHoleMask(
   }
   // Pulau terkurung dalam region keep ikut dipulihkan (strok keep terbaru)
   claimEnclosed(keepCov, keepSeq, maxKeepSeq)
+
+  // Simetri un-keep: pulau terkurung dalam region remove yang sebelumnya
+  // di-KEEP ikut terhapus (strok remove terbaru). Pulau yang tidak pernah
+  // di-keep tetap aman — elemen desain di dalam slot tidak ikut terhapus.
+  {
+    let anyRem = false
+    for (let i = 0; i < remCov.length; i++) {
+      if (remCov[i]) {
+        anyRem = true
+        break
+      }
+    }
+    if (anyRem) {
+      const outsideR = new Uint8Array(inside.length)
+      const stackR: number[] = []
+      for (let i = 0; i < inside.length; i++) {
+        if (!inside[i] || remCov[i] || outsideR[i]) continue
+        const gx = bx0 + (i % bw)
+        const gy = by0 + Math.floor(i / bw)
+        const edge =
+          gx - 1 < bx0 ||
+          gx + 1 > bx1 ||
+          gy - 1 < by0 ||
+          gy + 1 > by1 ||
+          !inside[i - 1] ||
+          !inside[i + 1] ||
+          !inside[i - bw] ||
+          !inside[i + bw]
+        if (edge) {
+          outsideR[i] = 1
+          stackR.push(i)
+        }
+      }
+      while (stackR.length > 0) {
+        const idx = stackR.pop() as number
+        const gx = bx0 + (idx % bw)
+        const gy = by0 + Math.floor(idx / bw)
+        for (const [ox, oy] of NEIGHBORS) {
+          const nx = gx + ox
+          const ny = gy + oy
+          if (nx < bx0 || ny < by0 || nx > bx1 || ny > by1) continue
+          const nidx = (ny - by0) * bw + (nx - bx0)
+          if (outsideR[nidx] || remCov[nidx] || !inside[nidx]) continue
+          outsideR[nidx] = 1
+          stackR.push(nidx)
+        }
+      }
+      // Pulau = inside ∧ ¬remCov ∧ ¬outsideR. Klaim hanya yang overlap keep.
+      for (let i = 0; i < inside.length; i++) {
+        if (!inside[i] || remCov[i] || outsideR[i] || !keepCov[i]) continue
+        // BFS satu pulau dari piksel keep ini
+        const island: number[] = [i]
+        const seen = new Uint8Array(inside.length)
+        seen[i] = 1
+        for (let qi = 0; qi < island.length; qi++) {
+          const idx = island[qi]
+          const gx = bx0 + (idx % bw)
+          const gy = by0 + Math.floor(idx / bw)
+          for (const [ox, oy] of NEIGHBORS) {
+            const nx = gx + ox
+            const ny = gy + oy
+            if (nx < bx0 || ny < by0 || nx > bx1 || ny > by1) continue
+            const nidx = (ny - by0) * bw + (nx - bx0)
+            if (seen[nidx] || !inside[nidx] || remCov[nidx] || outsideR[nidx]) continue
+            seen[nidx] = 1
+            island.push(nidx)
+          }
+        }
+        for (const idx of island) {
+          remCov[idx] = 1
+          if (maxRemSeq > remSeq[idx]) remSeq[idx] = maxRemSeq
+        }
+      }
+    }
+  }
 
   // Resolusi konflik per piksel antara region Remove dan Keep.
   const keepGrid = new Uint8Array(inside.length)

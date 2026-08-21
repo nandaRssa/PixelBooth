@@ -856,6 +856,90 @@ class SessionTest extends TestCase
         imagedestroy($final);
     }
 
+    public function test_remove_menimpa_keep_pulau_terkurung(): void
+    {
+        // Simetri fleksibilitas: setelah bingkai + polkadot di-KEEP (s=1),
+        // kuas Remove pada bingkai yang sama (s=2, lebih baru) harus
+        // menghapus bingkai SEKALIGUS polkadot terkurungnya.
+        $w = 800;
+        $h = 1200;
+        $img = imagecreatetruecolor($w, $h);
+        imagefilledrectangle($img, 0, 0, $w - 1, $h - 1, imagecolorallocate($img, 255, 255, 255));
+        imagefilledrectangle($img, 70, 0, 105, $h - 1, imagecolorallocate($img, 15, 15, 15));
+        foreach ([300, 380, 460] as $cy) {
+            imagefilledellipse($img, 87, $cy, 7, 7, imagecolorallocate($img, 255, 255, 255));
+        }
+        ob_start();
+        imagepng($img);
+        $pngData = ob_get_clean();
+        imagedestroy($img);
+        Storage::disk('public')->put('templates/polkadot-rm.png', $pngData);
+
+        $template = Template::create([
+            'name' => 'Template Polkadot RM',
+            'slug' => 'polkadot-rm',
+            'template_file' => 'templates/polkadot-rm.png',
+            'canvas_width' => $w,
+            'canvas_height' => $h,
+            'frame_count' => 1,
+            'frame_configuration' => [[
+                'id' => 1,
+                'order' => 0,
+                'x' => 55,
+                'y' => 240,
+                'width' => 280,
+                'height' => 300,
+                'rotation' => 0,
+                'flip_h' => false,
+                'flip_v' => false,
+                'clear_zone' => 60,
+                'clear_expansion' => 25,
+                'region_sensitivity' => 50,
+                'min_region_size' => 1,
+                'edge_protection' => 0,
+                'feather' => 2,
+                'edge_cleanup' => 0,
+                'protected_areas' => [],
+                'remove_areas' => [],
+                // Keep bingkai dulu (s=1), lalu Remove bingkai (s=2)
+                'remove_seeds' => [['x' => 32, 'y' => 100, 's' => 2]],
+                'protect_seeds' => [],
+                'keep_seeds' => [['x' => 32, 'y' => 100, 's' => 1]],
+            ]],
+            'status' => 'active',
+        ]);
+
+        $photo = imagecreatetruecolor(200, 200);
+        imagefilledrectangle($photo, 0, 0, 199, 199, imagecolorallocate($photo, 255, 0, 0));
+        ob_start();
+        imagejpeg($photo, null, 95);
+        $photoData = ob_get_clean();
+        imagedestroy($photo);
+        $photoBase64 = 'data:image/jpeg;base64,' . base64_encode($photoData);
+
+        $session = $this->postJson('/api/sessions', [
+            'template_id' => $template->id,
+        ], $this->headers())->json('data');
+
+        $this->postJson("/api/sessions/{$session['id']}/capture", [
+            'image_base64' => $photoBase64,
+        ], $this->headers())->assertOk();
+
+        $response = $this->postJson("/api/sessions/{$session['id']}/complete", [], $this->headers());
+        $response->assertOk();
+
+        $final = imagecreatefromjpeg(Storage::disk('public')->path($response->json('data.photo.storage_path')));
+
+        // Remove lebih baru dari Keep: bingkai + semua polkadot jadi kamera
+        foreach ([[87, 340], [87, 300], [87, 380], [87, 460]] as [$px, $py]) {
+            $c = imagecolorat($final, $px, $py);
+            $this->assertGreaterThan(180, ($c >> 16) & 0xFF, "Titik ($px,$py) harus terhapus oleh Remove");
+            $this->assertLessThan(120, ($c >> 8) & 0xFF, "Titik ($px,$py) harus terhapus oleh Remove");
+        }
+
+        imagedestroy($final);
+    }
+
     public function test_cancel_menghapus_sesi_dan_file_temporary(): void
     {
         $template = $this->makeTemplate();
