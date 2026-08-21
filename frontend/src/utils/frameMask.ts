@@ -128,9 +128,12 @@ export function computeHoleMask(
   const tol = 6 + f.region_sensitivity * 1.14
   const ep = f.edge_protection / 100
 
-  // Area manual dalam koordinat lokal frame (px → skala kerja)
-  const protLocal = f.protected_areas.map((a) => [a.x * scale, a.y * scale, a.w * scale, a.h * scale])
-  const remLocal = f.remove_areas.map((a) => [a.x * scale, a.y * scale, a.w * scale, a.h * scale])
+  // Area manual disimpan dari sudut kiri-atas frame; konversi ke basis pusat.
+  // Area adalah KONTEN frame → posisinya ikut dicerminkan flip.
+  const fxs = f.flip_h ? -1 : 1
+  const fys = f.flip_v ? -1 : 1
+  const protLocal = f.protected_areas.map((a) => [a.x * scale - hw, a.y * scale - hh, a.w * scale, a.h * scale])
+  const remLocal = f.remove_areas.map((a) => [a.x * scale - hw, a.y * scale - hh, a.w * scale, a.h * scale])
 
   // Bounding box axis-aligned frame yang dirotasi (clamp ke canvas kerja)
   const corners: Array<[number, number]> = [
@@ -175,14 +178,17 @@ export function computeHoleMask(
       const idx = (gy - by0) * bw + (gx - bx0)
       inside[idx] = 1
       if (Math.abs(lx) <= hzW && Math.abs(ly) <= hzH) seed[idx] = 1
+      // Uji area pada koordinat lokal yang sudah dicerminkan flip
+      const alx = lx * fxs
+      const aly = ly * fys
       for (const [ax, ay, aw, ah] of protLocal) {
-        if (lx >= ax && lx <= ax + aw && ly >= ay && ly <= ay + ah) {
+        if (alx >= ax && alx <= ax + aw && aly >= ay && aly <= ay + ah) {
           prot[idx] = 1
           break
         }
       }
       for (const [ax, ay, aw, ah] of remLocal) {
-        if (lx >= ax && lx <= ax + aw && ly >= ay && ly <= ay + ah) {
+        if (alx >= ax && alx <= ax + aw && aly >= ay && aly <= ay + ah) {
           rem[idx] = 1
           break
         }
@@ -197,7 +203,7 @@ export function computeHoleMask(
   let n = 0
   for (let i = 0; i < seed.length; i++) {
     if (!seed[i]) continue
-    const o = (i * 4)
+    const o = ((by0 + Math.floor(i / bw)) * gw + (bx0 + (i % bw))) * 4
     rs += wd.data[o]
     gs += wd.data[o + 1]
     bs += wd.data[o + 2]
@@ -231,7 +237,7 @@ export function computeHoleMask(
       // Edge Protection: makin jauh dari pusat, toleransi makin ketat
       const r = dMax > dHard ? (dist - dHard) / (dMax - dHard) : 0
       const effTol = tol * (1 - 0.85 * ep * r)
-      const o = nidx * 4
+      const o = (ny * gw + nx) * 4
       const diff = Math.max(
         Math.abs(wd.data[o] - avgR),
         Math.abs(wd.data[o + 1] - avgG),

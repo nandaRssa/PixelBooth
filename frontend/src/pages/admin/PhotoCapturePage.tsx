@@ -598,6 +598,9 @@ const PhotoCapturePage: React.FC = () => {
                         src={frameImages[i]}
                         alt={`Foto ${i + 1}`}
                         className="w-full h-full object-cover"
+                        style={{
+                          transform: `scaleX(${slot.flip_h ? -1 : 1}) scaleY(${slot.flip_v ? -1 : 1})`,
+                        }}
                       />
                     ) : (
                       <div className="w-full h-full bg-black" />

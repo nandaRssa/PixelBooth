@@ -58,6 +58,102 @@ class SessionTest extends TestCase
         return 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
     }
 
+    /**
+     * Template polos 800x1200 dengan satu frame + Manual Remove Area
+     * pada SETENGAH KIRI frame (koordinat konten, basis sudut kiri-atas).
+     */
+    private function solidTemplateWithLeftRemoveArea(bool $flipH, string $slug): Template
+    {
+        $img = imagecreatetruecolor(800, 1200);
+        imagefilledrectangle($img, 0, 0, 799, 1199, imagecolorallocate($img, 32, 32, 32));
+        ob_start();
+        imagepng($img);
+        $pngData = ob_get_clean();
+        imagedestroy($img);
+        Storage::disk('public')->put("templates/{$slug}.png", $pngData);
+
+        return Template::create([
+            'name' => "Template {$slug}",
+            'slug' => $slug,
+            'template_file' => "templates/{$slug}.png",
+            'canvas_width' => 800,
+            'canvas_height' => 1200,
+            'frame_count' => 1,
+            'frame_configuration' => [[
+                'id' => 1,
+                'order' => 0,
+                'x' => 300,
+                'y' => 500,
+                'width' => 200,
+                'height' => 200,
+                'rotation' => 0,
+                'flip_h' => $flipH,
+                'flip_v' => false,
+                'clear_zone' => 5,
+                'clear_expansion' => 0,
+                'region_sensitivity' => 0,
+                'min_region_size' => 0,
+                'edge_protection' => 0,
+                'feather' => 0,
+                'protected_areas' => [],
+                'remove_areas' => [['x' => 0, 'y' => 0, 'w' => 100, 'h' => 200]],
+            ]],
+            'status' => 'active',
+        ]);
+    }
+
+    /**
+     * Jalankan sesi lengkap dengan foto merah solid, kembalikan path final.
+     */
+    private function renderRedSession(Template $template): string
+    {
+        $photo = imagecreatetruecolor(200, 200);
+        imagefilledrectangle($photo, 0, 0, 199, 199, imagecolorallocate($photo, 255, 0, 0));
+        ob_start();
+        imagejpeg($photo, null, 95);
+        $photoData = ob_get_clean();
+        imagedestroy($photo);
+        $photoBase64 = 'data:image/jpeg;base64,' . base64_encode($photoData);
+
+        $session = $this->postJson('/api/sessions', [
+            'template_id' => $template->id,
+        ], $this->headers())->json('data');
+
+        $this->postJson("/api/sessions/{$session['id']}/capture", [
+            'image_base64' => $photoBase64,
+        ], $this->headers())
+            ->assertOk()
+            ->assertJsonPath('data.all_done', true);
+
+        $response = $this->postJson("/api/sessions/{$session['id']}/complete", [], $this->headers());
+        $response->assertOk();
+
+        return Storage::disk('public')->path($response->json('data.photo.storage_path'));
+    }
+
+    public function test_flip_horizontal_mencerminkan_area_manual_pada_mask(): void
+    {
+        // Tanpa flip: Remove Area di kiri frame → kiri berlubang (foto merah),
+        // kanan tetap desain. Dengan flip_h: area mencerminkan ke kanan.
+        $noFlip = $this->renderRedSession($this->solidTemplateWithLeftRemoveArea(false, 'flip-off'));
+        $flipped = $this->renderRedSession($this->solidTemplateWithLeftRemoveArea(true, 'flip-on'));
+
+        $a = imagecreatefromjpeg($noFlip);
+        $b = imagecreatefromjpeg($flipped);
+        $r = fn ($c) => ($c >> 16) & 0xFF;
+
+        // Tanpa flip: kiri = foto, kanan = desain gelap
+        $this->assertGreaterThan(180, $r(imagecolorat($a, 350, 600)), 'Kiri frame harus ter-clear (remove area)');
+        $this->assertLessThan(80, $r(imagecolorat($a, 450, 600)), 'Kanan frame harus tetap desain');
+
+        // Dengan flip_h: cermin — kanan = foto, kiri = desain gelap
+        $this->assertGreaterThan(180, $r(imagecolorat($b, 450, 600)), 'Flip harus memindahkan lubang ke kanan');
+        $this->assertLessThan(80, $r(imagecolorat($b, 350, 600)), 'Flip harus menutup lubang di kiri');
+
+        imagedestroy($a);
+        imagedestroy($b);
+    }
+
     public function test_admin_dapat_membuat_sesi_foto(): void
     {
         $template = $this->makeTemplate();

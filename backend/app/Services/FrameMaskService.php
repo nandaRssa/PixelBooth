@@ -118,14 +118,18 @@ class FrameMaskService
         $tol = 6 + $f['region_sensitivity'] * 1.14;
         $ep = $f['edge_protection'] / 100;
 
-        // Area manual disimpan dalam koordinat lokal frame (tidak dirotasi)
+        // Area manual disimpan dalam koordinat lokal frame dari sudut kiri-atas.
+        // Konversi ke basis pusat agar konsisten dengan klasifikasi grid, dan
+        // karena area adalah KONTEN frame, posisinya ikut dicerminkan flip.
+        $fxs = $f['flip_h'] ? -1 : 1;
+        $fys = $f['flip_v'] ? -1 : 1;
         $protLocal = [];
         foreach ($f['protected_areas'] as $a) {
-            $protLocal[] = [$a['x'] * $scale, $a['y'] * $scale, $a['w'] * $scale, $a['h'] * $scale];
+            $protLocal[] = [$a['x'] * $scale - $hw, $a['y'] * $scale - $hh, $a['w'] * $scale, $a['h'] * $scale];
         }
         $remLocal = [];
         foreach ($f['remove_areas'] as $a) {
-            $remLocal[] = [$a['x'] * $scale, $a['y'] * $scale, $a['w'] * $scale, $a['h'] * $scale];
+            $remLocal[] = [$a['x'] * $scale - $hw, $a['y'] * $scale - $hh, $a['w'] * $scale, $a['h'] * $scale];
         }
 
         // Bounding box axis-aligned dari frame yang dirotasi (clamp ke canvas)
@@ -165,14 +169,18 @@ class FrameMaskService
                 if (abs($lx) <= $hzW && abs($ly) <= $hzH) {
                     $seed[$idx] = 1;
                 }
+                // Area manual = konten frame: uji pada koordinat lokal yang
+                // sudah dicerminkan sesuai flip (sejalan dengan pasteRotatedCover)
+                $alx = $lx * $fxs;
+                $aly = $ly * $fys;
                 foreach ($protLocal as [$ax, $ay, $aw, $ah]) {
-                    if ($lx >= $ax && $lx <= $ax + $aw && $ly >= $ay && $ly <= $ay + $ah) {
+                    if ($alx >= $ax && $alx <= $ax + $aw && $aly >= $ay && $aly <= $ay + $ah) {
                         $prot[$idx] = 1;
                         break;
                     }
                 }
                 foreach ($remLocal as [$ax, $ay, $aw, $ah]) {
-                    if ($lx >= $ax && $lx <= $ax + $aw && $ly >= $ay && $ly <= $ay + $ah) {
+                    if ($alx >= $ax && $alx <= $ax + $aw && $aly >= $ay && $aly <= $ay + $ah) {
                         $rem[$idx] = 1;
                         break;
                     }

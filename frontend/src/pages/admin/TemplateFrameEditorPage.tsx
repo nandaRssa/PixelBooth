@@ -44,6 +44,9 @@ interface DragState {
   startCanvas: { x: number; y: number }
   startFrame: CameraFrame
   anchor?: { x: number; y: number }
+  /** Proyeksi lokal pointer terhadap anchor saat mulai resize (anti-lompat) */
+  grabLx?: number
+  grabLy?: number
   grabAngle?: number
   drawArea?: 'protect' | 'remove'
 }
@@ -208,6 +211,9 @@ const TemplateFrameEditorPage: React.FC = () => {
       ctx.save()
       ctx.translate(cx, cy)
       ctx.rotate(rad)
+      // Konten frame (video/placeholder) dicerminkan sesuai flip —
+      // transform identik dengan render final (rotasi lalu flip lokal)
+      ctx.scale(f.flip_h ? -1 : 1, f.flip_v ? -1 : 1)
       ctx.beginPath()
       ctx.rect(-f.width / 2, -f.height / 2, f.width, f.height)
       ctx.clip()
@@ -224,7 +230,6 @@ const TemplateFrameEditorPage: React.FC = () => {
           dw = f.width
           dh = f.width / vr
         }
-        ctx.scale(f.flip_h ? -1 : 1, f.flip_v ? -1 : 1)
         ctx.drawImage(video, -dw / 2, -dh / 2, dw, dh)
       } else if (previewMask) {
         ctx.fillStyle = '#16202B'
@@ -264,8 +269,10 @@ const TemplateFrameEditorPage: React.FC = () => {
       ctx.strokeRect(-f.width / 2, -f.height / 2, f.width, f.height)
       ctx.setLineDash([])
 
-      // Area protect/remove frame terpilih
+      // Area protect/remove frame terpilih (konten → ikut flip)
       if (isSel) {
+        ctx.save()
+        ctx.scale(f.flip_h ? -1 : 1, f.flip_v ? -1 : 1)
         for (const a of f.protected_areas) {
           ctx.fillStyle = 'rgba(34,197,94,0.18)'
           ctx.strokeStyle = '#22C55E'
@@ -284,6 +291,7 @@ const TemplateFrameEditorPage: React.FC = () => {
           ctx.strokeRect(a.x - f.width / 2, a.y - f.height / 2, a.w, a.h)
           ctx.setLineDash([])
         }
+        ctx.restore()
       }
 
       // Label Frame N
@@ -329,11 +337,16 @@ const TemplateFrameEditorPage: React.FC = () => {
       const rad = (selected.rotation * Math.PI) / 180
       const cx = selected.x + selected.width / 2
       const cy = selected.y + selected.height / 2
+      const fx = selected.flip_h ? -1 : 1
+      const fy = selected.flip_v ? -1 : 1
       const cos = Math.cos(-rad)
       const sin = Math.sin(-rad)
       const toLocal = (px: number, py: number): [number, number] => {
-        const dx = px - cx
-        const dy = py - cy
+        let dx = px - cx
+        let dy = py - cy
+        // Pointer → koordinat konten: balikkan flip dulu, lalu rotasi
+        dx *= fx
+        dy *= fy
         return [dx * cos - dy * sin + selected.width / 2, dx * sin + dy * cos + selected.height / 2]
       }
       const [lx1, ly1] = toLocal(drawingRect.x1, drawingRect.y1)
@@ -345,6 +358,7 @@ const TemplateFrameEditorPage: React.FC = () => {
       ctx.save()
       ctx.translate(cx, cy)
       ctx.rotate(rad)
+      ctx.scale(fx, fy)
       ctx.fillStyle = mode === 'protect' ? 'rgba(34,197,94,0.25)' : 'rgba(239,68,68,0.25)'
       ctx.strokeStyle = mode === 'protect' ? '#22C55E' : '#EF4444'
       ctx.lineWidth = 1.5 / S
@@ -454,14 +468,26 @@ const TemplateFrameEditorPage: React.FC = () => {
   const hitHandle = (f: CameraFrame, p: { x: number; y: number }): DragType | null => {
     const tol = HANDLE_TOL_PX / viewRef.current.scale
     const [lx, ly] = localPoint(f, p)
-    const names: DragType[] = ['resize-nw', 'resize-n', 'resize-ne', 'resize-w', 'resize-e', 'resize-sw', 'resize-s', 'resize-se']
-    const pts = handlePoints(f)
-    for (let i = 0; i < pts.length; i++) {
-      if (Math.hypot(lx - pts[i][0], ly - pts[i][1]) <= tol) return names[i]
-    }
+    const hw = f.width / 2
+    const hh = f.height / 2
+
+    // Rotate handle: di atas tengah tepi atas
     const rotDist = ROT_HANDLE_DIST / viewRef.current.scale
-    if (Math.hypot(lx - 0, ly - (-f.height / 2 - rotDist)) <= tol) return 'rotate'
-    return null
+    if (Math.hypot(lx, ly + hh + rotDist) <= tol) return 'rotate'
+
+    // Harus berada di sekitar border frame (± toleransi)
+    if (Math.abs(lx) > hw + tol || Math.abs(ly) > hh + tol) return null
+
+    // Zona PITA di sepanjang tiap tepi (ala software grafis):
+    // pegang di mana pun sepanjang tepi kiri = resize-w, tepi atas = resize-n.
+    // Sudut hanya di area persegi sudut tempat kedua pita bertemu.
+    const nearX = hw - Math.abs(lx) <= tol
+    const nearY = hh - Math.abs(ly) <= tol
+    if (!nearX && !nearY) return null // interior -> bukan handle
+
+    const ns = nearY ? (ly < 0 ? 'n' : 's') : ''
+    const ew = nearX ? (lx < 0 ? 'w' : 'e') : ''
+    return `resize-${ns}${ew}` as DragType
   }
 
   const hitFrame = (p: { x: number; y: number }): CameraFrame | null => {
@@ -511,15 +537,22 @@ const TemplateFrameEditorPage: React.FC = () => {
         const anchorLocal: [number, number] = [-sx * f.width / 2, -sy * f.height / 2]
         const rad = (f.rotation * Math.PI) / 180
         const c = { x: f.x + f.width / 2, y: f.y + f.height / 2 }
+        const anchor = {
+          x: c.x + anchorLocal[0] * Math.cos(rad) - anchorLocal[1] * Math.sin(rad),
+          y: c.y + anchorLocal[0] * Math.sin(rad) + anchorLocal[1] * Math.cos(rad),
+        }
+        // Proyeksi lokal pointer terhadap anchor saat mulai drag — dipakai
+        // sebagai basis delta agar resize 1:1 tanpa lompatan awal
+        const dx0 = p.x - anchor.x
+        const dy0 = p.y - anchor.y
         dragRef.current = {
           type: ht,
           frameId: f.id,
           startCanvas: p,
           startFrame: f,
-          anchor: {
-            x: c.x + anchorLocal[0] * Math.cos(rad) - anchorLocal[1] * Math.sin(rad),
-            y: c.y + anchorLocal[0] * Math.sin(rad) + anchorLocal[1] * Math.cos(rad),
-          },
+          anchor,
+          grabLx: dx0 * Math.cos(-rad) - dy0 * Math.sin(-rad),
+          grabLy: dx0 * Math.sin(-rad) + dy0 * Math.cos(-rad),
         }
         return
       }
@@ -532,10 +565,42 @@ const TemplateFrameEditorPage: React.FC = () => {
     }
   }
 
+  // Kursor ala software grafis sesuai handle yang di-hover
+  const HANDLE_CURSORS: Partial<Record<DragType, string>> = {
+    'resize-e': 'ew-resize',
+    'resize-w': 'ew-resize',
+    'resize-n': 'ns-resize',
+    'resize-s': 'ns-resize',
+    'resize-ne': 'nesw-resize',
+    'resize-sw': 'nesw-resize',
+    'resize-nw': 'nwse-resize',
+    'resize-se': 'nwse-resize',
+    rotate: 'grab',
+  }
+
+  const updateCursor = (p: { x: number; y: number }) => {
+    const cv = canvasRef.current
+    if (!cv) return
+    if (mode !== 'select') {
+      cv.style.cursor = 'crosshair'
+      return
+    }
+    let cur = ''
+    if (selected) {
+      const ht = hitHandle(selected, p)
+      if (ht) cur = HANDLE_CURSORS[ht] ?? ''
+      else if (hitFrame(p)) cur = 'move'
+    }
+    cv.style.cursor = cur
+  }
+
   const onPointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
     const drag = dragRef.current
-    if (!drag) return
     const p = toCanvas(e.clientX, e.clientY)
+    if (!drag) {
+      updateCursor(p)
+      return
+    }
     const f0 = drag.startFrame
 
     if (drag.type === 'draw') {
@@ -566,7 +631,10 @@ const TemplateFrameEditorPage: React.FC = () => {
       return
     }
 
-    // Resize — anchor tetap, ukuran dari proyeksi lokal pointer
+    // Resize gaya software grafis — berbasis DELTA pointer sejak mulai drag:
+    // - Tepi yang ditarik bergeser PERSIS mengikuti pointer (1:1, tanpa lompatan
+    //   awal), sisi/sudut berlawanan tetap terkunci di anchor.
+    // - Corner: width & height bebas mengikuti arah tarikan.
     const rad = (f0.rotation * Math.PI) / 180
     const cos = Math.cos(-rad)
     const sin = Math.sin(-rad)
@@ -575,31 +643,18 @@ const TemplateFrameEditorPage: React.FC = () => {
     const lx = ax * cos - ay * sin
     const ly = ax * sin + ay * cos
 
-    const horizontal = drag.type.includes('e') || drag.type.includes('w')
-    const vertical = drag.type.includes('n') || drag.type.includes('s')
+    const dirX = drag.type.includes('w') ? -1 : drag.type.includes('e') ? 1 : 0
+    const dirY = drag.type.includes('n') ? -1 : drag.type.includes('s') ? 1 : 0
 
-    let newW = f0.width
-    let newH = f0.height
+    const dlx = lx - (drag.grabLx ?? 0)
+    const dly = ly - (drag.grabLy ?? 0)
 
-    if (drag.type.startsWith('resize-') && drag.type !== 'resize-n' && drag.type !== 'resize-s' && drag.type !== 'resize-e' && drag.type !== 'resize-w') {
-      // Corner: proporsional menjaga rasio
-      const s = Math.max(
-        Math.abs(lx) / Math.max(f0.width, 1),
-        Math.abs(ly) / Math.max(f0.height, 1)
-      )
-      newW = Math.max(MIN_SIZE, f0.width * s)
-      newH = Math.max(MIN_SIZE, f0.height * s)
-    } else if (horizontal) {
-      newW = Math.max(MIN_SIZE, Math.abs(lx))
-    } else if (vertical) {
-      newH = Math.max(MIN_SIZE, Math.abs(ly))
-    }
+    const newW = dirX !== 0 ? Math.max(MIN_SIZE, f0.width + dirX * dlx) : f0.width
+    const newH = dirY !== 0 ? Math.max(MIN_SIZE, f0.height + dirY * dly) : f0.height
 
-    // Posisi tengah baru agar anchor tetap
-    const signX = drag.type.includes('e') ? 1 : drag.type.includes('w') ? -1 : 0
-    const signY = drag.type.includes('s') ? 1 : drag.type.includes('n') ? -1 : 0
-    const offX = signX * (newW / 2)
-    const offY = signY * (newH / 2)
+    // Posisi tengah baru agar anchor (sisi/sudut berlawanan) tetap
+    const offX = dirX * (newW / 2)
+    const offY = dirY * (newH / 2)
     const cr = Math.cos(rad)
     const sr = Math.sin(rad)
     const ncx = (drag.anchor?.x ?? 0) + offX * cr - offY * sr
@@ -627,13 +682,18 @@ const TemplateFrameEditorPage: React.FC = () => {
 
   const rectToLocalArea = (f: CameraFrame, r: { x1: number; y1: number; x2: number; y2: number }): ClearArea | null => {
     const rad = (f.rotation * Math.PI) / 180
+    const fx = f.flip_h ? -1 : 1
+    const fy = f.flip_v ? -1 : 1
     const cos = Math.cos(-rad)
     const sin = Math.sin(-rad)
     const cx = f.x + f.width / 2
     const cy = f.y + f.height / 2
     const conv = (px: number, py: number): [number, number] => {
-      const dx = px - cx
-      const dy = py - cy
+      let dx = px - cx
+      let dy = py - cy
+      // Pointer → koordinat konten: balikkan flip dulu, lalu rotasi
+      dx *= fx
+      dy *= fy
       return [dx * cos - dy * sin + f.width / 2, dx * sin + dy * cos + f.height / 2]
     }
     const [lx1, ly1] = conv(r.x1, r.y1)
