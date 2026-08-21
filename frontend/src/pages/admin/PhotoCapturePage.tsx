@@ -58,7 +58,9 @@ const PhotoCapturePage: React.FC = () => {
   const activeVideoRef = useRef<HTMLVideoElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const countdownRef = useRef<number | null>(null)
-  const captureFnRef = useRef<() => void>(() => {})
+  const captureTriggeredRef = useRef(false)
+  const captureInFlightRef = useRef(false)
+  const captureFnRef = useRef<() => Promise<void>>(() => Promise.resolve())
 
   // ===== Slot preview =====
   // Cerminan PhotoRenderService::resolveSlots agar preview sesuai hasil akhir
@@ -209,20 +211,40 @@ const PhotoCapturePage: React.FC = () => {
     setPhase('countdown')
     setCountdown(COUNTDOWN_SECONDS)
 
-    const tick = () => {
-      setCountdown((prev) => {
-        if (prev === null) return prev
-        if (prev <= 1) {
-          clearInterval(countdownRef.current ?? undefined)
-          captureFnRef.current()
-          return null
-        }
-        return prev - 1
-      })
+    if (countdownRef.current) {
+      clearInterval(countdownRef.current)
+    }
+    countdownRef.current = window.setInterval(() => {
+      setCountdown((prev) => (prev === null ? prev : prev - 1))
+    }, 1000)
+  }
+
+  // Saat countdown mencapai 0, ambil foto TEPAT SATU KALI.
+  // Pemicu capture tidak boleh berada di dalam updater setState —
+  // StrictMode menjalankan updater dua kali dan memicu double-capture.
+  // captureTriggeredRef mencegah pemicuan ganda; flag capture internal
+  // dikelola oleh doCapture sendiri (tidak di-set di sini).
+  useEffect(() => {
+    if (phase !== 'countdown' || countdown === null || countdown > 0) return
+
+    if (countdownRef.current) {
+      clearInterval(countdownRef.current)
+      countdownRef.current = null
     }
 
-    countdownRef.current = window.setInterval(tick, 1000)
-  }
+    if (!captureTriggeredRef.current) {
+      captureTriggeredRef.current = true
+      captureFnRef
+        .current()
+        .catch(() => {})
+        .finally(() => {
+          // Jamin UI selalu kembali ke keadaan siap, baik capture sukses
+          // maupun gagal — mencegah stuck di "Hitung Mundur".
+          captureTriggeredRef.current = false
+          setPhase('idle')
+        })
+    }
+  }, [phase, countdown])
 
   useEffect(() => {
     return () => {
@@ -232,7 +254,13 @@ const PhotoCapturePage: React.FC = () => {
 
   // ===== Capture =====
   const doCapture = async () => {
-    if (!session || !videoRef.current) return
+    if (!session || !videoRef.current) {
+      // Tidak bisa mengambil foto — kembali ke keadaan siap agar tidak stuck
+      setPhase('idle')
+      return
+    }
+    if (captureInFlightRef.current) return
+    captureInFlightRef.current = true
     setIsCapturing(true)
 
     try {
@@ -254,7 +282,6 @@ const PhotoCapturePage: React.FC = () => {
 
       const result = await sessionApi.capture(session.id, base64)
       setSession(result.session)
-      setPhase('idle')
 
       if (result.all_done) {
         // Semua frame selesai — matikan kamera, frame sudah tampil semua
@@ -268,7 +295,9 @@ const PhotoCapturePage: React.FC = () => {
     } catch {
       toast.error('Gagal mengambil foto. Coba lagi.')
     } finally {
+      captureInFlightRef.current = false
       setIsCapturing(false)
+      setPhase('idle')
     }
   }
 
@@ -608,7 +637,7 @@ const PhotoCapturePage: React.FC = () => {
 
             {/* Countdown di dalam bingkai frame yang sedang diambil */}
             <AnimatePresence>
-              {phase === 'countdown' && countdown !== null && activeSlot && template && (
+              {phase === 'countdown' && countdown !== null && countdown > 0 && activeSlot && template && (
                 <motion.div
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}

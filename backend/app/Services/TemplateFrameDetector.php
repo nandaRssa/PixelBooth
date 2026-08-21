@@ -220,27 +220,48 @@ class TemplateFrameDetector
                 continue;
             }
 
-            // Pilih run kolom terlebar (area foto utama)
-            $best = null;
+            // Gabungkan run kolom yang hanya terpisah <= 2 piksel
+            $mergedCols = [];
             foreach ($colRuns as $colRun) {
-                if ($best === null || ($colRun['end'] - $colRun['start']) > ($best['end'] - $best['start'])) {
-                    $best = $colRun;
+                $last = count($mergedCols) - 1;
+                if ($last >= 0 && ($colRun['start'] - $mergedCols[$last]['end']) <= 2) {
+                    $mergedCols[$last]['end'] = $colRun['end'];
+                } else {
+                    $mergedCols[] = $colRun;
                 }
             }
-            $slotW = $best['end'] - $best['start'] + 1;
-            if ($slotW < $width * 0.10) {
-                continue;
+
+            // Semua sel kolom yang cukup lebar (mendukung grid multi-kolom),
+            // bukan hanya yang terlebar. Dekorasi tipis disaring dengan
+            // membandingkan lebar sel terhadap sel terbesar dalam baris ini.
+            $cells = [];
+            foreach ($mergedCols as $colRun) {
+                $cellW = $colRun['end'] - $colRun['start'] + 1;
+                if ($cellW < $width * 0.08) {
+                    continue;
+                }
+                $cells[] = ['start' => $colRun['start'], 'w' => $cellW];
             }
 
-            $slots[] = [
-                'x' => $best['start'],
-                'y' => $run['start'],
-                'w' => $slotW,
-                'h' => $runHeight,
-            ];
+            if (count($cells) > 1) {
+                $maxCellW = max(array_map(fn ($c) => $c['w'], $cells));
+                $cells = array_values(array_filter(
+                    $cells,
+                    fn ($c) => $c['w'] >= $maxCellW * 0.45
+                ));
+            }
+
+            foreach ($cells as $cell) {
+                $slots[] = [
+                    'x' => $cell['start'],
+                    'y' => $run['start'],
+                    'w' => $cell['w'],
+                    'h' => $runHeight,
+                ];
+            }
         }
 
-        usort($slots, fn ($a, $b) => $a['y'] <=> $b['y']);
+        usort($slots, fn ($a, $b) => $a['y'] <=> $b['y'] ?: $a['x'] <=> $b['x']);
 
         return $slots;
     }

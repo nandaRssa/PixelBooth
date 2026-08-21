@@ -72,6 +72,36 @@ class TemplateFrameDetectorTest extends TestCase
         }
     }
 
+    public function test_detects_2x2_grid_frames(): void
+    {
+        $tmp = tempnam(sys_get_temp_dir(), 'tpl') . '.png';
+        $w = 872;
+        $h = 1429;
+        $this->makeTemplateImage($tmp, $w, $h, [
+            // Baris atas: 2 kolom
+            [100, 100, 420, 480],
+            [452, 100, 772, 480],
+            // Baris bawah: 2 kolom
+            [100, 520, 420, 900],
+            [452, 520, 772, 900],
+        ]);
+
+        $result = (new TemplateFrameDetector())->detect($tmp);
+        @unlink($tmp);
+
+        $this->assertNotNull($result, 'Seharusnya 4 bingkai terdeteksi');
+        $this->assertSame(4, $result['frame_count']);
+        $slots = $result['frame_configuration'];
+        $this->assertCount(4, $slots);
+
+        // Urut: kiri-atas, kanan-atas, kiri-bawah, kanan-bawah
+        $this->assertLessThan($slots[1]['x'], $slots[0]['x']);
+        $this->assertSame($slots[0]['y'], $slots[1]['y']);
+        $this->assertLessThan($slots[2]['y'], $slots[0]['y']);
+        $this->assertLessThan($slots[3]['x'], $slots[2]['x']);
+        $this->assertSame($slots[2]['y'], $slots[3]['y']);
+    }
+
     public function test_scales_slots_to_canvas_dimensions(): void
     {
         $tmp = tempnam(sys_get_temp_dir(), 'tpl') . '.png';
