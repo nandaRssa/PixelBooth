@@ -56,15 +56,9 @@ export function buildOverlayCanvas(
     tmp.height = mask.imageData.height
     tmpCtx.putImageData(mask.imageData, 0, 0)
 
-    // Skala bbox ruang kerja → koordinat canvas penuh
-    const inv = 1 / wt.scale
-    ctx.drawImage(
-      tmp,
-      mask.bx * inv,
-      mask.by * inv,
-      mask.bw * inv,
-      mask.bh * inv
-    )
+    // bx/by/bw/bh sudah koordinat canvas — drawImage sekaligus meng-upscale
+    // imageData ruang kerja ke ukuran canvas. Jangan konversi kedua kali.
+    ctx.drawImage(tmp, mask.bx, mask.by, mask.bw, mask.bh)
   }
   ctx.globalCompositeOperation = 'source-over'
 

@@ -58,7 +58,10 @@ const HANDLE_TOL_PX = 12
 const ROT_HANDLE_DIST = 34
 
 const DEFAULT_CLEAR = {
-  clear_zone: 50,
+  // Default 60 (smart clear): elemen dekorasi yang masuk ke dalam frame
+  // otomatis dipertahankan (menimpa kamera). Pakai toggle "Full Clear"
+  // untuk slot polos yang ingin dibolongi 1 frame penuh.
+  clear_zone: 60,
   clear_expansion: 25,
   region_sensitivity: 50,
   min_region_size: 1,
@@ -159,8 +162,9 @@ const TemplateFrameEditorPage: React.FC = () => {
         tmp.width = mask.imageData.width
         tmp.height = mask.imageData.height
         tmpCtx.putImageData(mask.imageData, 0, 0)
-        const inv = 1 / wt.scale
-        ctx.drawImage(tmp, mask.bx * inv, mask.by * inv, mask.bw * inv, mask.bh * inv)
+        // bx/by/bw/bh sudah dalam koordinat canvas (computeHoleMask yang
+        // mengonversi dari ruang kerja) — JANGAN dikonversi lagi.
+        ctx.drawImage(tmp, mask.bx, mask.by, mask.bw, mask.bh)
       }
       ctx.globalCompositeOperation = 'source-over'
       holesRef.current = canvas
@@ -998,7 +1002,7 @@ ctx.restore()
           )}
           {/* Penanda versi build — untuk memastikan bundle terbaru yang dimuat */}
           <div className="absolute bottom-2 right-3 text-[10px] text-[#555] select-none pointer-events-none">
-            editor-v6 · dual-mode
+            editor-v9 · full-clear-toggle
           </div>
         </div>
 
@@ -1149,6 +1153,20 @@ ctx.restore()
           {selected && (
             <section className={`bg-[#141414] border border-[#2A2A2A] rounded-xl p-4 space-y-3 ${frameMode === 'auto' ? 'opacity-50 pointer-events-none' : ''}`}>
               <h3 className="text-white text-sm font-semibold">Fine Tune Remove</h3>
+              <label className="flex items-center justify-between cursor-pointer">
+                <span className="text-[#A0A0A0] text-xs font-medium flex items-center gap-1.5">
+                  Full Clear
+                  <span className="text-[#606060] text-[10px] normal-case">(bolong 1 frame penuh)</span>
+                </span>
+                <input
+                  type="checkbox"
+                  checked={selected.clear_zone >= 100}
+                  onChange={(e) =>
+                    updateFrame(selected.id, { clear_zone: e.target.checked ? 100 : 60 })
+                  }
+                  className="accent-cyan-400 w-4 h-4"
+                />
+              </label>
               {slider('Center Clear Priority', 'clear_zone', 5, 100, 1, '%')}
               {slider('Clear Expansion', 'clear_expansion', 0, 200, 5, '%')}
               {slider('Region Sensitivity', 'region_sensitivity', 0, 100, 1, '')}

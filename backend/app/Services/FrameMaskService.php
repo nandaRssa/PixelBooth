@@ -62,7 +62,7 @@ class FrameMaskService
             'rotation' => (float) ($frame['rotation'] ?? 0),
             'flip_h' => (bool) ($frame['flip_h'] ?? false),
             'flip_v' => (bool) ($frame['flip_v'] ?? false),
-            'clear_zone' => min(100.0, max(5.0, (float) ($frame['clear_zone'] ?? 50))),
+            'clear_zone' => min(100.0, max(5.0, (float) ($frame['clear_zone'] ?? 60))),
             'clear_expansion' => min(200.0, max(0.0, (float) ($frame['clear_expansion'] ?? 25))),
             'region_sensitivity' => min(100.0, max(0.0, (float) ($frame['region_sensitivity'] ?? 50))),
             'min_region_size' => min(50.0, max(0.0, (float) ($frame['min_region_size'] ?? 1))),

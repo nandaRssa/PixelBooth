@@ -41,7 +41,7 @@ export function normalizeFrame(frame: Partial<CameraFrame>): CameraFrame {
     rotation: Number(frame.rotation ?? 0),
     flip_h: Boolean(frame.flip_h ?? false),
     flip_v: Boolean(frame.flip_v ?? false),
-    clear_zone: clamp(Number(frame.clear_zone ?? 50), 5, 100),
+    clear_zone: clamp(Number(frame.clear_zone ?? 60), 5, 100),
     clear_expansion: clamp(Number(frame.clear_expansion ?? 25), 0, 200),
     region_sensitivity: clamp(Number(frame.region_sensitivity ?? 50), 0, 100),
     min_region_size: clamp(Number(frame.min_region_size ?? 1), 0, 50),
