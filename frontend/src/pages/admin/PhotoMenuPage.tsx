@@ -297,7 +297,7 @@ const PhotoMenuPage: React.FC = () => {
                   <img
                     src={template.template_url}
                     alt={template.name}
-                    className="absolute inset-0 w-full h-full object-cover opacity-40"
+                    className="absolute inset-0 w-full h-full object-cover"
                   />
                 ) : (
                   <div className="absolute inset-0 flex items-center justify-center bg-pb-elevated">
@@ -307,7 +307,7 @@ const PhotoMenuPage: React.FC = () => {
 
                 {/* Badge jumlah frame */}
                 <span className="absolute top-2 right-2 px-2 py-0.5 rounded-md bg-black/60 backdrop-blur-sm
-                  text-pb-text text-xs font-medium">
+                  text-white text-xs font-medium">
                   {template.frame_count} frame
                 </span>
 
@@ -320,8 +320,8 @@ const PhotoMenuPage: React.FC = () => {
 
                 {/* Info bawah */}
                 <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/90 to-transparent">
-                  <p className="text-pb-text text-sm font-medium truncate">{template.name}</p>
-                  <p className="text-pb-text-secondary text-xs">
+                  <p className="text-white text-sm font-medium truncate">{template.name}</p>
+                  <p className="text-white/70 text-xs">
                     {template.canvas_width} x {template.canvas_height}
                   </p>
                 </div>

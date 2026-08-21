@@ -527,7 +527,7 @@ const PhotoCapturePage: React.FC = () => {
       <div className="flex items-center gap-3 mb-6">
         <div className="flex-1 h-2 bg-pb-elevated rounded-full overflow-hidden">
           <div
-            className="h-full bg-white rounded-full transition-all duration-300"
+            className="h-full bg-pb-accent rounded-full transition-all duration-300"
             style={{
               width: `${(allDone ? totalFrames : completedCount) / totalFrames * 100}%`,
             }}

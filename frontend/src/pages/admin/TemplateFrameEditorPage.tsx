@@ -1080,16 +1080,16 @@ ctx.restore()
     )
 
   return (
-    <div className="flex flex-col h-[calc(100vh-8rem)]">
+    <div className="flex flex-col h-[calc(100vh-4rem)]">
       {/* ===== Header ===== */}
-      <div className="flex items-center justify-between mb-4 shrink-0">
-        <div className="flex items-center gap-3">
+      <div className="flex items-center justify-between flex-wrap gap-y-2 mb-4 shrink-0">
+        <div className="flex items-center gap-3 min-w-0">
           <Button variant="ghost" size="sm" onClick={() => navigate('/templates')} leftIcon={<ArrowLeft size={16} />}>
             Kembali
           </Button>
-          <div>
+          <div className="min-w-0">
             <h1 className="text-pb-text text-xl font-bold leading-tight">Frame Editor</h1>
-            <p className="text-pb-text-muted text-xs mt-0.5">{template.name}</p>
+            <p className="text-pb-text-muted text-xs mt-0.5 truncate">{template.name}</p>
           </div>
           <span className="ml-2 px-2 py-0.5 rounded-md bg-amber-500/15 border border-amber-500/30 text-amber-400 text-xs font-medium">
             Draft — belum siap dipakai
@@ -1127,7 +1127,7 @@ ctx.restore()
           </button>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           <Button
             variant={testCamera ? 'primary' : 'secondary'}
             size="md"

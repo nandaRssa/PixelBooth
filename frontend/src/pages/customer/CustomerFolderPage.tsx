@@ -107,17 +107,17 @@ const CustomerFolderPage: React.FC = () => {
         </div>
 
         {/* QR + Share */}
-        <div className="bg-pb-surface border border-pb-border rounded-xl p-4 mb-4 flex items-center gap-4">
+        <div className="bg-pb-surface border border-pb-border rounded-xl p-4 mb-4 flex items-center gap-4 flex-wrap">
           <div className="bg-white p-2 rounded-lg flex-shrink-0">
             <QRCodeSVG value={pageUrl} size={64} fgColor="#0A0A0A" />
           </div>
-          <div className="flex-1">
+          <div className="flex-1 min-w-[160px]">
             <p className="text-pb-text text-sm font-medium">Bagikan Galeri Ini</p>
             <p className="text-pb-text-muted text-xs mt-0.5 leading-relaxed">
               Scan QR atau bagikan link untuk mengakses semua foto.
             </p>
           </div>
-          <Button variant="secondary" size="md" onClick={handleShare} leftIcon={<Share2 size={16} />}>
+          <Button variant="secondary" size="md" onClick={handleShare} leftIcon={<Share2 size={16} />} className="shrink-0">
             Bagikan
           </Button>
         </div>

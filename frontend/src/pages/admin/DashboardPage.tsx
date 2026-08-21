@@ -100,7 +100,7 @@ const DashboardPage: React.FC = () => {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.4 }}
-        className="mt-8 grid grid-cols-3 gap-4"
+        className="mt-8 grid grid-cols-1 sm:grid-cols-3 gap-4"
       >
         {[
           { label: 'Total Foto', value: '—' },
