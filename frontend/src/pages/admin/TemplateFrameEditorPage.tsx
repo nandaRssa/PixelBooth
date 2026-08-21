@@ -13,6 +13,7 @@ import {
   MousePointer2,
   Trash2,
   Undo2,
+  Redo2,
   Video,
   VideoOff,
   Eye,
@@ -596,8 +597,12 @@ ctx.restore()
       }
       if (ht) {
         const f = selected
-        const sx = ht.includes('e') ? 1 : ht.includes('w') ? -1 : 0
-        const sy = ht.includes('s') ? 1 : ht.includes('n') ? -1 : 0
+        // Arah diambil dari SISI handle setelah prefiks dibuang — kata
+        // "resize" mengandung huruf 's' & 'e', jadi includes() pada nama
+        // tipe mentah membuat grip atas/kiri salah arah (frame melompat).
+        const d = ht.replace(/^resize-/, '')
+        const sx = d.includes('e') ? 1 : d.includes('w') ? -1 : 0
+        const sy = d.includes('s') ? 1 : d.includes('n') ? -1 : 0
         const anchorLocal: [number, number] = [-sx * f.width / 2, -sy * f.height / 2]
         const rad = (f.rotation * Math.PI) / 180
         const c = { x: f.x + f.width / 2, y: f.y + f.height / 2 }
@@ -721,8 +726,10 @@ ctx.restore()
     const lx = ax * cos - ay * sin
     const ly = ax * sin + ay * cos
 
-    const dirX = drag.type.includes('w') ? -1 : drag.type.includes('e') ? 1 : 0
-    const dirY = drag.type.includes('n') ? -1 : drag.type.includes('s') ? 1 : 0
+    // Konvensi arah SAMA dengan onPointerDown: baca sufiks setelah "resize-"
+    const d = drag.type.replace(/^resize-/, '')
+    const dirX = d.includes('e') ? 1 : d.includes('w') ? -1 : 0
+    const dirY = d.includes('s') ? 1 : d.includes('n') ? -1 : 0
 
     const dlx = lx - (drag.grabLx ?? 0)
     const dly = ly - (drag.grabLy ?? 0)
@@ -798,14 +805,19 @@ ctx.restore()
     return { x: cx + xr * fx, y: cy + yr * fy }
   }
 
-  // ===== Undo history =====
+  // ===== Undo / Redo history =====
   const historyRef = useRef<CameraFrame[][]>([])
+  const redoRef = useRef<CameraFrame[][]>([])
   const lastHistAtRef = useRef(0)
 
-  /** Simpan salinan kondisi frames saat ini ke stack undo (maks 60 langkah). */
+  /**
+   * Simpan salinan kondisi frames saat ini ke stack undo (maks 60 langkah).
+   * Setiap edit baru membatalkan jalur redo — perilaku standar editor.
+   */
   const pushHistory = () => {
     historyRef.current.push(frames.map((f) => ({ ...f })))
     if (historyRef.current.length > 60) historyRef.current.shift()
+    redoRef.current.length = 0
   }
 
   // ===== Frame ops =====
@@ -873,12 +885,31 @@ ctx.restore()
     while (historyRef.current.length > 0) {
       const snap = historyRef.current.pop()!
       if (JSON.stringify(snap) === cur) continue // lewati snapshot redundan
+      // Kondisi sekarang masuk jalur redo agar Ctrl+Y bisa memulihkannya
+      redoRef.current.push(frames.map((f) => ({ ...f })))
+      if (redoRef.current.length > 60) redoRef.current.shift()
       setFrames(snap)
       setSelectedId((sid) => (snap.some((f) => f.id === sid) ? sid : null))
-      toast.info('Undo')
       return
     }
+    // Satu-satunya umpan balik undo: hanya saat tidak ada yang bisa dipulihkan
     toast.info('Tidak ada lagi yang bisa di-undo')
+  }
+
+  /** Redo (Ctrl+Y / Ctrl+Shift+Z): kebalikan undo. */
+  const redo = () => {
+    const cur = JSON.stringify(frames)
+    while (redoRef.current.length > 0) {
+      const snap = redoRef.current.pop()!
+      if (JSON.stringify(snap) === cur) continue
+      // Langsung dorong ke stack undo — JANGAN lewat pushHistory (menghapus redo)
+      historyRef.current.push(frames.map((f) => ({ ...f })))
+      if (historyRef.current.length > 60) historyRef.current.shift()
+      setFrames(snap)
+      setSelectedId((sid) => (snap.some((f) => f.id === sid) ? sid : null))
+      return
+    }
+    toast.info('Tidak ada yang bisa di-redo')
   }
 
   // ===== Clipboard frame =====
@@ -886,8 +917,8 @@ ctx.restore()
 
   const copyFrame = () => {
     if (!selected) return
+    // Senyap: hasil copy langsung terasa lewat Ctrl+V, tak perlu notifikasi
     clipboardRef.current = { ...selected }
-    toast.success(`Frame ${frames.findIndex((f) => f.id === selected.id) + 1} dicopy`)
   }
 
   const pasteFrame = () => {
@@ -946,10 +977,11 @@ ctx.restore()
   }
 
   // ===== Keyboard shortcuts =====
-  // Undo Ctrl+Z · Copy Ctrl+C · Paste Ctrl+V · Duplicate Ctrl+D ·
-  // Delete/Backspace hapus frame terpilih. Diabaikan saat fokus di input.
-  const keyActionsRef = useRef({ undo, copyFrame, pasteFrame, duplicateFrame, deleteFrame })
-  keyActionsRef.current = { undo, copyFrame, pasteFrame, duplicateFrame, deleteFrame }
+  // Undo Ctrl+Z · Redo Ctrl+Y / Ctrl+Shift+Z · Copy Ctrl+C · Paste Ctrl+V ·
+  // Duplicate Ctrl+D · Delete/Backspace hapus frame terpilih.
+  // Diabaikan saat fokus di input.
+  const keyActionsRef = useRef({ undo, redo, copyFrame, pasteFrame, duplicateFrame, deleteFrame })
+  keyActionsRef.current = { undo, redo, copyFrame, pasteFrame, duplicateFrame, deleteFrame }
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -957,7 +989,13 @@ ctx.restore()
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return
       const mod = e.ctrlKey || e.metaKey
       const k = e.key.toLowerCase()
-      if (mod && k === 'z') {
+      if (mod && k === 'z' && e.shiftKey) {
+        e.preventDefault()
+        keyActionsRef.current.redo()
+      } else if (mod && k === 'y') {
+        e.preventDefault()
+        keyActionsRef.current.redo()
+      } else if (mod && k === 'z') {
         e.preventDefault()
         keyActionsRef.current.undo()
       } else if (mod && k === 'c') {
@@ -1184,6 +1222,15 @@ ctx.restore()
                 <Button
                   variant="outline"
                   size="sm"
+                  onClick={redo}
+                  disabled={redoRef.current.length === 0}
+                  leftIcon={<Redo2 size={14} />}
+                >
+                  Redo
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
                   onClick={addFrame}
                   leftIcon={<Plus size={14} />}
                 >
@@ -1192,7 +1239,7 @@ ctx.restore()
               </div>
             </div>
             <p className="text-[10px] text-[#555] mb-2 leading-relaxed">
-              Ctrl+Z undo · Ctrl+C copy · Ctrl+V paste · Ctrl+D duplikat · Backspace hapus
+              Ctrl+Z undo · Ctrl+Y redo · Ctrl+C copy · Ctrl+V paste · Ctrl+D duplikat · Backspace hapus
             </p>
             <div className="space-y-1.5 max-h-36 overflow-y-auto">
               {frames.map((f, i) => (

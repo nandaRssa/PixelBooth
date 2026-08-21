@@ -57,20 +57,22 @@ const ToastComponent: React.FC<ToastItemProps> = ({ toast, onDismiss }) => {
   const Icon = config.icon
 
   React.useEffect(() => {
-    const duration = toast.duration ?? 4000
+    // Durasi singkat untuk umpan balik ringan; error boleh menginap lebih lama
+    const fallback = toast.type === 'error' ? 4500 : toast.type === 'warning' ? 3000 : 2500
+    const duration = toast.duration ?? fallback
     const timer = setTimeout(() => onDismiss(toast.id), duration)
     return () => clearTimeout(timer)
-  }, [toast.id, toast.duration, onDismiss])
+  }, [toast.id, toast.duration, toast.type, onDismiss])
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: -20, scale: 0.95 }}
+      initial={{ opacity: 0, y: 20, scale: 0.95 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, y: -10, scale: 0.95 }}
+      exit={{ opacity: 0, y: 10, scale: 0.95 }}
       className={`
-        flex items-start gap-3 px-4 py-3 rounded-lg border
+        flex items-start gap-3 px-4 py-3 rounded-lg border pointer-events-auto
         ${config.bg} ${config.border}
-        shadow-2xl min-w-[300px] max-w-[400px]
+        shadow-2xl min-w-[260px] max-w-[380px]
       `}
     >
       <Icon size={16} className={`${config.iconColor} mt-0.5 flex-shrink-0`} />
@@ -93,7 +95,9 @@ interface ToastContainerProps {
 
 export const ToastContainer: React.FC<ToastContainerProps> = ({ toasts, onDismiss }) => {
   return (
-    <div className="fixed top-4 right-4 z-[100] flex flex-col gap-2">
+    // Bawah-tengah: tidak menutupi sidebar/tombol kanan, header, atau canvas atas.
+    // Container pointer-events-none agar klik tembus saat tidak ada toast.
+    <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-[100] flex flex-col items-center gap-2 pointer-events-none">
       <AnimatePresence mode="popLayout">
         {toasts.map((toast) => (
           <ToastComponent key={toast.id} toast={toast} onDismiss={onDismiss} />
