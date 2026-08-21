@@ -756,6 +756,106 @@ class SessionTest extends TestCase
         }
     }
 
+    public function test_keep_pulihkan_polkadot_kecil_di_bingkai_mode_isi_penuh(): void
+    {
+        // Skenario user: template putih dengan bingkai hitam di tepi; bingkai
+        // bertabur polkadot putih kecil. Frame kamera menimpa sebagian bingkai
+        // sehingga mode isi penuh (mayoritas putih) melubangi polkadot.
+        // Kuas Keep pada SATU polkadot harus memulihkannya; polkadot lain
+        // yang tidak di-keep tetap terlubang (selektif).
+        $w = 800;
+        $h = 1200;
+        $img = imagecreatetruecolor($w, $h);
+        imagefilledrectangle($img, 0, 0, $w - 1, $h - 1, imagecolorallocate($img, 255, 255, 255));
+        // Bingkai hitam vertikal di kiri (x 70-105)
+        imagefilledrectangle($img, 70, 0, 105, $h - 1, imagecolorallocate($img, 15, 15, 15));
+        // Polkadot putih d=14 di tengah bingkai (pusat x=87)
+        foreach ([300, 380, 460] as $cy) {
+            imagefilledellipse($img, 87, $cy, 7, 7, imagecolorallocate($img, 255, 255, 255));
+        }
+        ob_start();
+        imagepng($img);
+        $pngData = ob_get_clean();
+        imagedestroy($img);
+        Storage::disk('public')->put('templates/polkadot.png', $pngData);
+
+        $template = Template::create([
+            'name' => 'Template Polkadot',
+            'slug' => 'polkadot',
+            'template_file' => 'templates/polkadot.png',
+            'canvas_width' => $w,
+            'canvas_height' => $h,
+            'frame_count' => 1,
+            'frame_configuration' => [[
+                'id' => 1,
+                'order' => 0,
+                'x' => 55,
+                'y' => 240,
+                'width' => 280,
+                'height' => 300,
+                'rotation' => 0,
+                'flip_h' => false,
+                'flip_v' => false,
+                'clear_zone' => 60,
+                'clear_expansion' => 25,
+                'region_sensitivity' => 50,
+                'min_region_size' => 1,
+                'edge_protection' => 0,
+                'feather' => 2,
+                'edge_cleanup' => 0,
+                'protected_areas' => [],
+                'remove_areas' => [],
+                'remove_seeds' => [],
+                'protect_seeds' => [],
+                // Keep pada BINGKAI hitam (87,340): lokal = (32,100).
+                // Polkadot putih yang terkurung bingkai ikut dipulihkan
+                // lewat aturan pulau terkurung — tanpa perlu klik satu-satu.
+                'keep_seeds' => [['x' => 32, 'y' => 100, 's' => 1]],
+            ]],
+            'status' => 'active',
+        ]);
+
+        $photo = imagecreatetruecolor(200, 200);
+        imagefilledrectangle($photo, 0, 0, 199, 199, imagecolorallocate($photo, 255, 0, 0));
+        ob_start();
+        imagejpeg($photo, null, 95);
+        $photoData = ob_get_clean();
+        imagedestroy($photo);
+        $photoBase64 = 'data:image/jpeg;base64,' . base64_encode($photoData);
+
+        $session = $this->postJson('/api/sessions', [
+            'template_id' => $template->id,
+        ], $this->headers())->json('data');
+
+        $this->postJson("/api/sessions/{$session['id']}/capture", [
+            'image_base64' => $photoBase64,
+        ], $this->headers())->assertOk();
+
+        $response = $this->postJson("/api/sessions/{$session['id']}/complete", [], $this->headers());
+        $response->assertOk();
+
+        $final = imagecreatefromjpeg(Storage::disk('public')->path($response->json('data.photo.storage_path')));
+
+        // Latar putih dalam frame tetap ter-clear (foto merah terlihat)
+        $cw = imagecolorat($final, 250, 390);
+        $this->assertGreaterThan(180, ($cw >> 16) & 0xFF, 'Latar putih harus ter-clear');
+        $this->assertLessThan(120, ($cw >> 8) & 0xFF, 'Latar putih harus ter-clear');
+
+        // Bingkai yang di-keep tetap desain (hitam, bukan foto merah)
+        $cb = imagecolorat($final, 87, 340);
+        $this->assertLessThan(120, ($cb >> 16) & 0xFF, 'Bingkai yang di-keep tetap desain');
+
+        // SEMUA polkadot yang terkurung bingkai ikut pulih
+        foreach ([300, 380, 460] as $dotY) {
+            $ck = imagecolorat($final, 87, $dotY);
+            $this->assertGreaterThan(150, ($ck >> 8) & 0xFF, "Polkadot y={$dotY} harus pulih");
+            $this->assertGreaterThan(150, ($ck >> 16) & 0xFF, "Polkadot y={$dotY} harus pulih");
+            $this->assertGreaterThan(150, $ck & 0xFF, "Polkadot y={$dotY} harus pulih");
+        }
+
+        imagedestroy($final);
+    }
+
     public function test_cancel_menghapus_sesi_dan_file_temporary(): void
     {
         $template = $this->makeTemplate();

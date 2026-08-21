@@ -101,6 +101,19 @@ const TemplateFrameEditorPage: React.FC = () => {
   // Nomor urut strok global: menentukan pemenang konflik Remove vs Keep
   // (strok terakhir menang — bisa saling menimpa berulang kali).
   const strokeSeqRef = useRef(0)
+  // Lanjutkan nomor strok dari seed tersimpan agar strok baru SELALU lebih
+  // baru daripada strok sesi sebelumnya (jika tidak, keep/remove lama bisa
+  // menang karena nomornya lebih tinggi).
+  useEffect(() => {
+    let mx = 0
+    for (const f of frames) {
+      for (const s of f.remove_seeds) mx = Math.max(mx, s.s ?? 0)
+      for (const s of f.protect_seeds) mx = Math.max(mx, s.s ?? 0)
+      for (const s of f.keep_seeds) mx = Math.max(mx, s.s ?? 0)
+    }
+    if (mx >= strokeSeqRef.current) strokeSeqRef.current = mx
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [template?.id])
 
   const containerRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)

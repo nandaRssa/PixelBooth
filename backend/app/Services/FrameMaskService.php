@@ -357,16 +357,77 @@ class FrameMaskService
             }
         };
 
+        /**
+         * Pulau terkurung: piksel inside yang BELUM diklaim dan tidak
+         * terhubung ke tepi bbox melalui piksel tak-terklaim = pulau yang
+         * sepenuhnya dikelilingi region ini (mis. polkadot di bingkai yang
+         * di-keep) -> ikut diklaim. Hanya untuk Keep/Protect.
+         */
+        $claimEnclosed = function (array &$cov, ?array &$seqArr, int $seq) use ($inside, $bw, $bh, $bx0, $by0, $bx1, $by1): void {
+            if ($cov === []) {
+                return;
+            }
+            $outside = [];
+            $stack = [];
+            // Seed komplementer = piksel inside yang bersentuhan dengan
+            // luar frame (ring margin bbox TIDAK inside).
+            foreach ($inside as $idx => $_) {
+                if (isset($cov[$idx]) || isset($outside[$idx])) {
+                    continue;
+                }
+                $gx = $bx0 + ($idx % $bw);
+                $gy = $by0 + intdiv($idx, $bw);
+                $edge = $gx - 1 < $bx0 || $gx + 1 > $bx1 || $gy - 1 < $by0 || $gy + 1 > $by1
+                    || ! isset($inside[$idx - 1]) || ! isset($inside[$idx + 1])
+                    || ! isset($inside[$idx - $bw]) || ! isset($inside[$idx + $bw]);
+                if ($edge) {
+                    $outside[$idx] = 1;
+                    $stack[] = $idx;
+                }
+            }
+            while ($stack !== []) {
+                $idx = array_pop($stack);
+                $gx = $bx0 + ($idx % $bw);
+                $gy = $by0 + intdiv($idx, $bw);
+                foreach ([[-1, 0], [1, 0], [0, -1], [0, 1]] as [$ox, $oy]) {
+                    $nx = $gx + $ox;
+                    $ny = $gy + $oy;
+                    if ($nx < $bx0 || $ny < $by0 || $nx > $bx1 || $ny > $by1) {
+                        continue;
+                    }
+                    $nidx = ($ny - $by0) * $bw + ($nx - $bx0);
+                    if (isset($outside[$nidx]) || isset($cov[$nidx]) || ! isset($inside[$nidx])) {
+                        continue;
+                    }
+                    $outside[$nidx] = 1;
+                    $stack[] = $nidx;
+                }
+            }
+            foreach ($inside as $idx => $_) {
+                if (! isset($cov[$idx]) && ! isset($outside[$idx])) {
+                    $cov[$idx] = 1;
+                    if ($seqArr !== null && (! isset($seqArr[$idx]) || $seq > $seqArr[$idx])) {
+                        $seqArr[$idx] = $seq;
+                    }
+                }
+            }
+        };
+
         // Urutan prioritas: Protect > (Remove vs Keep: STROK TERAKHIR
         // menang, seri -> Keep) > Smart Clear. Remove dan Keep bebas
         // diulang bergantian.
         $seedProt = [];
+        $maxProtSeq = 0;
         foreach ($f['protect_seeds'] as $s) {
             $pt = $seedToWork((float) $s['x'], (float) $s['y']);
             if ($pt !== null) {
                 $floodRegion($seedProt, $empty, $pt[0], $pt[1]);
+                $maxProtSeq = max($maxProtSeq, (int) ($s['s'] ?? 0));
             }
         }
+        // Pulau terkurung dalam region protect ikut dilindungi
+        $nullSeq = null;
+        $claimEnclosed($seedProt, $nullSeq, $maxProtSeq);
         $protGrid = [];
         foreach ($inside as $idx => $_) {
             if (isset($prot[$idx]) || isset($seedProt[$idx])) {
@@ -384,12 +445,16 @@ class FrameMaskService
         }
         $keepCov = [];
         $keepSeq = [];
+        $maxKeepSeq = 0;
         foreach ($f['keep_seeds'] as $s) {
             $pt = $seedToWork((float) $s['x'], (float) $s['y']);
             if ($pt !== null) {
                 $floodClaim($keepCov, $keepSeq, $protGrid, $pt[0], $pt[1], (int) ($s['s'] ?? 0));
+                $maxKeepSeq = max($maxKeepSeq, (int) ($s['s'] ?? 0));
             }
         }
+        // Pulau terkurung dalam region keep ikut dipulihkan
+        $claimEnclosed($keepCov, $keepSeq, $maxKeepSeq);
 
         // Resolusi konflik per piksel antara region Remove dan Keep.
         $keepGrid = [];

@@ -340,13 +340,79 @@ export function computeHoleMask(
     }
   }
 
+  /**
+   * Pulau terkurung: piksel inside yang BELUM diklaim dan tidak terhubung
+   * ke tepi bbox melalui piksel tak-terklaim = pulau yang sepenuhnya
+   * dikelilingi region ini (mis. polkadot di bingkai yang di-keep) →
+   * ikut diklaim. Hanya untuk Keep/Protect (alat pelestari desain).
+   */
+  const claimEnclosed = (cov: Uint8Array, seqArr: Int32Array | null, seq: number) => {
+    let any = false
+    for (let i = 0; i < cov.length; i++) {
+      if (cov[i]) {
+        any = true
+        break
+      }
+    }
+    if (!any) return
+    const outside = new Uint8Array(inside.length)
+    const stack: number[] = []
+    // Seed komplementer = piksel inside yang bersentuhan dengan luar frame
+    // (ring margin bbox TIDAK inside, jadi jangan pakai baris/kolam tepi
+    // grid mentah). Dari sinilah "diluar" menjangkau area tak-terklaim.
+    for (let i = 0; i < inside.length; i++) {
+      if (!inside[i] || cov[i] || outside[i]) continue
+      const gx = bx0 + (i % bw)
+      const gy = by0 + Math.floor(i / bw)
+      const edge =
+        gx - 1 < bx0 ||
+        gx + 1 > bx1 ||
+        gy - 1 < by0 ||
+        gy + 1 > by1 ||
+        !inside[i - 1] ||
+        !inside[i + 1] ||
+        !inside[i - bw] ||
+        !inside[i + bw]
+      if (edge) {
+        outside[i] = 1
+        stack.push(i)
+      }
+    }
+    while (stack.length > 0) {
+      const idx = stack.pop() as number
+      const gx = bx0 + (idx % bw)
+      const gy = by0 + Math.floor(idx / bw)
+      for (const [ox, oy] of NEIGHBORS) {
+        const nx = gx + ox
+        const ny = gy + oy
+        if (nx < bx0 || ny < by0 || nx > bx1 || ny > by1) continue
+        const nidx = (ny - by0) * bw + (nx - bx0)
+        if (outside[nidx] || cov[nidx] || !inside[nidx]) continue
+        outside[nidx] = 1
+        stack.push(nidx)
+      }
+    }
+    for (let i = 0; i < inside.length; i++) {
+      if (inside[i] && !cov[i] && !outside[i]) {
+        cov[i] = 1
+        if (seqArr && seq > seqArr[i]) seqArr[i] = seq
+      }
+    }
+  }
+
   // Urutan prioritas: Protect > (Remove vs Keep: STROK TERAKHIR menang,
   // seri → Keep) > Smart Clear. Remove dan Keep bebas diulang bergantian.
   const seedProt = new Uint8Array(inside.length)
+  let maxProtSeq = 0
   for (const s of f.protect_seeds) {
     const pt = seedToWork(s.x, s.y)
-    if (pt) floodRegion(seedProt, EMPTY, pt[0], pt[1])
+    if (pt) {
+      floodRegion(seedProt, EMPTY, pt[0], pt[1])
+      maxProtSeq = Math.max(maxProtSeq, s.s ?? 0)
+    }
   }
+  // Pulau terkurung dalam region protect ikut dilindungi
+  claimEnclosed(seedProt, null, maxProtSeq)
   const protGrid = new Uint8Array(inside.length)
   for (let i = 0; i < protGrid.length; i++) {
     protGrid[i] = prot[i] | seedProt[i] ? 1 : 0
@@ -360,10 +426,16 @@ export function computeHoleMask(
   }
   const keepCov = new Uint8Array(inside.length)
   const keepSeq = new Int32Array(inside.length)
+  let maxKeepSeq = 0
   for (const s of f.keep_seeds) {
     const pt = seedToWork(s.x, s.y)
-    if (pt) floodClaim(keepCov, keepSeq, protGrid, pt[0], pt[1], s.s ?? 0)
+    if (pt) {
+      floodClaim(keepCov, keepSeq, protGrid, pt[0], pt[1], s.s ?? 0)
+      maxKeepSeq = Math.max(maxKeepSeq, s.s ?? 0)
+    }
   }
+  // Pulau terkurung dalam region keep ikut dipulihkan (strok keep terbaru)
+  claimEnclosed(keepCov, keepSeq, maxKeepSeq)
 
   // Resolusi konflik per piksel antara region Remove dan Keep.
   const keepGrid = new Uint8Array(inside.length)
