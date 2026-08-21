@@ -10,6 +10,8 @@ export interface FrameConfig {
   width: number
   height: number
   order: number
+  shape?: string
+  mask?: [number, number][]
 }
 
 export interface Template {

@@ -8,9 +8,6 @@
 
 import type { PreviewSlot } from './previewSlots'
 
-const PLACEHOLDER_MIN = 218
-const PLACEHOLDER_SATURATION = 40
-
 export async function buildTemplateOverlay(
   templateUrl: string,
   slots: PreviewSlot[],
@@ -30,30 +27,39 @@ export async function buildTemplateOverlay(
   const ctx = canvas.getContext('2d')
   if (!ctx) throw new Error('Canvas tidak tersedia')
 
-  // Regangkan template ke ukuran canvas, sama seperti PhotoRenderService::drawBase
+  // Regangkan template ke ukuran canvas, sama seperti PhotoRenderService
   ctx.drawImage(img, 0, 0, canvasWidth, canvasHeight)
 
-  for (const slot of slots) {
-    const x = Math.max(0, Math.round(slot.x))
-    const y = Math.max(0, Math.round(slot.y))
-    const w = Math.min(canvasWidth - x, Math.round(slot.width))
-    const h = Math.min(canvasHeight - y, Math.round(slot.height))
-    if (w <= 0 || h <= 0) continue
+  // Gunakan destination-out untuk melubangi canvas mengikuti mask/shape slot secara presisi
+  ctx.globalCompositeOperation = 'destination-out'
+  ctx.fillStyle = 'rgba(0,0,0,1)'
 
-    const imageData = ctx.getImageData(x, y, w, h)
-    const data = imageData.data
-    for (let i = 0; i < data.length; i += 4) {
-      const r = data[i]
-      const g = data[i + 1]
-      const b = data[i + 2]
-      const min = Math.min(r, g, b)
-      const max = Math.max(r, g, b)
-      if (min > PLACEHOLDER_MIN && max - min < PLACEHOLDER_SATURATION) {
-        data[i + 3] = 0
+  for (const slot of slots) {
+    ctx.beginPath()
+    const points = slot.mask
+    if (Array.isArray(points) && points.length >= 3) {
+      ctx.moveTo(points[0][0], points[0][1])
+      for (let i = 1; i < points.length; i++) {
+        ctx.lineTo(points[i][0], points[i][1])
       }
+      ctx.closePath()
+      ctx.fill()
+    } else if (slot.shape === 'circle' || slot.shape === 'oval') {
+      const cx = slot.x + slot.width / 2
+      const cy = slot.y + slot.height / 2
+      const rx = slot.width / 2
+      const ry = slot.height / 2
+      ctx.ellipse(cx, cy, rx, ry, 0, 0, 2 * Math.PI)
+      ctx.fill()
+    } else {
+      // Fallback: rectangle
+      ctx.rect(slot.x, slot.y, slot.width, slot.height)
+      ctx.fill()
     }
-    ctx.putImageData(imageData, x, y)
   }
+
+  // Kembalikan composite operation normal
+  ctx.globalCompositeOperation = 'source-over'
 
   return canvas.toDataURL('image/png')
 }

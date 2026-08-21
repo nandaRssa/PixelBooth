@@ -11,6 +11,8 @@ export interface PreviewSlot {
   y: number
   width: number
   height: number
+  shape?: string
+  mask?: [number, number][]
 }
 
 export function resolvePreviewSlots(template: Template, count: number): PreviewSlot[] {
@@ -27,7 +29,14 @@ export function resolvePreviewSlots(template: Template, count: number): PreviewS
           s.height > 0
       )
       .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
-      .map((s) => ({ x: s.x, y: s.y, width: s.width, height: s.height }))
+      .map((s) => ({
+        x: s.x,
+        y: s.y,
+        width: s.width,
+        height: s.height,
+        shape: s.shape,
+        mask: s.mask,
+      }))
 
     if (slots.length >= count) return slots.slice(0, count)
   }

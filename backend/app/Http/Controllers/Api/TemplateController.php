@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Template;
-use App\Services\TemplateFrameDetector;
+use App\Services\TemplateAnalyzerService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -44,7 +44,7 @@ class TemplateController extends Controller
             'preview_file' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
             'canvas_width' => ['required', 'integer', 'min:100'],
             'canvas_height' => ['required', 'integer', 'min:100'],
-            'frame_count' => ['required', 'integer', 'min:1', 'max:10'],
+            'frame_count' => ['required', 'integer', 'min:1', 'max:50'],
             'frame_configuration' => ['nullable', 'json'],
         ]);
 
@@ -61,11 +61,12 @@ class TemplateController extends Controller
             ? json_decode($request->frame_configuration, true)
             : null;
 
-        // Deteksi otomatis bingkai bila konfigurasi tidak diberikan manual
+        // Deteksi otomatis bingkai (Intelligent Template Analyzer) bila konfigurasi
+        // tidak diberikan manual.
         $detected = null;
         if (! is_array($frameConfig) || count($frameConfig) === 0) {
-            $detector = new TemplateFrameDetector();
-            $detected = $detector->detect(
+            $analyzer = new TemplateAnalyzerService();
+            $detected = $analyzer->analyze(
                 Storage::disk('public')->path($templatePath),
                 (int) $request->canvas_width,
                 (int) $request->canvas_height
@@ -80,7 +81,7 @@ class TemplateController extends Controller
             'canvas_width' => $request->canvas_width,
             'canvas_height' => $request->canvas_height,
             'frame_count' => $detected['frame_count'] ?? $request->frame_count,
-            'frame_configuration' => $detected['frame_configuration'] ?? $frameConfig,
+            'frame_configuration' => $detected['frames'] ?? $frameConfig,
             'status' => 'active',
         ]);
 
@@ -93,7 +94,46 @@ class TemplateController extends Controller
     }
 
     /**
-     * Deteksi ulang bingkai pada template yang sudah ada.
+     * Analisis file template yang belum disimpan — untuk preview & koreksi
+     * sebelum template di-save. Tidak menyimpan apa pun.
+     */
+    public function analyze(Request $request): JsonResponse
+    {
+        $request->validate([
+            'template_file' => ['required', 'file', 'mimes:jpg,jpeg,png,webp', 'max:20480'],
+            'canvas_width' => ['required', 'integer', 'min:100'],
+            'canvas_height' => ['required', 'integer', 'min:100'],
+        ]);
+
+        $tmp = $request->file('template_file')->store('templates/tmp', 'public');
+        $analyzer = new TemplateAnalyzerService();
+        $result = $analyzer->analyze(
+            Storage::disk('public')->path($tmp),
+            (int) $request->canvas_width,
+            (int) $request->canvas_height
+        );
+        Storage::disk('public')->delete($tmp);
+
+        if (! $result) {
+            return response()->json([
+                'message' => 'Tidak ada area foto yang terdeteksi pada template ini.',
+                'data' => [
+                    'frame_count' => 0,
+                    'method' => null,
+                    'frames' => [],
+                ],
+            ]);
+        }
+
+        return response()->json([
+            'message' => "Analisis selesai: {$result['frame_count']} bingkai ditemukan ({$result['method']}).",
+            'data' => $result,
+        ]);
+    }
+
+    /**
+     * Analisis ulang bingkai pada template yang sudah ada — mengembalikan hasil
+     * deteksi untuk preview & koreksi admin, TANPA langsung menyimpan.
      */
     public function detectFrames(Template $template): JsonResponse
     {
@@ -103,28 +143,28 @@ class TemplateController extends Controller
             ], 404);
         }
 
-        $detector = new TemplateFrameDetector();
-        $detected = $detector->detect(
+        $analyzer = new TemplateAnalyzerService();
+        $result = $analyzer->analyze(
             Storage::disk('public')->path($template->template_file),
             $template->canvas_width,
             $template->canvas_height
         );
 
-        if (! $detected) {
+        if (! $result) {
             return response()->json([
-                'message' => 'Tidak ada bingkai foto yang terdeteksi pada template ini.',
-                'data' => $template->fresh(),
+                'message' => 'Tidak ada area foto yang terdeteksi pada template ini.',
+                'data' => [
+                    'frame_count' => 0,
+                    'method' => null,
+                    'frames' => [],
+                    'template' => $template,
+                ],
             ]);
         }
 
-        $template->update([
-            'frame_count' => $detected['frame_count'],
-            'frame_configuration' => $detected['frame_configuration'],
-        ]);
-
         return response()->json([
-            'message' => "Deteksi selesai: {$detected['frame_count']} bingkai ditemukan.",
-            'data' => $template->fresh(),
+            'message' => "Deteksi selesai: {$result['frame_count']} bingkai ditemukan ({$result['method']}).",
+            'data' => array_merge($result, ['template' => $template]),
         ]);
     }
 
@@ -136,7 +176,7 @@ class TemplateController extends Controller
         $request->validate([
             'name' => ['sometimes', 'string', 'max:255'],
             'frame_configuration' => ['sometimes'],
-            'frame_count' => ['sometimes', 'integer', 'min:1', 'max:10'],
+            'frame_count' => ['sometimes', 'integer', 'min:1', 'max:50'],
             'status' => ['sometimes', 'in:active,inactive'],
         ]);
 

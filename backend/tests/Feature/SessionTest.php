@@ -216,6 +216,100 @@ class SessionTest extends TestCase
             ->assertStatus(422);
     }
 
+    public function test_complete_merender_foto_mengikuti_bentuk_lingkaran(): void
+    {
+        // Template PNG 800x1200: bg gelap pekat + lubang transparan lingkaran
+        // di tengah (r=100). Alpha template harus menjadi mask foto.
+        $w = 800;
+        $h = 1200;
+        $img = imagecreatetruecolor($w, $h);
+        imagealphablending($img, false);
+        imagesavealpha($img, true);
+        $bg = imagecolorallocatealpha($img, 40, 40, 40, 0);
+        imagefilledrectangle($img, 0, 0, $w - 1, $h - 1, $bg);
+        $t = imagecolorallocatealpha($img, 0, 0, 0, 127);
+        imagefilledellipse($img, 400, 600, 200, 200, $t);
+        ob_start();
+        imagepng($img);
+        $pngData = ob_get_clean();
+        imagedestroy($img);
+        Storage::disk('public')->put('templates/circle.png', $pngData);
+
+        $cx = 300;
+        $cy = 500;
+        $diameter = 200;
+        $mask = [];
+        for ($i = 0; $i < 48; $i++) {
+            $a = 2 * M_PI * $i / 48;
+            $mask[] = [
+                (int) round(($cx + $diameter / 2) + ($diameter / 2) * cos($a)),
+                (int) round(($cy + $diameter / 2) + ($diameter / 2) * sin($a))
+            ];
+        }
+
+        $template = Template::create([
+            'name' => 'Template Lingkaran',
+            'slug' => 'template-lingkaran',
+            'template_file' => 'templates/circle.png',
+            'canvas_width' => $w,
+            'canvas_height' => $h,
+            'frame_count' => 1,
+            'frame_configuration' => [[
+                'id' => 1,
+                'order' => 0,
+                'shape' => 'circle',
+                'x' => $cx,
+                'y' => $cy,
+                'width' => $diameter,
+                'height' => $diameter,
+                'position' => ['x' => $cx, 'y' => $cy],
+                'size' => ['width' => $diameter, 'height' => $diameter],
+                'mask' => $mask,
+                'radius' => 100,
+                'radius_y' => 100,
+                'corner_radius' => null,
+                'fill_ratio' => 0.785,
+                'source' => 'alpha',
+            ]],
+            'status' => 'active',
+        ]);
+
+        // Foto capture: merah solid
+        $photo = imagecreatetruecolor(200, 200);
+        $red = imagecolorallocate($photo, 255, 0, 0);
+        imagefilledrectangle($photo, 0, 0, 199, 199, $red);
+        ob_start();
+        imagejpeg($photo, null, 90);
+        $photoData = ob_get_clean();
+        imagedestroy($photo);
+        $photoBase64 = 'data:image/jpeg;base64,' . base64_encode($photoData);
+
+        $session = $this->postJson('/api/sessions', [
+            'template_id' => $template->id,
+        ], $this->headers())->json('data');
+
+        $this->postJson("/api/sessions/{$session['id']}/capture", [
+            'image_base64' => $photoBase64,
+        ], $this->headers())
+            ->assertOk()
+            ->assertJsonPath('data.all_done', true);
+
+        $response = $this->postJson("/api/sessions/{$session['id']}/complete", [], $this->headers());
+        $response->assertOk();
+
+        $finalPath = Storage::disk('public')->path($response->json('data.photo.storage_path'));
+        $final = imagecreatefromjpeg($finalPath);
+
+        $center = imagecolorat($final, 400, 600);
+        $this->assertGreaterThan(200, ($center >> 16) & 0xFF, 'Tengah lingkaran harus berisi foto merah');
+        $this->assertLessThan(120, ($center >> 8) & 0xFF, 'Tengah lingkaran harus merah, bukan hijau');
+
+        $corner = imagecolorat($final, 30, 30);
+        $this->assertLessThan(80, ($corner >> 16) & 0xFF, 'Di luar lingkaran harus tetap template gelap');
+
+        imagedestroy($final);
+    }
+
     public function test_cancel_menghapus_sesi_dan_file_temporary(): void
     {
         $template = $this->makeTemplate();

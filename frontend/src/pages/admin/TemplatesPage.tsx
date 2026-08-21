@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/Button'
 import { EmptyState, Spinner } from '@/components/ui/StatusBadge'
 import { toast } from '@/components/ui/Toast'
 import { useTemplates, useCreateTemplate, useDeleteTemplate, useDetectTemplateFrames } from '@/hooks/useTemplates'
+import { TemplateCalibrationModal } from '@/components/template/TemplateCalibrationModal'
 import type { Template } from '@/types'
 
 // ==========================================
@@ -40,6 +41,8 @@ const TemplatesPage: React.FC = () => {
   const [templateFile, setTemplateFile] = useState<File | null>(null)
   const [previewFile, setPreviewFile] = useState<File | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<Template | null>(null)
+  const [isCalibrateOpen, setIsCalibrateOpen] = useState(false)
+  const [calibrateTarget, setCalibrateTarget] = useState<Template | null>(null)
 
   const templateInputRef = useRef<HTMLInputElement>(null)
   const previewInputRef = useRef<HTMLInputElement>(null)
@@ -227,11 +230,13 @@ const TemplatesPage: React.FC = () => {
                 opacity-0 group-hover:opacity-100 transition-opacity">
                 <button
                   type="button"
-                  onClick={() => handleDetectFrames(template)}
+                  onClick={() => {
+                    setCalibrateTarget(template)
+                    setIsCalibrateOpen(true)
+                  }}
                   className="w-8 h-8 rounded-lg bg-black/60 backdrop-blur-sm
                     text-[#A0A0A0] hover:text-green-400 hover:bg-black/80 transition-colors flex items-center justify-center"
-                  title="Deteksi Ulang Bingkai"
-                  disabled={detectFrames.isPending}
+                  title="Kalibrasi Bingkai"
                 >
                   <Scan size={14} />
                 </button>
@@ -453,6 +458,19 @@ const TemplatesPage: React.FC = () => {
         confirmLabel="Ya, Hapus"
         loading={deleteTemplate.isPending}
         danger
+      />
+
+      {/* ===== Calibration Editor Modal ===== */}
+      <TemplateCalibrationModal
+        isOpen={isCalibrateOpen}
+        onClose={() => {
+          setIsCalibrateOpen(false)
+          setCalibrateTarget(null)
+        }}
+        template={calibrateTarget}
+        onSaveSuccess={() => {
+          templatesQuery.refetch()
+        }}
       />
     </div>
   )

@@ -468,15 +468,31 @@ const PhotoCapturePage: React.FC = () => {
     )
   }
 
-  const slotPosition = (slot: { x: number; y: number; width: number; height: number }) =>
-    template
-      ? {
-          left: `${(slot.x / template.canvas_width) * 100}%`,
-          top: `${(slot.y / template.canvas_height) * 100}%`,
-          width: `${(slot.width / template.canvas_width) * 100}%`,
-          height: `${(slot.height / template.canvas_height) * 100}%`,
-        }
-      : { inset: 0 }
+  const slotPosition = (slot: any) => {
+    if (!template) return { inset: 0 }
+    
+    const style: React.CSSProperties = {
+      left: `${(slot.x / template.canvas_width) * 100}%`,
+      top: `${(slot.y / template.canvas_height) * 100}%`,
+      width: `${(slot.width / template.canvas_width) * 100}%`,
+      height: `${(slot.height / template.canvas_height) * 100}%`,
+    }
+
+    if (slot.mask && slot.mask.length >= 3) {
+      const points = slot.mask.map((p: [number, number]) => {
+        const rx = ((p[0] - slot.x) / slot.width) * 100
+        const ry = ((p[1] - slot.y) / slot.height) * 100
+        return `${rx.toFixed(2)}% ${ry.toFixed(2)}%`
+      })
+      style.clipPath = `polygon(${points.join(', ')})`
+    } else if (slot.shape === 'circle' || slot.shape === 'oval') {
+      style.clipPath = 'ellipse(50% 50% at 50% 50%)'
+    } else if (slot.shape === 'triangle') {
+      style.clipPath = 'polygon(50% 0%, 100% 100%, 0% 100%)'
+    }
+
+    return style
+  }
 
   return (
     <div>
