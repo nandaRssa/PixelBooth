@@ -51,30 +51,6 @@ class FrameMaskService
             }
             return $out;
         };
-        $points = function ($v): array {
-            if (! is_array($v)) {
-                return [];
-            }
-            $out = [];
-            foreach ($v as $p) {
-                if (! is_array($p)) {
-                    continue;
-                }
-                $pt = [
-                    'x' => max(0.0, (float) ($p['x'] ?? 0)),
-                    'y' => max(0.0, (float) ($p['y'] ?? 0)),
-                ];
-                // Urutan strok untuk resolusi Remove vs Keep
-                if (isset($p['s']) && is_numeric($p['s'])) {
-                    $pt['s'] = (int) round((float) $p['s']);
-                }
-                $out[] = $pt;
-                if (count($out) >= 48) {
-                    break;
-                }
-            }
-            return $out;
-        };
 
         return [
             'id' => (int) ($frame['id'] ?? 0),
@@ -86,22 +62,14 @@ class FrameMaskService
             'rotation' => (float) ($frame['rotation'] ?? 0),
             'flip_h' => (bool) ($frame['flip_h'] ?? false),
             'flip_v' => (bool) ($frame['flip_v'] ?? false),
-            'clear_zone' => min(100.0, max(5.0, (float) ($frame['clear_zone'] ?? 60))),
+            'clear_zone' => min(100.0, max(5.0, (float) ($frame['clear_zone'] ?? 50))),
             'clear_expansion' => min(200.0, max(0.0, (float) ($frame['clear_expansion'] ?? 25))),
             'region_sensitivity' => min(100.0, max(0.0, (float) ($frame['region_sensitivity'] ?? 50))),
             'min_region_size' => min(50.0, max(0.0, (float) ($frame['min_region_size'] ?? 1))),
             'edge_protection' => min(100.0, max(0.0, (float) ($frame['edge_protection'] ?? 60))),
             'feather' => min(20.0, max(0.0, (float) ($frame['feather'] ?? 2))),
-            'edge_cleanup' => min(5.0, max(0.0, round((float) ($frame['edge_cleanup'] ?? 0) * 10) / 10)),
-            // Confidence hasil auto detection (0-100), null untuk frame manual
-            'confidence' => isset($frame['confidence']) && is_numeric($frame['confidence'])
-                ? round((float) $frame['confidence'], 1)
-                : null,
             'protected_areas' => $areas($frame['protected_areas'] ?? null),
             'remove_areas' => $areas($frame['remove_areas'] ?? null),
-            'remove_seeds' => $points($frame['remove_seeds'] ?? null),
-            'protect_seeds' => $points($frame['protect_seeds'] ?? null),
-            'keep_seeds' => $points($frame['keep_seeds'] ?? null),
         ];
     }
 
@@ -147,23 +115,17 @@ class FrameMaskService
         $expPx = $f['clear_expansion'] / 100 * min($fw, $fh);
         $dMax = $dHard + $expPx;
 
-        // Sangat peka warna: perubahan warna sekecil apa pun dipertahankan.
-        // Default sens 50 -> tol 10. Harus identik dengan frontend.
-        $tol = 1 + $f['region_sensitivity'] * 0.18;
+        $tol = 6 + $f['region_sensitivity'] * 1.14;
         $ep = $f['edge_protection'] / 100;
 
-        // Area manual disimpan dalam koordinat lokal frame dari sudut kiri-atas.
-        // Konversi ke basis pusat agar konsisten dengan klasifikasi grid, dan
-        // karena area adalah KONTEN frame, posisinya ikut dicerminkan flip.
-        $fxs = $f['flip_h'] ? -1 : 1;
-        $fys = $f['flip_v'] ? -1 : 1;
+        // Area manual disimpan dalam koordinat lokal frame (tidak dirotasi)
         $protLocal = [];
         foreach ($f['protected_areas'] as $a) {
-            $protLocal[] = [$a['x'] * $scale - $hw, $a['y'] * $scale - $hh, $a['w'] * $scale, $a['h'] * $scale];
+            $protLocal[] = [$a['x'] * $scale, $a['y'] * $scale, $a['w'] * $scale, $a['h'] * $scale];
         }
         $remLocal = [];
         foreach ($f['remove_areas'] as $a) {
-            $remLocal[] = [$a['x'] * $scale - $hw, $a['y'] * $scale - $hh, $a['w'] * $scale, $a['h'] * $scale];
+            $remLocal[] = [$a['x'] * $scale, $a['y'] * $scale, $a['w'] * $scale, $a['h'] * $scale];
         }
 
         // Bounding box axis-aligned dari frame yang dirotasi (clamp ke canvas)
@@ -203,18 +165,14 @@ class FrameMaskService
                 if (abs($lx) <= $hzW && abs($ly) <= $hzH) {
                     $seed[$idx] = 1;
                 }
-                // Area manual = konten frame: uji pada koordinat lokal yang
-                // sudah dicerminkan sesuai flip (sejalan dengan pasteRotatedCover)
-                $alx = $lx * $fxs;
-                $aly = $ly * $fys;
                 foreach ($protLocal as [$ax, $ay, $aw, $ah]) {
-                    if ($alx >= $ax && $alx <= $ax + $aw && $aly >= $ay && $aly <= $ay + $ah) {
+                    if ($lx >= $ax && $lx <= $ax + $aw && $ly >= $ay && $ly <= $ay + $ah) {
                         $prot[$idx] = 1;
                         break;
                     }
                 }
                 foreach ($remLocal as [$ax, $ay, $aw, $ah]) {
-                    if ($alx >= $ax && $alx <= $ax + $aw && $aly >= $ay && $aly <= $ay + $ah) {
+                    if ($lx >= $ax && $lx <= $ax + $aw && $ly >= $ay && $ly <= $ay + $ah) {
                         $rem[$idx] = 1;
                         break;
                     }
@@ -240,391 +198,11 @@ class FrameMaskService
         $avgG = (int) round($gs / $n);
         $avgB = (int) round($bs / $n);
 
-        // ===== REGION BRUSH (Remove / Protect / Keep-Restore) =====
-        // Sapuan kuas disimpan sebagai SEED POINT. Seluruh region terhubung
-        // (4-arah, mirip warna seed-nya sendiri) ikut diproses sampai
-        // bertemu boundary warna berbeda / area lindungan / batas frame.
-        // Ukuran brush TIDAK membatasi ukuran region. Harus identik dengan
-        // frameMask.ts.
-        $tolR = max($tol * 2, 12);
-        $empty = [];
-        $seedToWork = function (float $ax, float $ay) use ($scale, $hw, $hh, $fxs, $fys, $cos, $sin, $cx, $cy, $bx0, $by0, $bx1, $by1, $bw, $inside): ?array {
-            // Seed disimpan dari sudut kiri-atas frame pada ruang KONTEN
-            $alx = $ax * $scale - $hw;
-            $aly = $ay * $scale - $hh;
-            $lx = $alx * $fxs;
-            $ly = $aly * $fys;
-            $dx = $lx * $cos - $ly * $sin;
-            $dy = $lx * $sin + $ly * $cos;
-            $gx = (int) round($cx + $dx);
-            $gy = (int) round($cy + $dy);
-            if ($gx < $bx0 || $gy < $by0 || $gx > $bx1 || $gy > $by1) {
-                return null;
-            }
-            $idx = ($gy - $by0) * $bw + ($gx - $bx0);
-            if (! isset($inside[$idx])) {
-                return null;
-            }
-            return [$gx, $gy];
-        };
-        $floodRegion = function (array &$out, array $walls, int $sx, int $sy) use ($work, $gw, $bw, $bx0, $by0, $bx1, $by1, $inside, $tolR): void {
-            $startIdx = ($sy - $by0) * $bw + ($sx - $bx0);
-            if (isset($out[$startIdx]) || isset($walls[$startIdx]) || ! isset($inside[$startIdx])) {
-                return;
-            }
-            $c0 = imagecolorat($work, $sx, $sy);
-            $r0 = ($c0 >> 16) & 0xFF;
-            $g0 = ($c0 >> 8) & 0xFF;
-            $b0 = $c0 & 0xFF;
-            $out[$startIdx] = 1;
-            $stack = [$startIdx];
-            while ($stack !== []) {
-                $idx = array_pop($stack);
-                $gx = $bx0 + ($idx % $bw);
-                $gy = $by0 + intdiv($idx, $bw);
-                foreach ([[-1, 0], [1, 0], [0, -1], [0, 1]] as [$ox, $oy]) {
-                    $nx = $gx + $ox;
-                    $ny = $gy + $oy;
-                    if ($nx < $bx0 || $ny < $by0 || $nx > $bx1 || $ny > $by1) {
-                        continue;
-                    }
-                    $nidx = ($ny - $by0) * $bw + ($nx - $bx0);
-                    if (isset($out[$nidx]) || isset($walls[$nidx]) || ! isset($inside[$nidx])) {
-                        continue;
-                    }
-                    $c = imagecolorat($work, $nx, $ny);
-                    $diff = max(
-                        abs((($c >> 16) & 0xFF) - $r0),
-                        abs((($c >> 8) & 0xFF) - $g0),
-                        abs(($c & 0xFF) - $b0)
-                    );
-                    if ($diff > $tolR) {
-                        continue;
-                    }
-                    $out[$nidx] = 1;
-                    $stack[] = $nidx;
-                }
-            }
-        };
-
-        /**
-         * Flood per-seed dengan klaim urutan strok: mencatat cakupan region
-         * DAN nomor strok terbesar yang mengklaim tiap piksel. Dinding =
-         * protect saja agar Remove/Keep saling menimpa (strok terakhir
-         * menang), bukan saling memblokir permanen.
-         */
-        $floodClaim = function (array &$cov, array &$seqArr, array $walls, int $sx, int $sy, int $seq) use ($work, $gw, $bw, $bx0, $by0, $bx1, $by1, $inside, $tolR): void {
-            $startIdx = ($sy - $by0) * $bw + ($sx - $bx0);
-            if (isset($walls[$startIdx]) || ! isset($inside[$startIdx])) {
-                return;
-            }
-            $c0 = imagecolorat($work, $sx, $sy);
-            $r0 = ($c0 >> 16) & 0xFF;
-            $g0 = ($c0 >> 8) & 0xFF;
-            $b0 = $c0 & 0xFF;
-            $visited = [$startIdx => true];
-            $cov[$startIdx] = 1;
-            if (! isset($seqArr[$startIdx]) || $seq > $seqArr[$startIdx]) {
-                $seqArr[$startIdx] = $seq;
-            }
-            $stack = [$startIdx];
-            while ($stack !== []) {
-                $idx = array_pop($stack);
-                $gx = $bx0 + ($idx % $bw);
-                $gy = $by0 + intdiv($idx, $bw);
-                foreach ([[-1, 0], [1, 0], [0, -1], [0, 1]] as [$ox, $oy]) {
-                    $nx = $gx + $ox;
-                    $ny = $gy + $oy;
-                    if ($nx < $bx0 || $ny < $by0 || $nx > $bx1 || $ny > $by1) {
-                        continue;
-                    }
-                    $nidx = ($ny - $by0) * $bw + ($nx - $bx0);
-                    if (isset($visited[$nidx]) || isset($walls[$nidx]) || ! isset($inside[$nidx])) {
-                        continue;
-                    }
-                    $c = imagecolorat($work, $nx, $ny);
-                    $diff = max(
-                        abs((($c >> 16) & 0xFF) - $r0),
-                        abs((($c >> 8) & 0xFF) - $g0),
-                        abs(($c & 0xFF) - $b0)
-                    );
-                    if ($diff > $tolR) {
-                        continue;
-                    }
-                    $visited[$nidx] = true;
-                    $cov[$nidx] = 1;
-                    if (! isset($seqArr[$nidx]) || $seq > $seqArr[$nidx]) {
-                        $seqArr[$nidx] = $seq;
-                    }
-                    $stack[] = $nidx;
-                }
-            }
-        };
-
-        /**
-         * Pulau terkurung: piksel inside yang BELUM diklaim dan tidak
-         * terhubung ke tepi bbox melalui piksel tak-terklaim = pulau yang
-         * sepenuhnya dikelilingi region ini (mis. polkadot di bingkai yang
-         * di-keep) -> ikut diklaim. Hanya untuk Keep/Protect.
-         */
-        $claimEnclosed = function (array &$cov, ?array &$seqArr, int $seq) use ($inside, $bw, $bh, $bx0, $by0, $bx1, $by1): void {
-            if ($cov === []) {
-                return;
-            }
-            $outside = [];
-            $stack = [];
-            // Seed komplementer = piksel inside yang bersentuhan dengan
-            // luar frame (ring margin bbox TIDAK inside).
-            foreach ($inside as $idx => $_) {
-                if (isset($cov[$idx]) || isset($outside[$idx])) {
-                    continue;
-                }
-                $gx = $bx0 + ($idx % $bw);
-                $gy = $by0 + intdiv($idx, $bw);
-                $edge = $gx - 1 < $bx0 || $gx + 1 > $bx1 || $gy - 1 < $by0 || $gy + 1 > $by1
-                    || ! isset($inside[$idx - 1]) || ! isset($inside[$idx + 1])
-                    || ! isset($inside[$idx - $bw]) || ! isset($inside[$idx + $bw]);
-                if ($edge) {
-                    $outside[$idx] = 1;
-                    $stack[] = $idx;
-                }
-            }
-            while ($stack !== []) {
-                $idx = array_pop($stack);
-                $gx = $bx0 + ($idx % $bw);
-                $gy = $by0 + intdiv($idx, $bw);
-                foreach ([[-1, 0], [1, 0], [0, -1], [0, 1]] as [$ox, $oy]) {
-                    $nx = $gx + $ox;
-                    $ny = $gy + $oy;
-                    if ($nx < $bx0 || $ny < $by0 || $nx > $bx1 || $ny > $by1) {
-                        continue;
-                    }
-                    $nidx = ($ny - $by0) * $bw + ($nx - $bx0);
-                    if (isset($outside[$nidx]) || isset($cov[$nidx]) || ! isset($inside[$nidx])) {
-                        continue;
-                    }
-                    $outside[$nidx] = 1;
-                    $stack[] = $nidx;
-                }
-            }
-            foreach ($inside as $idx => $_) {
-                if (! isset($cov[$idx]) && ! isset($outside[$idx])) {
-                    $cov[$idx] = 1;
-                    if ($seqArr !== null && (! isset($seqArr[$idx]) || $seq > $seqArr[$idx])) {
-                        $seqArr[$idx] = $seq;
-                    }
-                }
-            }
-        };
-
-        // Urutan prioritas: Protect > (Remove vs Keep: STROK TERAKHIR
-        // menang, seri -> Keep) > Smart Clear. Remove dan Keep bebas
-        // diulang bergantian.
-        $seedProt = [];
-        $maxProtSeq = 0;
-        foreach ($f['protect_seeds'] as $s) {
-            $pt = $seedToWork((float) $s['x'], (float) $s['y']);
-            if ($pt !== null) {
-                $floodRegion($seedProt, $empty, $pt[0], $pt[1]);
-                $maxProtSeq = max($maxProtSeq, (int) ($s['s'] ?? 0));
-            }
-        }
-        // Pulau terkurung dalam region protect ikut dilindungi
-        $nullSeq = null;
-        $claimEnclosed($seedProt, $nullSeq, $maxProtSeq);
-        $protGrid = [];
-        foreach ($inside as $idx => $_) {
-            if (isset($prot[$idx]) || isset($seedProt[$idx])) {
-                $protGrid[$idx] = 1;
-            }
-        }
-
-        $remCov = [];
-        $remSeq = [];
-        $maxRemSeq = 0;
-        foreach ($f['remove_seeds'] as $s) {
-            $pt = $seedToWork((float) $s['x'], (float) $s['y']);
-            if ($pt !== null) {
-                $floodClaim($remCov, $remSeq, $protGrid, $pt[0], $pt[1], (int) ($s['s'] ?? 0));
-                $maxRemSeq = max($maxRemSeq, (int) ($s['s'] ?? 0));
-            }
-        }
-        $keepCov = [];
-        $keepSeq = [];
-        $maxKeepSeq = 0;
-        foreach ($f['keep_seeds'] as $s) {
-            $pt = $seedToWork((float) $s['x'], (float) $s['y']);
-            if ($pt !== null) {
-                $floodClaim($keepCov, $keepSeq, $protGrid, $pt[0], $pt[1], (int) ($s['s'] ?? 0));
-                $maxKeepSeq = max($maxKeepSeq, (int) ($s['s'] ?? 0));
-            }
-        }
-        // Pulau terkurung dalam region keep ikut dipulihkan
-        $claimEnclosed($keepCov, $keepSeq, $maxKeepSeq);
-
-        // Simetri un-keep: pulau terkurung dalam region remove yang
-        // sebelumnya di-KEEP ikut terhapus. Pulau tanpa keep tetap aman.
-        if ($remCov !== []) {
-            $outsideR = [];
-            $stackR = [];
-            foreach ($inside as $idx => $_) {
-                if (isset($remCov[$idx]) || isset($outsideR[$idx])) {
-                    continue;
-                }
-                $gx = $bx0 + ($idx % $bw);
-                $gy = $by0 + intdiv($idx, $bw);
-                $edge = $gx - 1 < $bx0 || $gx + 1 > $bx1 || $gy - 1 < $by0 || $gy + 1 > $by1
-                    || ! isset($inside[$idx - 1]) || ! isset($inside[$idx + 1])
-                    || ! isset($inside[$idx - $bw]) || ! isset($inside[$idx + $bw]);
-                if ($edge) {
-                    $outsideR[$idx] = 1;
-                    $stackR[] = $idx;
-                }
-            }
-            while ($stackR !== []) {
-                $idx = array_pop($stackR);
-                $gx = $bx0 + ($idx % $bw);
-                $gy = $by0 + intdiv($idx, $bw);
-                foreach ([[-1, 0], [1, 0], [0, -1], [0, 1]] as [$ox, $oy]) {
-                    $nx = $gx + $ox;
-                    $ny = $gy + $oy;
-                    if ($nx < $bx0 || $ny < $by0 || $nx > $bx1 || $ny > $by1) {
-                        continue;
-                    }
-                    $nidx = ($ny - $by0) * $bw + ($nx - $bx0);
-                    if (isset($outsideR[$nidx]) || isset($remCov[$nidx]) || ! isset($inside[$nidx])) {
-                        continue;
-                    }
-                    $outsideR[$nidx] = 1;
-                    $stackR[] = $nidx;
-                }
-            }
-            // Pulau = inside ∧ ¬remCov ∧ ¬outsideR. Klaim hanya yang overlap keep.
-            foreach ($keepCov as $idx => $_) {
-                if (! isset($inside[$idx]) || isset($remCov[$idx]) || isset($outsideR[$idx])) {
-                    continue;
-                }
-                $island = [$idx];
-                $seen = [$idx => true];
-                for ($qi = 0; $qi < count($island); $qi++) {
-                    $cur = $island[$qi];
-                    $gx = $bx0 + ($cur % $bw);
-                    $gy = $by0 + intdiv($cur, $bw);
-                    foreach ([[-1, 0], [1, 0], [0, -1], [0, 1]] as [$ox, $oy]) {
-                        $nx = $gx + $ox;
-                        $ny = $gy + $oy;
-                        if ($nx < $bx0 || $ny < $by0 || $nx > $bx1 || $ny > $by1) {
-                            continue;
-                        }
-                        $nidx = ($ny - $by0) * $bw + ($nx - $bx0);
-                        if (isset($seen[$nidx]) || ! isset($inside[$nidx]) || isset($remCov[$nidx]) || isset($outsideR[$nidx])) {
-                            continue;
-                        }
-                        $seen[$nidx] = true;
-                        $island[] = $nidx;
-                    }
-                }
-                foreach ($island as $iidx) {
-                    $remCov[$iidx] = 1;
-                    if (! isset($remSeq[$iidx]) || $maxRemSeq > $remSeq[$iidx]) {
-                        $remSeq[$iidx] = $maxRemSeq;
-                    }
-                }
-            }
-        }
-
-        // Resolusi konflik per piksel antara region Remove dan Keep.
-        $keepGrid = [];
-        $remWon = [];
-        foreach ($inside as $idx => $_) {
-            $r = isset($remCov[$idx]);
-            $k = isset($keepCov[$idx]);
-            if ($r && $k) {
-                if (($remSeq[$idx] ?? 0) > ($keepSeq[$idx] ?? 0)) {
-                    $remWon[$idx] = 1;
-                } else {
-                    $keepGrid[$idx] = 1;
-                }
-            } elseif ($r) {
-                $remWon[$idx] = 1;
-            } elseif ($k) {
-                $keepGrid[$idx] = 1;
-            }
-        }
-
-        // Guard gabungan: rect protect + region protect + region keep
-        // (hasil resolusi) - menghalangi smart clear, absorpsi tepi,
-        // Edge Cleanup & Full Clear. TIDAK menghalangi kuas Remove.
-        $guard = [];
-        foreach ($inside as $idx => $_) {
-            if (isset($prot[$idx]) || isset($seedProt[$idx]) || isset($keepGrid[$idx])) {
-                $guard[$idx] = 1;
-            }
-        }
-        $remAll = $rem;
-        foreach ($remWon as $idx => $_) {
-            $remAll[$idx] = 1;
-        }
-
-        // Tiga strategi clear:
-        // 1. Full Clear (clear_zone >= 100): bolong seluruh frame tanpa syarat.
-        // 2. MODE ISI PENUH: bila mayoritas area frame satu warna (rasio
-        //    piksel mirip warna seed >= 55%), bolong seluruh frame sekaligus
-        //    tanpa syarat konektivitas - noise/gradasi halus tidak memecah
-        //    lubang - kecuali piksel yang benar-benar beda warna (elemen)
-        //    dan area protect.
-        // 3. FRAME RAMAI: hard zone ternoda warna + BFS flood fill ketat.
-        $fullClear = $f['clear_zone'] >= 100;
-        $tolHard = max($tol * 2, 12);
-        $tolFill = max($tol * 4, 28);
-        $fillRatio = 0.55;
-
-        $diffs = [];
-        $insideCount = 0;
-        $sameCount = 0;
-        foreach ($inside as $idx => $_) {
-            $c = imagecolorat($work, $bx0 + ($idx % $bw), $by0 + intdiv($idx, $bw));
-            $diffs[$idx] = max(
-                abs((($c >> 16) & 0xFF) - $avgR),
-                abs((($c >> 8) & 0xFF) - $avgG),
-                abs(($c & 0xFF) - $avgB)
-            );
-            $insideCount++;
-            if ($diffs[$idx] <= $tolFill) {
-                $sameCount++;
-            }
-        }
-
-        $cleared = [];
-        $queue = [];
-        $fillMode = false;
-
-        if ($fullClear) {
-            foreach (array_keys($inside) as $idx) {
-                if (! isset($guard[$idx])) {
-                    $cleared[$idx] = 1;
-                }
-            }
-        } elseif ($insideCount > 0 && $sameCount / $insideCount >= $fillRatio) {
-            $fillMode = true;
-            foreach ($diffs as $idx => $diff) {
-                if ($diff <= $tolFill && ! isset($guard[$idx])) {
-                    $cleared[$idx] = 1;
-                }
-            }
-        } else {
-            foreach (array_keys($seed) as $idx) {
-                if (isset($guard[$idx])) {
-                    continue; // Protect/Keep menang meski di dalam hard zone
-                }
-                if ($diffs[$idx] <= $tolHard) {
-                    $cleared[$idx] = 1;
-                    $queue[] = $idx;
-                }
-            }
-        }
-        if (! $fillMode) {
-            for ($qi = 0; $qi < count($queue); $qi++) {
+        // PRIORITAS 1: Hard Clear Zone selalu clear.
+        // PRIORITAS 2: BFS flood fill ke connected region di sekelilingnya.
+        $cleared = $seed;
+        $queue = array_keys($seed);
+        for ($qi = 0; $qi < count($queue); $qi++) {
             $idx = $queue[$qi];
             $gx = $bx0 + ($idx % $bw);
             $gy = $by0 + intdiv($idx, $bw);
@@ -638,8 +216,8 @@ class FrameMaskService
                 if (isset($cleared[$nidx]) || ! isset($inside[$nidx])) {
                     continue;
                 }
-                if (isset($guard[$nidx])) {
-                    continue; // Protect/Keep menahan automatic clearing
+                if (isset($prot[$nidx])) {
+                    continue; // Protect Area menahan automatic clearing
                 }
                 $ndx = ($nx + 0.5) - $cx;
                 $ndy = ($ny + 0.5) - $cy;
@@ -662,139 +240,25 @@ class FrameMaskService
                 $cleared[$nidx] = 1;
                 $queue[] = $nidx;
             }
-            }
         }
 
-        // Force clear kuas/rect remove - HARUS sebelum anti-fringe & Edge
-        // Cleanup agar pembersihan tepi juga bekerja pada batas region
-        // hasil kuas Remove. Hanya Protect yang absolut.
-        foreach ($remAll as $idx => $_) {
-            if (! isset($prot[$idx]) && ! isset($seedProt[$idx]) && isset($inside[$idx])) {
+        // Manual Remove Area: paksa clear (Protect Area tetap menang bila bentrok)
+        foreach ($rem as $idx => $_) {
+            if (! isset($prot[$idx]) && isset($inside[$idx])) {
                 $cleared[$idx] = 1;
             }
         }
 
-        // PEMBERSIHAN TEPI (anti-fringe): serap pita transisi anti-alias di
-        // batas antara area clear dan warna kuat di seberangnya, sehingga
-        // tidak ada sisa tipis warna slot yang menempel di pinggiran elemen.
-        // Kandidat = piksel ber-diff MENENGAH (di atas ambang clear, di bawah
-        // STRONG) yang bersinggungan dengan area clear dan berbatasan langsung
-        // dengan warna kuat dua langkah lebih jauh. Inti warna kuat (hitam
-        // pekal dsb.) tidak disentuh. Harus identik dengan frameMask.ts.
-        $strong = 150;
-        for ($pass = 0; $pass < 2; $pass++) {
-            $snap = $cleared;
-            foreach ($inside as $idx => $_) {
-                if (isset($snap[$idx]) || isset($guard[$idx])) {
-                    continue;
-                }
-                $dP = $diffs[$idx];
-                if ($dP <= $tolFill || $dP >= $strong) {
-                    continue; // bukan pita transisi
-                }
-                $gx = $bx0 + ($idx % $bw);
-                $gy = $by0 + intdiv($idx, $bw);
-                foreach ([[-1, 0], [1, 0], [0, -1], [0, 1]] as [$ox, $oy]) {
-                    $nx = $gx + $ox;
-                    $ny = $gy + $oy;
-                    if ($nx < $bx0 || $ny < $by0 || $nx > $bx1 || $ny > $by1) {
-                        continue;
-                    }
-                    $nidx = ($ny - $by0) * $bw + ($nx - $bx0);
-                    if (! isset($snap[$nidx])) {
-                        continue; // harus bersinggungan dengan area clear
-                    }
-                    $qx = 2 * $gx - $nx;
-                    $qy = 2 * $gy - $ny;
-                    if ($qx < $bx0 || $qy < $by0 || $qx > $bx1 || $qy > $by1) {
-                        continue;
-                    }
-                    $qidx = ($qy - $by0) * $bw + ($qx - $bx0);
-                    if (! isset($inside[$qidx]) || $diffs[$qidx] < $strong) {
-                        continue;
-                    }
-                    $cleared[$idx] = 1; // pita transisi -> ikut clear sampai warna kuat
-                    break;
-                }
-            }
-        }
-
         // Minimum Region Size: buang pulau clear kecil yang tidak memuat seed
-        // (tidak relevan di mode isi penuh - lubang memang satu keseluruhan)
         $minArea = $f['min_region_size'] / 100 * $fw * $fh;
-        if (! $fillMode && $minArea > 1) {
+        if ($minArea > 1) {
             $this->dropSmallIslands($cleared, $seed, $bw, $bx0, $by0, $bx1, $by1, $minArea);
-        }
-
-        // EDGE CLEANUP: dilasi lubang HANYA di boundary mask - menelan garis
-        // tipis / halo warna / serpihan desain yang masih menempel di tepi
-        // area kamera hasil Smart Clear, tanpa deteksi ulang. Mendukung
-        // nilai fraksional (step 0.2 px): pass penuh = floor(N), sisa
-        // desimal menjadi pass sebagian berupa kekuatan alpha di ring
-        // boundary. Protect Area tidak pernah ter-clear dan area di luar
-        // frame tidak tersentuh. Bukan penghalus (itu tugas Feather).
-        // Harus identik dengan frameMask.ts.
-        $ecRaw = (float) $f['edge_cleanup'];
-        $ecFull = (int) floor($ecRaw);
-        $ecFrac = $ecRaw - $ecFull;
-        $ecStrength = [];
-        if ($ecRaw > 0) {
-            $d8 = [[-1, -1], [0, -1], [1, -1], [-1, 0], [1, 0], [-1, 1], [0, 1], [1, 1]];
-            $dilateEdge = function (bool $commit, float $weight = 1.0) use (&$cleared, &$ecStrength, $inside, $guard, $bw, $bx0, $by0, $bx1, $by1, $d8): void {
-                $snap = $cleared;
-                foreach ($inside as $idx => $_) {
-                    if (isset($snap[$idx]) || isset($guard[$idx])) {
-                        continue;
-                    }
-                    $gx = $bx0 + ($idx % $bw);
-                    $gy = $by0 + intdiv($idx, $bw);
-                    $touch = false;
-                    foreach ($d8 as [$ox, $oy]) {
-                        $nx = $gx + $ox;
-                        $ny = $gy + $oy;
-                        if ($nx < $bx0 || $ny < $by0 || $nx > $bx1 || $ny > $by1) {
-                            continue;
-                        }
-                        if (isset($snap[($ny - $by0) * $bw + ($nx - $bx0)])) {
-                            $touch = true;
-                            break;
-                        }
-                    }
-                    if (! $touch) {
-                        continue;
-                    }
-                    if ($commit) {
-                        $cleared[$idx] = 1;
-                    } else {
-                        $ecStrength[$idx] = max($ecStrength[$idx] ?? 0.0, $weight);
-                    }
-                }
-            };
-            for ($pass = 0; $pass < $ecFull; $pass++) {
-                $dilateEdge(true);
-            }
-            if ($ecFrac > 0) {
-                $dilateEdge(false, $ecFrac);
-            }
         }
 
         // Feather: box blur peta hole agar tepi compositing halus
         $holeGrid = [];
         foreach ($cleared as $idx => $_) {
             $holeGrid[$idx] = 1.0;
-        }
-        foreach ($ecStrength as $idx => $s) {
-            if ($s > ($holeGrid[$idx] ?? 0.0)) {
-                $holeGrid[$idx] = $s;
-            }
-        }
-        // Keep / Restore menang atas SEMUA proses kecuali kuas Remove yang
-        // lebih baru (strok terakhir menang): kembalikan desain secara
-        // penuh (alpha 0) agar tepi restore tegas.
-        foreach ($keepGrid as $idx => $_) {
-            if (! isset($remAll[$idx])) {
-                $holeGrid[$idx] = 0.0;
-            }
         }
         $fr = (int) round($f['feather'] * $scale);
         if ($fr > 0) {

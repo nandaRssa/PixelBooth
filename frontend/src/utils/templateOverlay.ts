@@ -1,69 +1,83 @@
 // ==========================================
 // PIXELBOOTH — Template Overlay Builder
-// Membuat versi template yang area placeholder fotonya (putih) dibuat
-// transparan, sehingga saat ditaruh DI ATAS video kamera, desain template
-// (termasuk elemen yang menimpa bingkai) tetap terlihat di atas foto/kamera —
-// persis seperti hasil render final PhotoRenderService.
+// Membangun layer desain dengan LUBANG mask kamera hasil konfigurasi
+// frame manual user (Hard Clear Zone + Connected Region Clearing).
+// Desain ditaruh DI ATAS kamera; hanya area clear yang transparan —
+// elemen desain di perifer otomatis dipertahankan.
 // ==========================================
 
-import type { PreviewSlot } from './previewSlots'
+import type { CameraFrame } from '@/types'
+import { computeHoleMask, downscaleTemplate, type WorkTemplate } from './frameMask'
 
-export async function buildTemplateOverlay(
-  templateUrl: string,
-  slots: PreviewSlot[],
-  canvasWidth: number,
-  canvasHeight: number,
-  detectionMethod: 'transparent' | 'white-detection' = 'transparent'
-): Promise<string> {
-  const img = new Image()
-  img.src = templateUrl
-  await new Promise<void>((resolve, reject) => {
-    img.onload = () => resolve()
+/** Muat gambar dan tunggu sampai siap. */
+export function loadImage(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    img.crossOrigin = 'anonymous'
+    img.onload = () => resolve(img)
     img.onerror = () => reject(new Error('Gagal memuat gambar template'))
+    img.src = src
   })
+}
 
+/**
+ * Bangun canvas desain (canvasW x canvasH) dengan lubang mask per frame.
+ * Caller menggambar canvas ini DI ATAS video/foto kamera.
+ */
+export function buildOverlayCanvas(
+  templateImg: HTMLImageElement,
+  frames: CameraFrame[],
+  canvasW: number,
+  canvasH: number,
+  work?: WorkTemplate
+): HTMLCanvasElement {
   const canvas = document.createElement('canvas')
-  canvas.width = canvasWidth
-  canvas.height = canvasHeight
+  canvas.width = canvasW
+  canvas.height = canvasH
   const ctx = canvas.getContext('2d')
   if (!ctx) throw new Error('Canvas tidak tersedia')
 
   // Regangkan template ke ukuran canvas, sama seperti PhotoRenderService
-  ctx.drawImage(img, 0, 0, canvasWidth, canvasHeight)
+  ctx.drawImage(templateImg, 0, 0, canvasW, canvasH)
 
-  // Hanya lubangi template secara manual jika menggunakan metode deteksi warna putih (fallback)
-  // Untuk template transparan, biarkan PNG overlay alami apa adanya tanpa dimodifikasi
-  if (detectionMethod === 'white-detection') {
-    ctx.globalCompositeOperation = 'destination-out'
-    ctx.fillStyle = 'rgba(0,0,0,1)'
+  if (frames.length === 0) return canvas
 
-    for (const slot of slots) {
-      ctx.beginPath()
-      const points = slot.mask
-      if (Array.isArray(points) && points.length >= 3) {
-        ctx.moveTo(points[0][0], points[0][1])
-        for (let i = 1; i < points.length; i++) {
-          ctx.lineTo(points[i][0], points[i][1])
-        }
-        ctx.closePath()
-        ctx.fill()
-      } else if (slot.shape === 'circle' || slot.shape === 'oval') {
-        const cx = slot.x + slot.width / 2
-        const cy = slot.y + slot.height / 2
-        const rx = slot.width / 2
-        const ry = slot.height / 2
-        ctx.ellipse(cx, cy, rx, ry, 0, 0, 2 * Math.PI)
-        ctx.fill()
-      } else {
-        // Fallback: rectangle
-        ctx.rect(slot.x, slot.y, slot.width, slot.height)
-        ctx.fill()
-      }
-    }
+  const wt = work ?? downscaleTemplate(templateImg, canvasW, canvasH)
+  const tmp = document.createElement('canvas')
+  const tmpCtx = tmp.getContext('2d')
+  if (!tmpCtx) throw new Error('Canvas tidak tersedia')
 
-    // Kembalikan composite operation normal
-    ctx.globalCompositeOperation = 'source-over'
+  ctx.globalCompositeOperation = 'destination-out'
+  for (const frame of frames) {
+    const mask = computeHoleMask(wt, frame)
+    if (!mask) continue
+
+    tmp.width = mask.imageData.width
+    tmp.height = mask.imageData.height
+    tmpCtx.putImageData(mask.imageData, 0, 0)
+
+    // Skala bbox ruang kerja → koordinat canvas penuh
+    const inv = 1 / wt.scale
+    ctx.drawImage(
+      tmp,
+      mask.bx * inv,
+      mask.by * inv,
+      mask.bw * inv,
+      mask.bh * inv
+    )
   }
+  ctx.globalCompositeOperation = 'source-over'
 
-  return canvas.toDataURL('image/png')
+  return canvas
+}
+
+/** Versi dataURL (untuk <img> overlay di PhotoCapturePage). */
+export async function buildTemplateOverlay(
+  templateUrl: string,
+  frames: CameraFrame[],
+  canvasWidth: number,
+  canvasHeight: number
+): Promise<string> {
+  const img = await loadImage(templateUrl)
+  return buildOverlayCanvas(img, frames, canvasWidth, canvasHeight).toDataURL('image/png')
 }

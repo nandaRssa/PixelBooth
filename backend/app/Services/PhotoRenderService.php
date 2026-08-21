@@ -8,11 +8,22 @@ use App\Models\Template;
 use Illuminate\Support\Facades\Storage;
 
 /**
- * Merender foto final photobooth:
- * menggabungkan capture frame ke template sesuai frame configuration.
+ * Rendering foto final dengan konsep layer:
+ *
+ *   TEMPLATE DESIGN  (paling atas — tidak pernah rusak oleh kamera)
+ *   CAMERA           (di bawah desain)
+ *   CAMERA MASK      (lubang pada desain sesuai frame manual user)
+ *
+ * Kamera digambar di bawah desain. Mask dari FrameMaskService menentukan
+ * area desain yang di-clear (transparan) sehingga kamera terlihat. Elemen
+ * desain di luar Hard Clear Zone otomatis dipertahankan.
  */
 class PhotoRenderService
 {
+    public function __construct(private readonly FrameMaskService $maskService)
+    {
+    }
+
     /**
      * Render foto final dari sesi.
      *
@@ -23,11 +34,6 @@ class PhotoRenderService
         $template = $session->template;
         $canvasW = $template->canvas_width;
         $canvasH = $template->canvas_height;
-
-        $canvas = imagecreatetruecolor($canvasW, $canvasH);
-        if (! $canvas) {
-            throw new \RuntimeException('Gagal membuat canvas foto final.');
-        }
 
         $captures = SessionCapture::where('session_id', $session->id)
             ->where('status', 'approved')
@@ -46,74 +52,58 @@ class PhotoRenderService
             throw new \RuntimeException('Gagal memuat gambar template.');
         }
 
-        $w = imagesx($templateImg);
-        $h = imagesy($templateImg);
-
-        // Buat salinan template yang mendukung alpha channel
-        $templateWithHoles = imagecreatetruecolor($w, $h);
-        imagealphablending($templateWithHoles, false);
-        imagesavealpha($templateWithHoles, true);
-        imagecopy($templateWithHoles, $templateImg, 0, 0, 0, 0, $w, $h);
-        imagedestroy($templateImg);
-
-        // Hanya buat lubang transparan (alpha = 127) jika menggunakan deteksi warna putih
-        // Jika menggunakan mode transparan, biarkan overlay PNG apa adanya untuk menjaga desain/ornamen di atas foto
-        if (($template->detection_method ?? 'transparent') === 'white-detection') {
-            $transparent = imagecolorallocatealpha($templateWithHoles, 0, 0, 0, 127);
-            foreach ($slots as $slot) {
-                $points = $slot['mask'] ?? null;
-                if (is_array($points) && count($points) >= 3) {
-                    $flat = [];
-                    foreach ($points as $p) {
-                        $px = (int) round($p[0] * $w / $canvasW);
-                        $py = (int) round($p[1] * $h / $canvasH);
-                        $flat[] = $px;
-                        $flat[] = $py;
-                    }
-                    imagefilledpolygon($templateWithHoles, $flat, count($flat) / 2, $transparent);
-                } else {
-                    $x = (int) round($slot['x'] * $w / $canvasW);
-                    $y = (int) round($slot['y'] * $h / $canvasH);
-                    $sw = (int) round($slot['width'] * $w / $canvasW);
-                    $sh = (int) round($slot['height'] * $h / $canvasH);
-                    imagefilledrectangle($templateWithHoles, $x, $y, $x + $sw - 1, $y + $sh - 1, $transparent);
-                }
-            }
-        }
-
-        // 1. Gambar latar belakang pada canvas utama
-        $bg = imagecolorallocate($canvas, 18, 18, 18);
-        imagefilledrectangle($canvas, 0, 0, $canvasW - 1, $canvasH - 1, $bg);
-
-        // 2. Tempel dan clip setiap capture foto di bawah slot masing-masing
-        foreach ($captures as $index => $capture) {
-            $slot = $slots[$index] ?? null;
-            if (! $slot || ! $capture->photo_path) {
-                continue;
-            }
-            $frameImg = $this->loadCaptureImage($capture);
-            if (! $frameImg) {
-                continue;
-            }
-            $this->pasteFrame($canvas, $frameImg, $slot);
-            imagedestroy($frameImg);
-        }
-
-        // 3. Gambar template dengan lubang transparan di atas canvas utama
-        imagealphablending($canvas, true);
+        // Layer desain pada resolusi canvas (akan diberi lubang mask per frame)
+        $design = imagecreatetruecolor($canvasW, $canvasH);
+        imagealphablending($design, false);
+        imagesavealpha($design, true);
         imagecopyresampled(
-            $canvas,
-            $templateWithHoles,
+            $design,
+            $templateImg,
             0,
             0,
             0,
             0,
             $canvasW,
             $canvasH,
-            $w,
-            $h
+            imagesx($templateImg),
+            imagesy($templateImg)
         );
-        imagedestroy($templateWithHoles);
+
+        // Canvas utama + background gelap
+        $canvas = imagecreatetruecolor($canvasW, $canvasH);
+        imagealphablending($canvas, true);
+        $bg = imagecolorallocate($canvas, 18, 18, 18);
+        imagefilledrectangle($canvas, 0, 0, $canvasW - 1, $canvasH - 1, $bg);
+
+        foreach ($captures as $index => $capture) {
+            $slot = $slots[$index] ?? null;
+            if (! $slot || ! $capture->photo_path) {
+                continue;
+            }
+            $photo = $this->loadCaptureImage($capture);
+            if (! $photo) {
+                continue;
+            }
+
+            // 1. Mask lubang kamera dari konfigurasi frame manual user
+            $mask = $this->maskService->buildMask($templateImg, $slot, $canvasW, $canvasH);
+
+            // 2. Kamera DI BAWAH desain: digambar mengikuti posisi+rotasi frame
+            $this->pasteRotatedCover($canvas, $photo, $slot);
+
+            // 3. Lubang mask dipotong ke layer desain (desain tetap utuh di luarnya)
+            if ($mask) {
+                $this->cutMaskIntoDesign($design, $mask['image'], $mask['bbox']);
+                imagedestroy($mask['image']);
+            }
+
+            imagedestroy($photo);
+        }
+        imagedestroy($templateImg);
+
+        // 4. Desain (dengan lubang) digambar PALING ATAS — kamera tak pernah menimpa desain
+        imagecopy($canvas, $design, 0, 0, 0, 0, $canvasW, $canvasH);
+        imagedestroy($design);
 
         // Simpan file final
         $storagePath = "sessions/{$session->session_token}/final.jpg";
@@ -167,7 +157,121 @@ class PhotoRenderService
         return $storagePath;
     }
 
+    /**
+     * Tempel foto "cover" mengikuti posisi, ukuran, dan ROTASI frame.
+     * Piksel di luar area frame dibiarkan transparan (desain tetap terlihat).
+     */
+    private function pasteRotatedCover($canvas, $photo, array $slot): void
+    {
+        $w = (float) $slot['width'];
+        $h = (float) $slot['height'];
+        if ($w < 1 || $h < 1) {
+            return;
+        }
 
+        $rot = deg2rad((float) ($slot['rotation'] ?? 0));
+        $cos = cos($rot);
+        $sin = sin($rot);
+        $cx = $slot['x'] + $w / 2;
+        $cy = $slot['y'] + $h / 2;
+
+        // Foto versi cover berukuran frame (ruang lokal, tanpa rotasi)
+        $local = imagecreatetruecolor((int) round($w), (int) round($h));
+        $this->resizeCoverInto($local, $photo);
+        $lw = imagesx($local);
+        $lh = imagesy($local);
+
+        // Bounding box axis-aligned frame yang dirotasi (clamp ke canvas)
+        $xs = [];
+        $ys = [];
+        foreach ([[-$w / 2, -$h / 2], [$w / 2, -$h / 2], [$w / 2, $h / 2], [-$w / 2, $h / 2]] as [$lx, $ly]) {
+            $xs[] = $cx + $lx * $cos - $ly * $sin;
+            $ys[] = $cy + $lx * $sin + $ly * $cos;
+        }
+        $bx = max(0, (int) floor(min($xs)));
+        $by = max(0, (int) floor(min($ys)));
+        $bw = min(imagesx($canvas) - $bx, (int) ceil(max($xs)) - $bx + 1);
+        $bh = min(imagesy($canvas) - $by, (int) ceil(max($ys)) - $by + 1);
+        if ($bw <= 0 || $bh <= 0) {
+            imagedestroy($local);
+            return;
+        }
+
+        $buf = imagecreatetruecolor($bw, $bh);
+        imagealphablending($buf, false);
+        imagesavealpha($buf, true);
+        imagefilledrectangle($buf, 0, 0, $bw - 1, $bh - 1, imagecolorallocatealpha($buf, 0, 0, 0, 127));
+
+        $hw = $w / 2;
+        $hh = $h / 2;
+        for ($py = 0; $py < $bh; $py++) {
+            $Y = $by + $py + 0.5;
+            for ($px = 0; $px < $bw; $px++) {
+                $X = $bx + $px + 0.5;
+                $dx = $X - $cx;
+                $dy = $Y - $cy;
+                $lx = $dx * $cos + $dy * $sin;
+                $ly = -$dx * $sin + $dy * $cos;
+                if (abs($lx) > $hw || abs($ly) > $hh) {
+                    continue;
+                }
+                $sx = min($lw - 1, max(0, (int) (($lx + $hw) / $w * $lw)));
+                $sy = min($lh - 1, max(0, (int) (($ly + $hh) / $h * $lh)));
+                if (! empty($slot['flip_h'])) {
+                    $sx = $lw - 1 - $sx;
+                }
+                if (! empty($slot['flip_v'])) {
+                    $sy = $lh - 1 - $sy;
+                }
+                imagesetpixel($buf, $px, $py, imagecolorat($local, $sx, $sy));
+            }
+        }
+        imagedestroy($local);
+
+        imagecopy($canvas, $buf, $bx, $by, 0, 0, $bw, $bh);
+        imagedestroy($buf);
+    }
+
+    /**
+     * Potong lubang mask ke layer desain: alpha desain hanya BESAR (lebih
+     * transparan), tidak pernah membuat desain lebih solid. Dengan demikian
+     * kamera tidak pernah merusak/menimpa elemen desain.
+     */
+    private function cutMaskIntoDesign($design, $maskImg, array $bbox): void
+    {
+        [$bx, $by, $bw, $bh] = $bbox;
+        $dw = imagesx($design);
+        $dh = imagesy($design);
+
+        $x0 = max(0, $bx);
+        $y0 = max(0, $by);
+        $x1 = min($dw - 1, $bx + $bw - 1);
+        $y1 = min($dh - 1, $by + $bh - 1);
+        if ($x1 < $x0 || $y1 < $y0) {
+            return;
+        }
+
+        for ($y = $y0; $y <= $y1; $y++) {
+            for ($x = $x0; $x <= $x1; $x++) {
+                $a = (imagecolorat($maskImg, $x - $bx, $y - $by) >> 24) & 0x7F;
+                if ($a <= 0) {
+                    continue;
+                }
+                $d = imagecolorat($design, $x, $y);
+                $da = ($d >> 24) & 0x7F;
+                $na = max($da, $a);
+                if ($na === $da) {
+                    continue;
+                }
+                imagesetpixel(
+                    $design,
+                    $x,
+                    $y,
+                    imagecolorallocatealpha($design, ($d >> 16) & 0xFF, ($d >> 8) & 0xFF, $d & 0xFF, $na)
+                );
+            }
+        }
+    }
 
     /**
      * Muat capture frame dari storage.
@@ -182,120 +286,8 @@ class PhotoRenderService
     }
 
     /**
-     * Tempel foto yang di-clip mengikuti mask bentuk frame (non-alpha path).
-     */
-    private function pasteFrame($canvas, $src, array $slot): void
-    {
-        $dstX = (int) $slot['x'];
-        $dstY = (int) $slot['y'];
-        $dstW = (int) $slot['width'];
-        $dstH = (int) $slot['height'];
-        if ($dstW <= 0 || $dstH <= 0) {
-            return;
-        }
-
-        $maskImg = $this->rasterizeShape($slot, $dstX, $dstY, $dstW, $dstH);
-        if (! $maskImg) {
-            $this->pasteCover($canvas, $src, $dstX, $dstY, $dstW, $dstH);
-            return;
-        }
-
-        $photo = imagecreatetruecolor($dstW, $dstH);
-        imagealphablending($photo, false);
-        imagesavealpha($photo, true);
-        $this->resizeCoverInto($photo, $src);
-
-        for ($y = 0; $y < $dstH; $y++) {
-            for ($x = 0; $x < $dstW; $x++) {
-                $ma = (imagecolorat($maskImg, $x, $y) >> 24) & 0x7F;
-                if ($ma >= 110) {
-                    continue;
-                }
-                $c = imagecolorat($photo, $x, $y);
-                imagesetpixel($canvas, $dstX + $x, $dstY + $y, $c);
-            }
-        }
-
-        imagedestroy($photo);
-        imagedestroy($maskImg);
-    }
-
-    /**
-     * Rasterisasi mask bentuk frame menjadi gambar alpha (bbox size).
-     * Tanpa mask → persegi penuh.
-     *
-     * @return \GdImage|false
-     */
-    private function rasterizeShape(array $slot, int $dstX, int $dstY, int $dstW, int $dstH)
-    {
-        if ($dstW <= 0 || $dstH <= 0) {
-            return false;
-        }
-
-        $img = imagecreatetruecolor($dstW, $dstH);
-        imagealphablending($img, false);
-        imagesavealpha($img, true);
-        $transparent = imagecolorallocatealpha($img, 0, 0, 0, 127);
-        imagefilledrectangle($img, 0, 0, $dstW - 1, $dstH - 1, $transparent);
-
-        $points = $slot['mask'] ?? null;
-        if (! is_array($points) || count($points) < 3) {
-            $points = [
-                [$dstX, $dstY],
-                [$dstX + $dstW, $dstY],
-                [$dstX + $dstW, $dstY + $dstH],
-                [$dstX, $dstY + $dstH],
-            ];
-        }
-
-        $opaque = imagecolorallocatealpha($img, 255, 255, 255, 0);
-        $flat = [];
-        foreach ($points as $p) {
-            $flat[] = (int) round($p[0] - $dstX);
-            $flat[] = (int) round($p[1] - $dstY);
-        }
-        if (count($flat) >= 6) {
-            imagefilledpolygon($img, $flat, (int) (count($flat) / 2), $opaque);
-        }
-
-        return $img;
-    }
-
-    /**
-     * Gambar dasar canvas — template bila file-nya ada, selain itu background gelap.
-     */
-    private function drawBase($canvas, Template $template): void
-    {
-        $canvasW = imagesx($canvas);
-        $canvasH = imagesy($canvas);
-
-        // Background gelap
-        $bg = imagecolorallocate($canvas, 18, 18, 18);
-        imagefilledrectangle($canvas, 0, 0, $canvasW - 1, $canvasH - 1, $bg);
-
-        // Template image bila tersedia
-        if ($template->template_file && Storage::disk('public')->exists($template->template_file)) {
-            $templateImg = $this->loadImage(Storage::disk('public')->path($template->template_file));
-            if ($templateImg) {
-                imagecopyresampled(
-                    $canvas,
-                    $templateImg,
-                    0,
-                    0,
-                    0,
-                    0,
-                    $canvasW,
-                    $canvasH,
-                    imagesx($templateImg),
-                    imagesy($templateImg)
-                );
-                imagedestroy($templateImg);
-            }
-        }
-    }
-
-    /**
-     * Tentukan slot frame: pakai frame_configuration jika valid, jika tidak auto layout.
+     * Tentukan slot frame: pakai frame_configuration manual user jika valid,
+     * jika tidak fallback auto layout (template legacy tanpa konfigurasi).
      */
     private function resolveSlots(Template $template, int $count): array
     {
@@ -304,30 +296,33 @@ class PhotoRenderService
         }
 
         $config = $template->frame_configuration;
+        $slots = [];
         if (is_array($config) && count($config) > 0) {
-            $slots = array_values(array_filter($config, function ($slot) {
-                return isset($slot['x'], $slot['y'], $slot['width'], $slot['height'])
-                    && (int) $slot['width'] > 0
-                    && (int) $slot['height'] > 0;
-            }));
-
-            // Urutkan berdasarkan order bila ada
-            usort($slots, function ($a, $b) {
-                $oa = $a['order'] ?? 0;
-                $ob = $b['order'] ?? 0;
-                return $oa <=> $ob;
-            });
-
+            foreach ($config as $i => $raw) {
+                if (! is_array($raw) || ! isset($raw['x'], $raw['y'], $raw['width'], $raw['height'])) {
+                    continue;
+                }
+                if ((float) $raw['width'] <= 0 || (float) $raw['height'] <= 0) {
+                    continue;
+                }
+                $norm = $this->maskService->normalizeFrame($raw);
+                $norm['order'] = (int) ($raw['order'] ?? $i);
+                $slots[] = $norm;
+            }
+            usort($slots, fn ($a, $b) => $a['order'] <=> $b['order']);
             if (count($slots) >= $count) {
                 return array_slice($slots, 0, $count);
             }
         }
 
-        return $this->autoLayout($template->canvas_width, $template->canvas_height, $count);
+        return array_map(
+            fn ($s) => $this->maskService->normalizeFrame($s),
+            $this->autoLayout($template->canvas_width, $template->canvas_height, $count)
+        );
     }
 
     /**
-     * Auto layout sederhana:
+     * Auto layout sederhana untuk template legacy tanpa konfigurasi frame:
      * - 1 frame: penuh
      * - 2-3 frame: strip vertikal (fotobooth klasik)
      * - 4+ frame: grid
@@ -345,7 +340,6 @@ class PhotoRenderService
             ]];
         }
 
-        // Strip vertikal untuk 2-3 frame
         if ($count <= 3) {
             $slotH = (int) (($canvasH - ($margin * ($count + 1))) / $count);
             $slots = [];
@@ -360,7 +354,6 @@ class PhotoRenderService
             return $slots;
         }
 
-        // Grid untuk 4+ frame
         $cols = (int) ceil(sqrt($count));
         $rows = (int) ceil($count / $cols);
         $slotW = (int) (($canvasW - ($margin * ($cols + 1))) / $cols);
@@ -401,22 +394,7 @@ class PhotoRenderService
     }
 
     /**
-     * Tempel gambar menutupi slot (cover): crop sesuai rasio lalu resize ke ukuran slot.
-     */
-    private function pasteCover($canvas, $src, int $dstX, int $dstY, int $dstW, int $dstH): void
-    {
-        if ($src === false || $dstW <= 0 || $dstH <= 0) {
-            return;
-        }
-
-        $tmp = imagecreatetruecolor($dstW, $dstH);
-        $this->resizeCoverInto($tmp, $src);
-        imagecopy($canvas, $tmp, $dstX, $dstY, 0, 0, $dstW, $dstH);
-        imagedestroy($tmp);
-    }
-
-    /**
-     * Resize gambar sumber menutupi (cover) ke dalam gambar tujuan berukuran slot.
+     * Resize gambar sumber menutupi (cover) ke dalam gambar tujuan.
      */
     private function resizeCoverInto($dst, $src): void
     {
@@ -438,11 +416,9 @@ class PhotoRenderService
         $cropY = 0;
 
         if ($srcRatio > $dstRatio) {
-            // Gambar lebih lebar — potong sisi kiri-kanan
             $cropW = (int) ($srcH * $dstRatio);
             $cropX = intdiv($srcW - $cropW, 2);
         } else {
-            // Gambar lebih tinggi — potong atas-bawah
             $cropH = (int) ($srcW / $dstRatio);
             $cropY = intdiv($srcH - $cropH, 2);
         }

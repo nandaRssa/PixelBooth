@@ -32,6 +32,13 @@ class SessionController extends Controller
 
         $template = Template::findOrFail($request->template_id);
 
+        // Template draft belum dikonfirmasi di Frame Editor — tidak boleh dipakai.
+        if ($template->status !== 'active') {
+            return response()->json([
+                'message' => 'Template belum dikonfigurasi. Selesaikan Frame Editor dan Confirm Template terlebih dahulu.',
+            ], 422);
+        }
+
         $session = PhotoSession::create([
             'template_id' => $template->id,
             'folder_id' => $request->folder_id,

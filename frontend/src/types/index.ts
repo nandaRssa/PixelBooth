@@ -3,16 +3,50 @@
 // ==========================================
 
 // ===== TEMPLATE =====
-export interface FrameConfig {
+
+/** Area manual (koordinat lokal frame, px, tidak ikut rotasi) */
+export interface ClearArea {
+  x: number
+  y: number
+  w: number
+  h: number
+}
+
+/**
+ * Camera Frame manual — sumber kebenaran posisi kamera.
+ * Setiap frame sepenuhnya independen (posisi, ukuran, rotasi, flip,
+ * dan konfigurasi clear/masking sendiri).
+ */
+export interface CameraFrame {
   id: number
+  order: number
   x: number
   y: number
   width: number
   height: number
-  order: number
-  shape?: string
-  mask?: [number, number][]
+  rotation: number
+  flip_h: boolean
+  flip_v: boolean
+  /** Hard Clear Zone: % area tengah yang WAJIB di-clear (seed) */
+  clear_zone: number
+  /** Seberapa jauh connected clearing boleh berkembang (% sisi pendek frame) */
+  clear_expansion: number
+  /** 0-100 toleransi kemiripan warna connected region */
+  region_sensitivity: number
+  /** % minimal area pulau clear agar dianggap signifikan */
+  min_region_size: number
+  /** 0-100 kekuatan proteksi elemen desain di perifer */
+  edge_protection: number
+  /** Penghalusan tepi mask (px) */
+  feather: number
+  /** Area yang dilindungi dari clear (kecuali di Hard Clear Zone) */
+  protected_areas: ClearArea[]
+  /** Area tambahan yang dipaksa menjadi area kamera */
+  remove_areas: ClearArea[]
 }
+
+/** Alias kompatibilitas untuk konfigurasi tersimpan di template */
+export type FrameConfig = CameraFrame
 
 export interface Template {
   id: number
@@ -24,8 +58,7 @@ export interface Template {
   canvas_height: number
   frame_count: number
   frame_configuration: FrameConfig[] | null
-  detection_method?: 'transparent' | 'white-detection'
-  status: 'active' | 'inactive'
+  status: 'draft' | 'active' | 'inactive'
   template_url: string | null
   preview_url: string | null
   created_at: string

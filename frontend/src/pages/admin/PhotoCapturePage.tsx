@@ -22,6 +22,7 @@ import { useFolders } from '@/hooks/useFolders'
 import { resolvePreviewSlots } from '@/utils/previewSlots'
 import { buildTemplateOverlay } from '@/utils/templateOverlay'
 import type { PhotoSession } from '@/types'
+import type { PreviewSlot } from '@/utils/previewSlots'
 
 // ==========================================
 // Photo Capture Page — Webcam (device camera)
@@ -115,8 +116,7 @@ const PhotoCapturePage: React.FC = () => {
       tpl.template_url,
       previewSlots,
       tpl.canvas_width,
-      tpl.canvas_height,
-      tpl.detection_method
+      tpl.canvas_height
     )
       .then((url) => {
         if (!cancelled) setOverlay({ url, token: overlayToken })
@@ -474,9 +474,9 @@ const PhotoCapturePage: React.FC = () => {
     )
   }
 
-  const slotPosition = (slot: any) => {
+  const slotPosition = (slot: PreviewSlot) => {
     if (!template) return { inset: 0 }
-    
+
     const style: React.CSSProperties = {
       left: `${(slot.x / template.canvas_width) * 100}%`,
       top: `${(slot.y / template.canvas_height) * 100}%`,
@@ -484,20 +484,19 @@ const PhotoCapturePage: React.FC = () => {
       height: `${(slot.height / template.canvas_height) * 100}%`,
     }
 
-    if (slot.mask && slot.mask.length >= 3) {
-      const points = slot.mask.map((p: [number, number]) => {
-        const rx = ((p[0] - slot.x) / slot.width) * 100
-        const ry = ((p[1] - slot.y) / slot.height) * 100
-        return `${rx.toFixed(2)}% ${ry.toFixed(2)}%`
-      })
-      style.clipPath = `polygon(${points.join(', ')})`
-    } else if (slot.shape === 'circle' || slot.shape === 'oval') {
-      style.clipPath = 'ellipse(50% 50% at 50% 50%)'
-    } else if (slot.shape === 'triangle') {
-      style.clipPath = 'polygon(50% 0%, 100% 100%, 0% 100%)'
+    // Rotasi frame manual (pivot tengah)
+    if (slot.rotation) {
+      style.transform = `rotate(${slot.rotation}deg)`
     }
 
     return style
+  }
+
+  // Transform video: mirror selfie default; flip frame membalik arahnya
+  const videoTransform = (slot: PreviewSlot): string => {
+    const sx = slot.flip_h ? 1 : -1
+    const sy = slot.flip_v ? -1 : 1
+    return `scaleX(${sx}) scaleY(${sy})`
   }
 
   return (
@@ -588,8 +587,11 @@ const PhotoCapturePage: React.FC = () => {
                         playsInline
                         muted
                         autoPlay
-                        className="w-full h-full object-cover -scale-x-100"
-                        style={{ filter: 'brightness(1.45) contrast(1.1) saturate(1.1)' }}
+                        className="w-full h-full object-cover"
+                        style={{
+                          filter: 'brightness(1.45) contrast(1.1) saturate(1.1)',
+                          transform: videoTransform(slot),
+                        }}
                       />
                     ) : frameImages[i] ? (
                       <img

@@ -216,70 +216,67 @@ class SessionTest extends TestCase
             ->assertStatus(422);
     }
 
-    public function test_complete_merender_foto_mengikuti_bentuk_lingkaran(): void
+    public function test_template_draft_tidak_bisa_dipakai_sesi(): void
     {
-        // Template PNG 800x1200: bg gelap pekat + lubang transparan lingkaran
-        // di tengah (r=100). Alpha template harus menjadi mask foto.
+        $template = $this->makeTemplate(1);
+        $template->update(['status' => 'draft']);
+
+        $this->postJson('/api/sessions', ['template_id' => $template->id], $this->headers())
+            ->assertStatus(422);
+    }
+
+    public function test_complete_merender_mask_hard_clear_zone_dan_proteksi_desain(): void
+    {
+        // Template 800x1200: bg gelap + placeholder putih (300,500)-(500,700)
+        // + logo hijau (305,515)-(495,535) + strip biru (492,505)-(508,695).
+        // Frame manual user: (300,500) 200x200, Hard Clear Zone 50%.
         $w = 800;
         $h = 1200;
         $img = imagecreatetruecolor($w, $h);
-        imagealphablending($img, false);
-        imagesavealpha($img, true);
-        $bg = imagecolorallocatealpha($img, 40, 40, 40, 0);
-        imagefilledrectangle($img, 0, 0, $w - 1, $h - 1, $bg);
-        $t = imagecolorallocatealpha($img, 0, 0, 0, 127);
-        imagefilledellipse($img, 400, 600, 200, 200, $t);
+        imagefilledrectangle($img, 0, 0, $w - 1, $h - 1, imagecolorallocate($img, 32, 32, 32));
+        imagefilledrectangle($img, 300, 500, 500, 700, imagecolorallocate($img, 255, 255, 255));
+        imagefilledrectangle($img, 305, 515, 495, 535, imagecolorallocate($img, 0, 170, 0));
+        imagefilledrectangle($img, 492, 505, 508, 695, imagecolorallocate($img, 0, 68, 204));
         ob_start();
         imagepng($img);
         $pngData = ob_get_clean();
         imagedestroy($img);
-        Storage::disk('public')->put('templates/circle.png', $pngData);
-
-        $cx = 300;
-        $cy = 500;
-        $diameter = 200;
-        $mask = [];
-        for ($i = 0; $i < 48; $i++) {
-            $a = 2 * M_PI * $i / 48;
-            $mask[] = [
-                (int) round(($cx + $diameter / 2) + ($diameter / 2) * cos($a)),
-                (int) round(($cy + $diameter / 2) + ($diameter / 2) * sin($a))
-            ];
-        }
+        Storage::disk('public')->put('templates/mask.png', $pngData);
 
         $template = Template::create([
-            'name' => 'Template Lingkaran',
-            'slug' => 'template-lingkaran',
-            'template_file' => 'templates/circle.png',
+            'name' => 'Template Mask',
+            'slug' => 'template-mask',
+            'template_file' => 'templates/mask.png',
             'canvas_width' => $w,
             'canvas_height' => $h,
             'frame_count' => 1,
             'frame_configuration' => [[
                 'id' => 1,
                 'order' => 0,
-                'shape' => 'circle',
-                'x' => $cx,
-                'y' => $cy,
-                'width' => $diameter,
-                'height' => $diameter,
-                'position' => ['x' => $cx, 'y' => $cy],
-                'size' => ['width' => $diameter, 'height' => $diameter],
-                'mask' => $mask,
-                'radius' => 100,
-                'radius_y' => 100,
-                'corner_radius' => null,
-                'fill_ratio' => 0.785,
-                'source' => 'alpha',
+                'x' => 300,
+                'y' => 500,
+                'width' => 200,
+                'height' => 200,
+                'rotation' => 0,
+                'flip_h' => false,
+                'flip_v' => false,
+                'clear_zone' => 50,
+                'clear_expansion' => 10,
+                'region_sensitivity' => 50,
+                'min_region_size' => 1,
+                'edge_protection' => 60,
+                'feather' => 0,
+                'protected_areas' => [],
+                'remove_areas' => [],
             ]],
             'status' => 'active',
         ]);
 
         // Foto capture: merah solid
         $photo = imagecreatetruecolor(200, 200);
-        $red = imagecolorallocate($photo, 255, 0, 0);
-        imagefilledrectangle($photo, 0, 0, 199, 199, $red);
+        imagefilledrectangle($photo, 0, 0, 199, 199, imagecolorallocate($photo, 255, 0, 0));
         ob_start();
-        imagejpeg($photo, null, 90);
+        imagejpeg($photo, null, 95);
         $photoData = ob_get_clean();
         imagedestroy($photo);
         $photoBase64 = 'data:image/jpeg;base64,' . base64_encode($photoData);
@@ -300,12 +297,46 @@ class SessionTest extends TestCase
         $finalPath = Storage::disk('public')->path($response->json('data.photo.storage_path'));
         $final = imagecreatefromjpeg($finalPath);
 
-        $center = imagecolorat($final, 400, 600);
-        $this->assertGreaterThan(200, ($center >> 16) & 0xFF, 'Tengah lingkaran harus berisi foto merah');
-        $this->assertLessThan(120, ($center >> 8) & 0xFF, 'Tengah lingkaran harus merah, bukan hijau');
+        $px = fn ($x, $y) => imagecolorat($final, $x, $y);
+        $r = fn ($c) => ($c >> 16) & 0xFF;
+        $g = fn ($c) => ($c >> 8) & 0xFF;
+        $b = fn ($c) => $c & 0xFF;
 
-        $corner = imagecolorat($final, 30, 30);
-        $this->assertLessThan(80, ($corner >> 16) & 0xFF, 'Di luar lingkaran harus tetap template gelap');
+        // PRIORITAS 1 — pusat Hard Clear Zone: foto merah terlihat
+        $c = $px(400, 600);
+        $this->assertGreaterThan(180, $r($c), 'Pusat frame harus berisi foto');
+        $this->assertLessThan(100, $g($c), 'Pusat frame harus foto, bukan desain');
+
+        // PRIORITAS 2 — connected region di bawah hard zone ikut ter-clear
+        $c = $px(400, 665);
+        $this->assertGreaterThan(180, $r($c), 'Area putih terhubung harus ter-clear');
+
+        // Connected region menembus celah sempit antara logo dan tepi hard zone
+        $c = $px(400, 543);
+        $this->assertGreaterThan(180, $r($c), 'Celah terhubung harus ter-clear');
+
+        // PRIORITAS 4 — logo hijau di perifer DIPERTAHANKAN (kamera di-mask)
+        $c = $px(400, 525);
+        $this->assertGreaterThan(100, $g($c), 'Logo hijau harus dipertahankan');
+        $this->assertLessThan(100, $r($c), 'Logo hijau tidak boleh tertimpa foto');
+
+        // Pulau putih di atas logo tak terjangkau flood → tetap desain putih
+        $c = $px(400, 508);
+        $this->assertGreaterThan(200, $r($c));
+        $this->assertGreaterThan(200, $g($c));
+
+        // Strip biru di tepi kanan frame DIPERTAHANKAN
+        $c = $px(500, 600);
+        $this->assertGreaterThan(150, $b($c), 'Strip biru harus dipertahankan');
+        $this->assertLessThan(100, $r($c));
+
+        // Clear Expansion habis: sudut bawah kiri tetap putih (di luar jangkauan)
+        $c = $px(312, 688);
+        $this->assertGreaterThan(200, $r($c), 'Area di luar expansion tidak boleh ter-clear');
+
+        // Background gelap jauh dari frame tetap utuh
+        $c = $px(30, 30);
+        $this->assertLessThan(80, $r($c));
 
         imagedestroy($final);
     }

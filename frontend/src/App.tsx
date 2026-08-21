@@ -11,6 +11,7 @@ import GalleryPage from '@/pages/admin/GalleryPage'
 import PhotoMenuPage from '@/pages/admin/PhotoMenuPage'
 import PhotoCapturePage from '@/pages/admin/PhotoCapturePage'
 import TemplatesPage from '@/pages/admin/TemplatesPage'
+import TemplateFrameEditorPage from '@/pages/admin/TemplateFrameEditorPage'
 
 // Customer Pages
 import CustomerPhotoPage from '@/pages/customer/CustomerPhotoPage'
@@ -76,6 +77,7 @@ const App: React.FC = () => {
               <Route path="/photo" element={<PhotoMenuPage />} />
               <Route path="/photo/session/:id" element={<PhotoCapturePage />} />
               <Route path="/templates" element={<TemplatesPage />} />
+              <Route path="/templates/:id/editor" element={<TemplateFrameEditorPage />} />
               <Route path="/settings" element={
                 <div className="text-white">
                   <h1 className="text-2xl font-bold mb-2">Pengaturan</h1>

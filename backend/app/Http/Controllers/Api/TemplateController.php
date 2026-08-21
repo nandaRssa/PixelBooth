@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Template;
-use App\Services\TemplateAnalyzerService;
+use App\Services\FrameMaskService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -12,6 +12,10 @@ use Illuminate\Support\Facades\Storage;
 
 class TemplateController extends Controller
 {
+    public function __construct(private readonly FrameMaskService $maskService)
+    {
+    }
+
     /**
      * Daftar semua template aktif.
      */
@@ -34,7 +38,8 @@ class TemplateController extends Controller
     }
 
     /**
-     * Upload template baru.
+     * Upload template baru. TIDAK ADA deteksi otomatis — frame sepenuhnya
+     * ditentukan manual oleh user melalui Frame Editor setelah upload.
      */
     public function store(Request $request): JsonResponse
     {
@@ -44,7 +49,7 @@ class TemplateController extends Controller
             'preview_file' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
             'canvas_width' => ['required', 'integer', 'min:100'],
             'canvas_height' => ['required', 'integer', 'min:100'],
-            'frame_count' => ['required', 'integer', 'min:1', 'max:50'],
+            'frame_count' => ['nullable', 'integer', 'min:1', 'max:20'],
             'frame_configuration' => ['nullable', 'json'],
         ]);
 
@@ -57,21 +62,9 @@ class TemplateController extends Controller
             $previewPath = $request->file('preview_file')->store("templates/{$slug}/preview", 'public');
         }
 
-        $frameConfig = $request->frame_configuration
-            ? json_decode($request->frame_configuration, true)
-            : null;
-
-        // Deteksi otomatis bingkai (Intelligent Template Analyzer) bila konfigurasi
-        // tidak diberikan manual.
-        $detected = null;
-        if (! is_array($frameConfig) || count($frameConfig) === 0) {
-            $analyzer = new TemplateAnalyzerService();
-            $detected = $analyzer->analyze(
-                Storage::disk('public')->path($templatePath),
-                (int) $request->canvas_width,
-                (int) $request->canvas_height
-            );
-        }
+        $frameConfig = $this->sanitizeFrames(
+            $request->frame_configuration ? json_decode($request->frame_configuration, true) : null
+        );
 
         $template = Template::create([
             'name' => $request->name,
@@ -80,116 +73,41 @@ class TemplateController extends Controller
             'preview_file' => $previewPath,
             'canvas_width' => $request->canvas_width,
             'canvas_height' => $request->canvas_height,
-            'frame_count' => $detected['frame_count'] ?? $request->frame_count,
-            'frame_configuration' => $detected['frames'] ?? $frameConfig,
-            'detection_method' => $detected['detection_method'] ?? 'transparent',
-            'status' => 'active',
+            'frame_count' => max(1, count($frameConfig) ?: (int) $request->input('frame_count', 1)),
+            'frame_configuration' => $frameConfig,
+            // Template baru = draft: wajib lewat Frame Editor + Confirm Template
+            // sebelum siap dipakai Photo Session.
+            'status' => 'draft',
         ]);
 
         return response()->json([
-            'message' => $detected
-                ? "Template berhasil diunggah. {$detected['frame_count']} bingkai terdeteksi otomatis."
-                : 'Template berhasil diunggah.',
+            'message' => 'Template berhasil diunggah. Atur posisi kamera pada Frame Editor.',
             'data' => $template,
         ], 201);
     }
 
     /**
-     * Analisis file template yang belum disimpan — untuk preview & koreksi
-     * sebelum template di-save. Tidak menyimpan apa pun.
-     */
-    public function analyze(Request $request): JsonResponse
-    {
-        $request->validate([
-            'template_file' => ['required', 'file', 'mimes:jpg,jpeg,png,webp', 'max:20480'],
-            'canvas_width' => ['required', 'integer', 'min:100'],
-            'canvas_height' => ['required', 'integer', 'min:100'],
-        ]);
-
-        $tmp = $request->file('template_file')->store('templates/tmp', 'public');
-        $analyzer = new TemplateAnalyzerService();
-        $result = $analyzer->analyze(
-            Storage::disk('public')->path($tmp),
-            (int) $request->canvas_width,
-            (int) $request->canvas_height
-        );
-        Storage::disk('public')->delete($tmp);
-
-        if (! $result) {
-            return response()->json([
-                'message' => 'Tidak ada area foto yang terdeteksi pada template ini.',
-                'data' => [
-                    'frame_count' => 0,
-                    'method' => null,
-                    'frames' => [],
-                ],
-            ]);
-        }
-
-        return response()->json([
-            'message' => "Analisis selesai: {$result['frame_count']} bingkai ditemukan ({$result['method']}).",
-            'data' => $result,
-        ]);
-    }
-
-    /**
-     * Analisis ulang bingkai pada template yang sudah ada — mengembalikan hasil
-     * deteksi untuk preview & koreksi admin, TANPA langsung menyimpan.
-     */
-    public function detectFrames(Template $template): JsonResponse
-    {
-        if (! $template->template_file || ! Storage::disk('public')->exists($template->template_file)) {
-            return response()->json([
-                'message' => 'File template tidak ditemukan.',
-            ], 404);
-        }
-
-        $analyzer = new TemplateAnalyzerService();
-        $result = $analyzer->analyze(
-            Storage::disk('public')->path($template->template_file),
-            $template->canvas_width,
-            $template->canvas_height
-        );
-
-        if (! $result) {
-            return response()->json([
-                'message' => 'Tidak ada area foto yang terdeteksi pada template ini.',
-                'data' => [
-                    'frame_count' => 0,
-                    'method' => null,
-                    'frames' => [],
-                    'template' => $template,
-                ],
-            ]);
-        }
-
-        return response()->json([
-            'message' => "Deteksi selesai: {$result['frame_count']} bingkai ditemukan ({$result['method']}).",
-            'data' => array_merge($result, ['template' => $template]),
-        ]);
-    }
-
-    /**
-     * Update konfigurasi frame template.
+     * Update konfigurasi frame template (hasil Confirm Template dari editor).
      */
     public function update(Request $request, Template $template): JsonResponse
     {
         $request->validate([
             'name' => ['sometimes', 'string', 'max:255'],
             'frame_configuration' => ['sometimes'],
-            'frame_count' => ['sometimes', 'integer', 'min:1', 'max:50'],
-            'detection_method' => ['sometimes', 'string', 'in:transparent,white-detection'],
-            'status' => ['sometimes', 'in:active,inactive'],
+            'frame_count' => ['sometimes', 'integer', 'min:1', 'max:20'],
+            'status' => ['sometimes', 'in:draft,active,inactive'],
         ]);
 
-        $data = $request->only(['name', 'frame_count', 'detection_method', 'status']);
+        $data = $request->only(['name', 'frame_count', 'status']);
 
-        // frame_configuration bisa dikirim sebagai array atau JSON string
         if ($request->has('frame_configuration')) {
             $config = $request->input('frame_configuration');
-            $data['frame_configuration'] = is_string($config)
-                ? json_decode($config, true)
-                : $config;
+            $config = is_string($config) ? json_decode($config, true) : $config;
+            $config = $this->sanitizeFrames($config);
+            $data['frame_configuration'] = $config;
+            if (! $request->has('frame_count') && count($config) > 0) {
+                $data['frame_count'] = count($config);
+            }
         }
 
         $template->update($data);
@@ -205,7 +123,6 @@ class TemplateController extends Controller
      */
     public function destroy(Template $template): JsonResponse
     {
-        // Hapus file template dari storage
         if ($template->template_file) {
             Storage::disk('public')->deleteDirectory(dirname($template->template_file));
         }
@@ -213,5 +130,31 @@ class TemplateController extends Controller
         $template->delete();
 
         return response()->json(['message' => 'Template berhasil dihapus.']);
+    }
+
+    /**
+     * Normalisasi & validasi ringan daftar frame manual dari user.
+     * Setiap frame dinormalisasi via FrameMaskService (default lengkap).
+     */
+    private function sanitizeFrames($frames): array
+    {
+        if (! is_array($frames)) {
+            return [];
+        }
+
+        $out = [];
+        foreach (array_slice($frames, 0, 20) as $i => $raw) {
+            if (! is_array($raw) || ! isset($raw['x'], $raw['y'], $raw['width'], $raw['height'])) {
+                continue;
+            }
+            $norm = $this->maskService->normalizeFrame($raw);
+            $norm['id'] = $norm['id'] ?: ($i + 1);
+            $norm['order'] = $raw['order'] ?? $i;
+            $out[] = $norm;
+        }
+
+        usort($out, fn ($a, $b) => $a['order'] <=> $b['order']);
+
+        return array_values($out);
     }
 }

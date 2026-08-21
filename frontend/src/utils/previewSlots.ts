@@ -1,50 +1,32 @@
 // ==========================================
 // PIXELBOOTH — Preview Slot Resolver
-// Mencerminkan PhotoRenderService::resolveSlots
-// agar preview kamera sesuai hasil render akhir.
+// Mencerminkan PhotoRenderService::resolveSlots.
+// Frame manual user = sumber kebenaran; auto layout hanya
+// fallback untuk template legacy tanpa konfigurasi.
 // ==========================================
 
-import type { FrameConfig, Template } from '@/types'
+import type { CameraFrame, Template } from '@/types'
+import { normalizeFrame } from './frameMask'
 
-export interface PreviewSlot {
-  x: number
-  y: number
-  width: number
-  height: number
-  shape?: string
-  mask?: [number, number][]
-}
+export type PreviewSlot = CameraFrame
 
 export function resolvePreviewSlots(template: Template, count: number): PreviewSlot[] {
   if (count <= 0) return []
 
   const config = template.frame_configuration
   if (Array.isArray(config) && config.length > 0) {
-    const slots: PreviewSlot[] = config
-      .filter(
-        (s): s is FrameConfig =>
-          typeof s.x === 'number' &&
-          typeof s.y === 'number' &&
-          s.width > 0 &&
-          s.height > 0
-      )
-      .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
-      .map((s) => ({
-        x: s.x,
-        y: s.y,
-        width: s.width,
-        height: s.height,
-        shape: s.shape,
-        mask: s.mask,
-      }))
+    const slots = config
+      .filter((s) => s && typeof s.x === 'number' && typeof s.y === 'number' && s.width > 0 && s.height > 0)
+      .map((s, i) => ({ ...normalizeFrame(s), order: s.order ?? i }))
+      .sort((a, b) => a.order - b.order)
 
     if (slots.length >= count) return slots.slice(0, count)
   }
 
-  return autoLayout(template.canvas_width, template.canvas_height, count)
+  return autoLayout(template.canvas_width, template.canvas_height, count).map(normalizeFrame)
 }
 
-function autoLayout(canvasW: number, canvasH: number, count: number): PreviewSlot[] {
+function autoLayout(canvasW: number, canvasH: number, count: number): Partial<CameraFrame>[] {
   const margin = Math.round(Math.min(canvasW, canvasH) * 0.04)
 
   if (count === 1) {

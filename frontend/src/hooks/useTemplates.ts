@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { templateApi, type TemplatePayload } from '@/api/templates'
+import { templateApi, type TemplatePayload, type TemplateUpdatePayload } from '@/api/templates'
 import { hardwareApi } from '@/api/hardware'
 
 // ==========================================
@@ -14,6 +14,14 @@ export function useTemplates() {
   })
 }
 
+export function useTemplate(id: number | null) {
+  return useQuery({
+    queryKey: ['templates', id],
+    queryFn: () => templateApi.show(id as number),
+    enabled: id != null,
+  })
+}
+
 export function useCreateTemplate() {
   const queryClient = useQueryClient()
 
@@ -25,22 +33,24 @@ export function useCreateTemplate() {
   })
 }
 
+export function useUpdateTemplate() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({ id, payload }: { id: number; payload: TemplateUpdatePayload }) =>
+      templateApi.update(id, payload),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['templates'] })
+      queryClient.invalidateQueries({ queryKey: ['templates', variables.id] })
+    },
+  })
+}
+
 export function useDeleteTemplate() {
   const queryClient = useQueryClient()
 
   return useMutation({
     mutationFn: (id: number) => templateApi.remove(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['templates'] })
-    },
-  })
-}
-
-export function useDetectTemplateFrames() {
-  const queryClient = useQueryClient()
-
-  return useMutation({
-    mutationFn: (id: number) => templateApi.detectFrames(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['templates'] })
     },

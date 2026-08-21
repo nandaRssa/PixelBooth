@@ -71,7 +71,8 @@ const PhotoMenuPage: React.FC = () => {
   const createSession = useCreateSession()
 
   const webcamAvailable = useWebcamAvailability()
-  const templates = templatesQuery.data ?? []
+  // Hanya template yang sudah dikonfirmasi di Frame Editor yang bisa dipakai
+  const templates = (templatesQuery.data ?? []).filter((t) => t.status === 'active')
   const folders = foldersQuery.data ?? []
   const hardware = hardwareQuery.data
 
