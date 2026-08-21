@@ -1,32 +1,41 @@
 // ==========================================
 // PIXELBOOTH — Preview Slot Resolver
-// Mencerminkan PhotoRenderService::resolveSlots.
-// Frame manual user = sumber kebenaran; auto layout hanya
-// fallback untuk template legacy tanpa konfigurasi.
+// Mencerminkan PhotoRenderService::resolveSlots
+// agar preview kamera sesuai hasil render akhir.
 // ==========================================
 
-import type { CameraFrame, Template } from '@/types'
-import { normalizeFrame } from './frameMask'
+import type { FrameConfig, Template } from '@/types'
 
-export type PreviewSlot = CameraFrame
+export interface PreviewSlot {
+  x: number
+  y: number
+  width: number
+  height: number
+}
 
 export function resolvePreviewSlots(template: Template, count: number): PreviewSlot[] {
   if (count <= 0) return []
 
   const config = template.frame_configuration
   if (Array.isArray(config) && config.length > 0) {
-    const slots = config
-      .filter((s) => s && typeof s.x === 'number' && typeof s.y === 'number' && s.width > 0 && s.height > 0)
-      .map((s, i) => ({ ...normalizeFrame(s), order: s.order ?? i }))
-      .sort((a, b) => a.order - b.order)
+    const slots: PreviewSlot[] = config
+      .filter(
+        (s): s is FrameConfig =>
+          typeof s.x === 'number' &&
+          typeof s.y === 'number' &&
+          s.width > 0 &&
+          s.height > 0
+      )
+      .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+      .map((s) => ({ x: s.x, y: s.y, width: s.width, height: s.height }))
 
     if (slots.length >= count) return slots.slice(0, count)
   }
 
-  return autoLayout(template.canvas_width, template.canvas_height, count).map(normalizeFrame)
+  return autoLayout(template.canvas_width, template.canvas_height, count)
 }
 
-function autoLayout(canvasW: number, canvasH: number, count: number): Partial<CameraFrame>[] {
+function autoLayout(canvasW: number, canvasH: number, count: number): PreviewSlot[] {
   const margin = Math.round(Math.min(canvasW, canvasH) * 0.04)
 
   if (count === 1) {

@@ -37,14 +37,14 @@ class Template extends Model
     public function getTemplateUrlAttribute(): ?string
     {
         return $this->template_file
-            ? asset('storage/' . $this->template_file)
+            ? '/storage/' . ltrim($this->template_file, '/')
             : null;
     }
 
     public function getPreviewUrlAttribute(): ?string
     {
         return $this->preview_file
-            ? asset('storage/' . $this->preview_file)
+            ? '/storage/' . ltrim($this->preview_file, '/')
             : null;
     }
 

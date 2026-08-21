@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
@@ -18,6 +18,7 @@ import { Spinner, CameraStatusBadge } from '@/components/ui/StatusBadge'
 import { toast } from '@/components/ui/Toast'
 import { sessionApi } from '@/api/sessions'
 import { useFolders } from '@/hooks/useFolders'
+import { resolvePreviewSlots } from '@/utils/previewSlots'
 import type { PhotoSession } from '@/types'
 
 // ==========================================
@@ -51,9 +52,24 @@ const PhotoCapturePage: React.FC = () => {
   const foldersQuery = useFolders(null)
 
   const videoRef = useRef<HTMLVideoElement>(null)
+  const slotVideoRefs = useRef<(HTMLVideoElement | null)[]>([])
   const streamRef = useRef<MediaStream | null>(null)
   const countdownRef = useRef<number | null>(null)
   const captureFnRef = useRef<() => void>(() => {})
+
+  // ===== Slot preview =====
+  // Cerminan PhotoRenderService::resolveSlots agar preview sesuai hasil akhir
+  const previewSlots = useMemo(() => {
+    const tpl = session?.template
+    if (!tpl) return []
+    return resolvePreviewSlots(tpl, session?.total_frames ?? 0)
+  }, [session?.template, session?.total_frames])
+
+  const activeSlot = useMemo(() => {
+    if (previewSlots.length === 0) return null
+    const idx = (session?.current_frame ?? 1) - 1
+    return previewSlots[Math.min(Math.max(idx, 0), previewSlots.length - 1)] ?? null
+  }, [previewSlots, session?.current_frame])
 
   // ===== Muat sesi =====
   useEffect(() => {
@@ -119,6 +135,19 @@ const PhotoCapturePage: React.FC = () => {
       video.play().catch(() => {})
     }
   }, [cameraActive])
+
+  // ===== Lampirkan stream ke video tiap slot preview =====
+  useEffect(() => {
+    const stream = streamRef.current
+    if (cameraActive && stream) {
+      slotVideoRefs.current.forEach((el) => {
+        if (el && el.srcObject !== stream) {
+          el.srcObject = stream
+          el.play().catch(() => {})
+        }
+      })
+    }
+  }, [cameraActive, phase, previewSlots])
 
   // ===== Countdown =====
   const startCountdown = () => {
@@ -387,70 +416,162 @@ const PhotoCapturePage: React.FC = () => {
       {/* ===== Camera Preview ===== */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Video / Captured */}
-        <div className="lg:col-span-2 bg-[#0D0D0D] border border-[#2A2A2A] rounded-2xl overflow-hidden relative aspect-[4/3]">
-          {/* Video selalu dirender agar stream tetap terpasang */}
-          <video
-            ref={videoRef}
-            playsInline
-            muted
-            autoPlay
-            className="w-full h-full object-cover -scale-x-100"
-            style={{ filter: 'brightness(1.45) contrast(1.1) saturate(1.1)' }}
-          />
-
-          {/* Frame overlay indicator */}
-          <div className="absolute inset-4 border-2 border-white/20 rounded-xl pointer-events-none" />
-
-          {/* Hasil frame terakhir menutupi preview */}
-          {capturedUrl && phase === 'captured' && (
-            <img
-              src={capturedUrl}
-              alt="Frame terakhir"
-              className="absolute inset-0 w-full h-full object-cover"
+        <div className="lg:col-span-2 flex justify-center">
+          <div
+            className="relative bg-[#0D0D0D] border border-[#2A2A2A] rounded-2xl overflow-hidden"
+            style={{
+              aspectRatio: template
+                ? `${template.canvas_width} / ${template.canvas_height}`
+                : '4 / 3',
+              width: template
+                ? `min(100%, calc(78vh * ${template.canvas_width} / ${template.canvas_height}))`
+                : '100%',
+              maxHeight: '78vh',
+            }}
+          >
+            {/* Video utama: sumber capture, tertutup overlay template */}
+            <video
+              ref={videoRef}
+              playsInline
+              muted
+              autoPlay
+              className="absolute inset-0 w-full h-full object-cover -scale-x-100"
+              style={{ filter: 'brightness(1.45) contrast(1.1) saturate(1.1)' }}
             />
-          )}
 
-          {/* Kamera tidak aktif */}
-          {!cameraActive && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-6">
-              <VideoOff size={36} className="text-[#333] mb-3" />
-              <p className="text-[#A0A0A0] text-sm mb-4">Kamera tidak aktif</p>
-              {cameraError && <p className="text-red-400 text-xs max-w-xs mb-4">{cameraError}</p>}
-              <Button variant="secondary" size="md" onClick={startCamera} leftIcon={<Video size={16} />}>
-                Aktifkan Kamera
-              </Button>
-            </div>
-          )}
+            {template && template.template_url ? (
+              <>
+                {/* Template sebagai dasar desain */}
+                <img
+                  src={template.template_url}
+                  alt={template.name}
+                  draggable={false}
+                  className="absolute inset-0 w-full h-full object-fill pointer-events-none select-none"
+                />
 
-          {/* Countdown overlay */}
-          <AnimatePresence>
-            {phase === 'countdown' && countdown !== null && (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="absolute inset-0 bg-black/60 flex items-center justify-center z-10"
-              >
-                <motion.div
-                  key={countdown}
-                  initial={{ scale: 1.6, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  className="w-28 h-28 rounded-full bg-white/10 border border-white/30 flex items-center justify-center"
-                >
-                  <span className="text-white text-6xl font-bold">{countdown}</span>
-                </motion.div>
-              </motion.div>
+                {/* Kamera di dalam tiap slot foto */}
+                {previewSlots.length > 0 && !(phase === 'captured' && capturedUrl) && (
+                  <div className="absolute inset-0 pointer-events-none">
+                    {previewSlots.map((slot, i) => (
+                      <div
+                        key={i}
+                        className="absolute"
+                        style={{
+                          left: `${(slot.x / template.canvas_width) * 100}%`,
+                          top: `${(slot.y / template.canvas_height) * 100}%`,
+                          width: `${(slot.width / template.canvas_width) * 100}%`,
+                          height: `${(slot.height / template.canvas_height) * 100}%`,
+                        }}
+                      >
+                        {cameraActive ? (
+                          <video
+                            ref={(el) => {
+                              slotVideoRefs.current[i] = el
+                            }}
+                            playsInline
+                            muted
+                            autoPlay
+                            className="w-full h-full object-cover -scale-x-100"
+                            style={{ filter: 'brightness(1.45) contrast(1.1) saturate(1.1)' }}
+                          />
+                        ) : (
+                          <div className="w-full h-full bg-[#0A0A0A]" />
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Hasil capture tampil di dalam slot (preview final sesuai render) */}
+                {phase === 'captured' && capturedUrl && (
+                  <div className="absolute inset-0 pointer-events-none">
+                    {previewSlots.map((slot, i) => (
+                      <div
+                        key={i}
+                        className="absolute overflow-hidden"
+                        style={{
+                          left: `${(slot.x / template.canvas_width) * 100}%`,
+                          top: `${(slot.y / template.canvas_height) * 100}%`,
+                          width: `${(slot.width / template.canvas_width) * 100}%`,
+                          height: `${(slot.height / template.canvas_height) * 100}%`,
+                        }}
+                      >
+                        <img
+                          src={capturedUrl}
+                          alt="Frame"
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
+                {/* Tanpa gambar template: preview polos */}
+                <div className="absolute inset-4 border-2 border-white/20 rounded-xl pointer-events-none" />
+                {capturedUrl && phase === 'captured' && (
+                  <img
+                    src={capturedUrl}
+                    alt="Frame terakhir"
+                    className="absolute inset-0 w-full h-full object-cover"
+                  />
+                )}
+              </>
             )}
-          </AnimatePresence>
 
-          {isCapturing && (
-            <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-10">
-              <div className="text-center">
-                <Spinner size="lg" className="text-white mb-2" />
-                <p className="text-[#A0A0A0] text-sm">Memproses foto...</p>
+            {/* Kamera tidak aktif */}
+            {!cameraActive && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-6">
+                <VideoOff size={36} className="text-[#333] mb-3" />
+                <p className="text-[#A0A0A0] text-sm mb-4">Kamera tidak aktif</p>
+                {cameraError && <p className="text-red-400 text-xs max-w-xs mb-4">{cameraError}</p>}
+                <Button variant="secondary" size="md" onClick={startCamera} leftIcon={<Video size={16} />}>
+                  Aktifkan Kamera
+                </Button>
               </div>
-            </div>
-          )}
+            )}
+
+            {/* Countdown di dalam bingkai foto yang sedang diambil */}
+            <AnimatePresence>
+              {phase === 'countdown' && countdown !== null && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="absolute z-10 flex items-center justify-center pointer-events-none"
+                  style={
+                    activeSlot && template
+                      ? {
+                          left: `${(activeSlot.x / template.canvas_width) * 100}%`,
+                          top: `${(activeSlot.y / template.canvas_height) * 100}%`,
+                          width: `${(activeSlot.width / template.canvas_width) * 100}%`,
+                          height: `${(activeSlot.height / template.canvas_height) * 100}%`,
+                        }
+                      : { inset: 0 }
+                  }
+                >
+                  <motion.div
+                    key={countdown}
+                    initial={{ scale: 1.6, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    className="w-28 h-28 rounded-full bg-black/50 border border-white/40 flex items-center justify-center"
+                  >
+                    <span className="text-white text-6xl font-bold">{countdown}</span>
+                  </motion.div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {isCapturing && (
+              <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-10">
+                <div className="text-center">
+                  <Spinner size="lg" className="text-white mb-2" />
+                  <p className="text-[#A0A0A0] text-sm">Memproses foto...</p>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* ===== Controls ===== */}
@@ -461,7 +582,8 @@ const PhotoCapturePage: React.FC = () => {
                 Siap untuk Frame {currentFrame}
               </h3>
               <p className="text-[#606060] text-sm mb-6">
-                Posisikan subjek di dalam bingkai, lalu tekan tombol untuk memulai hitung mundur.
+                Kamera sudah berada di dalam bingkai template. Posisikan subjek sesuai bingkai, lalu
+                tekan tombol untuk memulai hitung mundur.
               </p>
               <Button
                 variant="primary"
