@@ -1002,7 +1002,7 @@ ctx.restore()
           )}
           {/* Penanda versi build — untuk memastikan bundle terbaru yang dimuat */}
           <div className="absolute bottom-2 right-3 text-[10px] text-[#555] select-none pointer-events-none">
-            editor-v9 · full-clear-toggle
+            editor-v10 · color-sensitive
           </div>
         </div>
 

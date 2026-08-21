@@ -125,7 +125,10 @@ export function computeHoleMask(
   const expPx = ((f.clear_expansion / 100) * Math.min(fw, fh))
   const dMax = dHard + expPx
 
-  const tol = 6 + f.region_sensitivity * 1.14
+  // Peka warna: toleransi rendah — perubahan warna apa pun di dalam slot
+  // (bayangan, pastel, gradasi) dipertahankan, bukan dihapus.
+  // Default sens 50 -> tol 20 (sebelumnya 63). Harus identik dengan backend.
+  const tol = 2 + f.region_sensitivity * 0.36
   const ep = f.edge_protection / 100
 
   // Area manual disimpan dari sudut kiri-atas frame; konversi ke basis pusat.

@@ -115,7 +115,10 @@ class FrameMaskService
         $expPx = $f['clear_expansion'] / 100 * min($fw, $fh);
         $dMax = $dHard + $expPx;
 
-        $tol = 6 + $f['region_sensitivity'] * 1.14;
+        // Peka warna: toleransi rendah — perubahan warna apa pun di dalam
+        // slot (bayangan, pastel, gradasi) dipertahankan, bukan dihapus.
+        // Default sens 50 -> tol 20 (sebelumnya 63).
+        $tol = 2 + $f['region_sensitivity'] * 0.36;
         $ep = $f['edge_protection'] / 100;
 
         // Area manual disimpan dalam koordinat lokal frame dari sudut kiri-atas.
