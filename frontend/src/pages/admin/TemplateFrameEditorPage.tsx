@@ -13,6 +13,7 @@ import {
   Eraser,
   MousePointer2,
   Trash2,
+  Undo2,
   Video,
   VideoOff,
   Eye,
@@ -24,7 +25,7 @@ import { toast } from '@/components/ui/Toast'
 import { templateApi, useTemplate, useUpdateTemplate } from '@/hooks/useTemplates'
 import { normalizeFrame, computeHoleMask, downscaleTemplate, type WorkTemplate } from '@/utils/frameMask'
 import { loadImage } from '@/utils/templateOverlay'
-import type { CameraFrame, ClearArea, Template } from '@/types'
+import type { CameraFrame, Template } from '@/types'
 
 // ==========================================
 // Template Frame Editor
@@ -36,9 +37,10 @@ import type { CameraFrame, ClearArea, Template } from '@/types'
 // Layer render: DESIGN (atas) > CAMERA (bawah) > MASK.
 // ==========================================
 
-type EditorMode = 'select' | 'protect' | 'remove'
+type EditorMode = 'select' | 'protect' | 'remove' | 'restore'
+type BrushKey = 'remove_seeds' | 'protect_seeds' | 'keep_seeds'
 type DragType = 'move' | 'resize-e' | 'resize-w' | 'resize-n' | 'resize-s'
-  | 'resize-ne' | 'resize-nw' | 'resize-se' | 'resize-sw' | 'rotate' | 'draw'
+  | 'resize-ne' | 'resize-nw' | 'resize-se' | 'resize-sw' | 'rotate' | 'brush'
 
 interface DragState {
   type: DragType
@@ -50,7 +52,8 @@ interface DragState {
   grabLx?: number
   grabLy?: number
   grabAngle?: number
-  drawArea?: 'protect' | 'remove'
+  /** Mode kuas aktif saat drag brush */
+  brushKey?: BrushKey
 }
 
 const MIN_SIZE = 24
@@ -87,17 +90,21 @@ const TemplateFrameEditorPage: React.FC = () => {
   const [testCamera, setTestCamera] = useState(false)
   const [cameraError, setCameraError] = useState<string | null>(null)
   const [initialized, setInitialized] = useState(false)
-  const [drawingRect, setDrawingRect] = useState<{ x1: number; y1: number; x2: number; y2: number } | null>(null)
   // Dual mode penentuan Camera Frame: manual (editor) / auto (deteksi sistem)
   const [frameMode, setFrameMode] = useState<'manual' | 'auto'>('manual')
   const [detecting, setDetecting] = useState(false)
   const manualBackupRef = useRef<CameraFrame[] | null>(null)
+  // Brush region: ukuran kuas (px layar) + posisi kursor untuk lingkaran preview
+  const [brushSize, setBrushSize] = useState(28)
+  const cursorRef = useRef<{ x: number; y: number } | null>(null)
+  const lastSeedRef = useRef<{ x: number; y: number } | null>(null)
 
   const containerRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const templateImgRef = useRef<HTMLImageElement | null>(null)
   const workRef = useRef<WorkTemplate | null>(null)
   const holesRef = useRef<HTMLCanvasElement | null>(null)
+  const regionRef = useRef<HTMLCanvasElement | null>(null)
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const dragRef = useRef<DragState | null>(null)
@@ -156,6 +163,13 @@ const TemplateFrameEditorPage: React.FC = () => {
       const tmpCtx = tmp.getContext('2d')
       if (!tmpCtx) return
 
+      // Kanvas overlay tint region brush (di atas layer desain)
+      const region = document.createElement('canvas')
+      region.width = canvas.width
+      region.height = canvas.height
+      const regionCtx = region.getContext('2d')
+      if (!regionCtx) return
+
       ctx.globalCompositeOperation = 'destination-out'
       for (const f of frames) {
         const mask = computeHoleMask(wt, f)
@@ -166,9 +180,12 @@ const TemplateFrameEditorPage: React.FC = () => {
         // bx/by/bw/bh sudah dalam koordinat canvas (computeHoleMask yang
         // mengonversi dari ruang kerja) — JANGAN dikonversi lagi.
         ctx.drawImage(tmp, mask.bx, mask.by, mask.bw, mask.bh)
+        tmpCtx.putImageData(mask.overlay, 0, 0)
+        regionCtx.drawImage(tmp, mask.bx, mask.by, mask.bw, mask.bh)
       }
       ctx.globalCompositeOperation = 'source-over'
       holesRef.current = canvas
+      regionRef.current = region
     } catch {
       // abaikan kegagalan rebuild sementara
     }
@@ -263,6 +280,11 @@ const TemplateFrameEditorPage: React.FC = () => {
       ctx.drawImage(holesRef.current, 0, 0)
     }
 
+    // --- Tint region brush (remove merah / protect kuning / keep hijau) ---
+    if (regionRef.current) {
+      ctx.drawImage(regionRef.current, 0, 0)
+    }
+
     // --- Chrome editor ---
     for (const f of frames) {
       const isSel = f.id === selectedId
@@ -343,41 +365,23 @@ ctx.restore()
       ctx.restore()
     }
 
-    // Rect yang sedang digambar
-    if (drawingRect && selected) {
-      const rad = (selected.rotation * Math.PI) / 180
-      const cx = selected.x + selected.width / 2
-      const cy = selected.y + selected.height / 2
-      const fx = selected.flip_h ? -1 : 1
-      const fy = selected.flip_v ? -1 : 1
-      const cos = Math.cos(-rad)
-      const sin = Math.sin(-rad)
-      const toLocal = (px: number, py: number): [number, number] => {
-        let dx = px - cx
-        let dy = py - cy
-        // Pointer → koordinat konten: balikkan flip dulu, lalu rotasi
-        dx *= fx
-        dy *= fy
-        return [dx * cos - dy * sin + selected.width / 2, dx * sin + dy * cos + selected.height / 2]
-      }
-      const [lx1, ly1] = toLocal(drawingRect.x1, drawingRect.y1)
-      const [lx2, ly2] = toLocal(drawingRect.x2, drawingRect.y2)
-      const rx = Math.min(lx1, lx2) - selected.width / 2
-      const ry = Math.min(ly1, ly2) - selected.height / 2
-      const rw = Math.abs(lx2 - lx1)
-      const rh = Math.abs(ly2 - ly1)
+    // Lingkaran kursor kuas (ukuran = kemudahan menjangkau seed, BUKAN
+    // batas region — region mengikuti connected-region detection)
+    if (mode !== 'select' && frameMode === 'manual' && cursorRef.current) {
+      const cur = cursorRef.current
+      const color =
+        mode === 'remove' ? '#EF4444' : mode === 'protect' ? '#FACC15' : '#22C55E'
       ctx.save()
-      ctx.translate(cx, cy)
-      ctx.rotate(rad)
-      ctx.scale(fx, fy)
-      ctx.fillStyle = mode === 'protect' ? 'rgba(34,197,94,0.25)' : 'rgba(239,68,68,0.25)'
-      ctx.strokeStyle = mode === 'protect' ? '#22C55E' : '#EF4444'
+      ctx.beginPath()
+      ctx.arc(cur.x, cur.y, brushSize / 2 / S, 0, Math.PI * 2)
+      ctx.fillStyle = 'rgba(255,255,255,0.08)'
+      ctx.strokeStyle = color
       ctx.lineWidth = 1.5 / S
-      ctx.fillRect(rx, ry, rw, rh)
-      ctx.strokeRect(rx, ry, rw, rh)
+      ctx.fill()
+      ctx.stroke()
       ctx.restore()
     }
-  }, [template, frames, selectedId, mode, previewMask, testCamera, drawingRect, selected])
+  }, [template, frames, selectedId, mode, previewMask, testCamera, selected, brushSize])
 
   const scheduleRender = useCallback(() => {
     if (rafRef.current != null) return
@@ -534,15 +538,23 @@ ctx.restore()
     const p = toCanvas(e.clientX, e.clientY)
     ;(e.target as HTMLCanvasElement).setPointerCapture(e.pointerId)
 
-    if ((mode === 'protect' || mode === 'remove') && selected) {
+    if ((mode === 'protect' || mode === 'remove' || mode === 'restore') && selected) {
+      const key: BrushKey =
+        mode === 'remove' ? 'remove_seeds' : mode === 'protect' ? 'protect_seeds' : 'keep_seeds'
+      // Alt / klik-kanan: hapus seed kuas di sekitar kursor (koreksi sapuan)
+      if (e.altKey || e.button === 2) {
+        eraseSeeds(selected, key, p)
+        return
+      }
       dragRef.current = {
-        type: 'draw',
+        type: 'brush',
         frameId: selected.id,
         startCanvas: p,
         startFrame: selected,
-        drawArea: mode,
+        brushKey: key,
       }
-      setDrawingRect({ x1: p.x, y1: p.y, x2: p.x, y2: p.y })
+      lastSeedRef.current = p
+      addSeed(key, selected, p)
       return
     }
 
@@ -611,13 +623,19 @@ ctx.restore()
     const cv = canvasRef.current
     if (!cv) return
     if (frameMode === 'auto') {
+      cursorRef.current = null
       cv.style.cursor = 'not-allowed'
+      scheduleRender()
       return
     }
     if (mode !== 'select') {
-      cv.style.cursor = 'crosshair'
+      // Lingkaran kuas menggantikan kursor sistem
+      cursorRef.current = p
+      cv.style.cursor = 'none'
+      scheduleRender()
       return
     }
+    cursorRef.current = null
     let cur = ''
     if (selected) {
       const ht = hitHandle(selected, p)
@@ -636,8 +654,18 @@ ctx.restore()
     }
     const f0 = drag.startFrame
 
-    if (drag.type === 'draw') {
-      setDrawingRect((prev) => (prev ? { ...prev, x2: p.x, y2: p.y } : prev))
+    if (drag.type === 'brush') {
+      // Perbarui lingkaran kuas saat mengusap
+      cursorRef.current = p
+      // Tambah seed sepanjang sapuan dengan jarak minimal (kuas HANYA
+      // menentukan titik pemicu — region akhir dihitung flood fill)
+      const last = lastSeedRef.current
+      const spacing = Math.max(4, (brushSize * 0.4) / viewRef.current.scale)
+      if (!last || Math.hypot(p.x - last.x, p.y - last.y) >= spacing) {
+        lastSeedRef.current = p
+        const f = frames.find((x) => x.id === drag.frameId) ?? f0
+        addSeed(drag.brushKey as BrushKey, f, p)
+      }
       return
     }
 
@@ -699,44 +727,60 @@ ctx.restore()
   const onPointerUp = () => {
     const drag = dragRef.current
     dragRef.current = null
-
-    if (drag?.type === 'draw' && drawingRect && selected) {
-      const r = drawingRect
-      const area = rectToLocalArea(selected, r)
-      if (area && area.w >= 4 && area.h >= 4) {
-        const key = drag.drawArea === 'protect' ? 'protected_areas' : 'remove_areas'
-        updateFrame(selected.id, {
-          [key]: [...selected[key], area],
-        } as Partial<CameraFrame>)
-      }
-      setDrawingRect(null)
+    if (drag?.type === 'brush') {
+      lastSeedRef.current = null
+      scheduleRender()
     }
   }
 
-  const rectToLocalArea = (f: CameraFrame, r: { x1: number; y1: number; x2: number; y2: number }): ClearArea | null => {
+  /** Pointer canvas → koordinat konten frame (px template, basis kiri-atas). */
+  const toContentLocal = (f: CameraFrame, p: { x: number; y: number }): [number, number] => {
     const rad = (f.rotation * Math.PI) / 180
     const fx = f.flip_h ? -1 : 1
     const fy = f.flip_v ? -1 : 1
     const cos = Math.cos(-rad)
     const sin = Math.sin(-rad)
+    let dx = p.x - (f.x + f.width / 2)
+    let dy = p.y - (f.y + f.height / 2)
+    // Pointer → koordinat konten: balikkan flip dulu, lalu rotasi
+    dx *= fx
+    dy *= fy
+    return [dx * cos - dy * sin + f.width / 2, dx * sin + dy * cos + f.height / 2]
+  }
+
+  const addSeed = (key: BrushKey, f: CameraFrame, p: { x: number; y: number }) => {
+    if (frameMode === 'auto') return
+    const [lx, ly] = toContentLocal(f, p)
+    if (lx < 0 || ly < 0 || lx > f.width || ly > f.height) return
+    updateFrame(f.id, {
+      [key]: [...f[key], { x: Math.round(lx), y: Math.round(ly) }],
+    } as Partial<CameraFrame>)
+  }
+
+  const eraseSeeds = (f: CameraFrame, key: BrushKey, p: { x: number; y: number }) => {
+    if (frameMode === 'auto') return
+    const radius = brushSize / 2 / viewRef.current.scale
+    const inRadius = (s: { x: number; y: number }) => {
+      const c = toCanvasPoint(f, s.x, s.y)
+      return Math.hypot(c.x - p.x, c.y - p.y) <= radius
+    }
+    updateFrame(f.id, { [key]: f[key].filter((s) => !inRadius(s)) } as Partial<CameraFrame>)
+  }
+
+  /** Koordinat konten lokal → koordinat canvas template. */
+  const toCanvasPoint = (f: CameraFrame, ax: number, ay: number): { x: number; y: number } => {
+    const rad = (f.rotation * Math.PI) / 180
+    const fx = f.flip_h ? -1 : 1
+    const fy = f.flip_v ? -1 : 1
+    const cos = Math.cos(rad)
+    const sin = Math.sin(rad)
     const cx = f.x + f.width / 2
     const cy = f.y + f.height / 2
-    const conv = (px: number, py: number): [number, number] => {
-      let dx = px - cx
-      let dy = py - cy
-      // Pointer → koordinat konten: balikkan flip dulu, lalu rotasi
-      dx *= fx
-      dy *= fy
-      return [dx * cos - dy * sin + f.width / 2, dx * sin + dy * cos + f.height / 2]
-    }
-    const [lx1, ly1] = conv(r.x1, r.y1)
-    const [lx2, ly2] = conv(r.x2, r.y2)
-    return {
-      x: Math.min(lx1, lx2),
-      y: Math.min(ly1, ly2),
-      w: Math.abs(lx2 - lx1),
-      h: Math.abs(ly2 - ly1),
-    }
+    const lx = ax - f.width / 2
+    const ly = ay - f.height / 2
+    const xr = lx * cos - ly * sin
+    const yr = lx * sin + ly * cos
+    return { x: cx + xr * fx, y: cy + yr * fy }
   }
 
   // ===== Frame ops =====
@@ -777,6 +821,9 @@ ctx.restore()
       y: selected.y + 24,
       protected_areas: selected.protected_areas.map((a) => ({ ...a })),
       remove_areas: selected.remove_areas.map((a) => ({ ...a })),
+      remove_seeds: selected.remove_seeds.map((s) => ({ ...s })),
+      protect_seeds: selected.protect_seeds.map((s) => ({ ...s })),
+      keep_seeds: selected.keep_seeds.map((s) => ({ ...s })),
     })
     setFrames((prev) => [...prev, copy])
     setSelectedId(newId)
@@ -874,7 +921,7 @@ ctx.restore()
         <div className="flex items-center justify-between mb-1">
           <label className="text-[#A0A0A0] text-xs font-medium">{label}</label>
           <span className="text-white text-xs tabular-nums">
-            {selected[key]}
+            {Number.isInteger(selected[key]) ? selected[key] : Number(selected[key].toFixed(1))}
             {suffix}
           </span>
         </div>
@@ -972,11 +1019,18 @@ ctx.restore()
           <canvas
             ref={canvasRef}
             className="absolute inset-0 touch-none"
-            style={{ cursor: mode === 'select' ? 'default' : 'crosshair' }}
+            style={{ cursor: mode === 'select' ? 'default' : 'none' }}
             onPointerDown={onPointerDown}
             onPointerMove={onPointerMove}
             onPointerUp={onPointerUp}
             onPointerCancel={onPointerUp}
+            onPointerLeave={() => {
+              if (cursorRef.current) {
+                cursorRef.current = null
+                scheduleRender()
+              }
+            }}
+            onContextMenu={(e) => e.preventDefault()}
           />
           {detecting && (
             <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-black/60">
@@ -1003,7 +1057,7 @@ ctx.restore()
           )}
           {/* Penanda versi build — untuk memastikan bundle terbaru yang dimuat */}
           <div className="absolute bottom-2 right-3 text-[10px] text-[#555] select-none pointer-events-none">
-            editor-v14 · edge-cleanup
+            editor-v17 · brush-tint
           </div>
         </div>
 
@@ -1173,20 +1227,20 @@ ctx.restore()
               {slider('Region Sensitivity', 'region_sensitivity', 0, 100, 1, '')}
               {slider('Minimum Region Size', 'min_region_size', 0, 50, 0.5, '%')}
               {slider('Edge Protection', 'edge_protection', 0, 100, 1, '')}
-              {slider('Edge Cleanup', 'edge_cleanup', 0, 5, 1, 'px')}
+              {slider('Edge Cleanup', 'edge_cleanup', 0, 5, 0.2, 'px')}
               {slider('Feather', 'feather', 0, 20, 1, 'px')}
             </section>
           )}
 
-          {/* Manual Protect / Remove */}
+          {/* Manual Protect / Remove / Restore — Brush Region */}
           {selected && (
             <section className={`bg-[#141414] border border-[#2A2A2A] rounded-xl p-4 ${frameMode === 'auto' ? 'opacity-50 pointer-events-none' : ''}`}>
-              <h3 className="text-white text-sm font-semibold mb-3">Manual Area</h3>
-              <div className="grid grid-cols-3 gap-1.5 mb-3">
+              <h3 className="text-white text-sm font-semibold mb-3">Brush Area</h3>
+              <div className="grid grid-cols-4 gap-1.5 mb-3">
                 <button
                   type="button"
                   onClick={() => setMode('select')}
-                  className={`flex flex-col items-center gap-1 rounded-lg px-2 py-2 text-[11px] font-medium transition-colors ${
+                  className={`flex flex-col items-center gap-1 rounded-lg px-1 py-2 text-[10px] font-medium transition-colors ${
                     mode === 'select'
                       ? 'bg-white/10 border border-white/30 text-white'
                       : 'bg-[#0A0A0A] border border-[#2A2A2A] text-[#A0A0A0]'
@@ -1197,20 +1251,8 @@ ctx.restore()
                 </button>
                 <button
                   type="button"
-                  onClick={() => setMode('protect')}
-                  className={`flex flex-col items-center gap-1 rounded-lg px-2 py-2 text-[11px] font-medium transition-colors ${
-                    mode === 'protect'
-                      ? 'bg-green-500/20 border border-green-500/50 text-green-300'
-                      : 'bg-[#0A0A0A] border border-[#2A2A2A] text-[#A0A0A0]'
-                  }`}
-                >
-                  <Shield size={14} />
-                  Protect
-                </button>
-                <button
-                  type="button"
                   onClick={() => setMode('remove')}
-                  className={`flex flex-col items-center gap-1 rounded-lg px-2 py-2 text-[11px] font-medium transition-colors ${
+                  className={`flex flex-col items-center gap-1 rounded-lg px-1 py-2 text-[10px] font-medium transition-colors ${
                     mode === 'remove'
                       ? 'bg-red-500/20 border border-red-500/50 text-red-300'
                       : 'bg-[#0A0A0A] border border-[#2A2A2A] text-[#A0A0A0]'
@@ -1219,21 +1261,75 @@ ctx.restore()
                   <Eraser size={14} />
                   Remove
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setMode('protect')}
+                  className={`flex flex-col items-center gap-1 rounded-lg px-1 py-2 text-[10px] font-medium transition-colors ${
+                    mode === 'protect'
+                      ? 'bg-amber-500/20 border border-amber-500/50 text-amber-300'
+                      : 'bg-[#0A0A0A] border border-[#2A2A2A] text-[#A0A0A0]'
+                  }`}
+                >
+                  <Shield size={14} />
+                  Protect
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMode('restore')}
+                  className={`flex flex-col items-center gap-1 rounded-lg px-1 py-2 text-[10px] font-medium transition-colors ${
+                    mode === 'restore'
+                      ? 'bg-green-500/20 border border-green-500/50 text-green-300'
+                      : 'bg-[#0A0A0A] border border-[#2A2A2A] text-[#A0A0A0]'
+                  }`}
+                >
+                  <Undo2 size={14} />
+                  Keep
+                </button>
               </div>
               {mode !== 'select' && (
-                <p className="text-[#606060] text-[11px] leading-relaxed mb-2">
-                  {mode === 'protect'
-                    ? 'Tarik kotak pada frame untuk melindungi desain dari clear.'
-                    : 'Tarik kotak pada frame untuk menambah area kamera.'}
-                </p>
+                <>
+                  <div className="mb-2">
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-[#A0A0A0] text-xs font-medium">Brush Size</label>
+                      <span className="text-white text-xs tabular-nums">{brushSize}px</span>
+                    </div>
+                    <input
+                      type="range"
+                      min={6}
+                      max={96}
+                      step={2}
+                      value={brushSize}
+                      onChange={(e) => setBrushSize(Number(e.target.value))}
+                      className="w-full accent-cyan-400"
+                    />
+                  </div>
+                  <p className="text-[#606060] text-[11px] leading-relaxed mb-2">
+                    {mode === 'remove' && 'Usap area yang ingin dijadikan kamera — seluruh region terhubung ikut terhapus sampai batas warna berbeda.'}
+                    {mode === 'protect' && 'Usap elemen desain yang ingin dipertahankan — seluruh region-nya dilindungi dari clear.'}
+                    {mode === 'restore' && 'Usap desain yang terlanjur ter-clear — seluruh region-nya dikembalikan tampil.'}
+                    {' '}Alt+klik untuk menghapus sapuan.
+                  </p>
+                </>
               )}
-              {(selected.protected_areas.length > 0 || selected.remove_areas.length > 0) && (
+              {(
+                selected.protected_areas.length > 0 ||
+                selected.remove_areas.length > 0 ||
+                selected.remove_seeds.length > 0 ||
+                selected.protect_seeds.length > 0 ||
+                selected.keep_seeds.length > 0
+              ) && (
                 <Button
                   variant="secondary"
                   size="sm"
                   fullWidth
                   onClick={() =>
-                    updateFrame(selected.id, { protected_areas: [], remove_areas: [] })
+                    updateFrame(selected.id, {
+                      protected_areas: [],
+                      remove_areas: [],
+                      remove_seeds: [],
+                      protect_seeds: [],
+                      keep_seeds: [],
+                    })
                   }
                 >
                   Reset Semua Area Manual

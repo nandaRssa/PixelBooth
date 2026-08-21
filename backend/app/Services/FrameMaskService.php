@@ -51,6 +51,25 @@ class FrameMaskService
             }
             return $out;
         };
+        $points = function ($v): array {
+            if (! is_array($v)) {
+                return [];
+            }
+            $out = [];
+            foreach ($v as $p) {
+                if (! is_array($p)) {
+                    continue;
+                }
+                $out[] = [
+                    'x' => max(0.0, (float) ($p['x'] ?? 0)),
+                    'y' => max(0.0, (float) ($p['y'] ?? 0)),
+                ];
+                if (count($out) >= 48) {
+                    break;
+                }
+            }
+            return $out;
+        };
 
         return [
             'id' => (int) ($frame['id'] ?? 0),
@@ -68,9 +87,12 @@ class FrameMaskService
             'min_region_size' => min(50.0, max(0.0, (float) ($frame['min_region_size'] ?? 1))),
             'edge_protection' => min(100.0, max(0.0, (float) ($frame['edge_protection'] ?? 60))),
             'feather' => min(20.0, max(0.0, (float) ($frame['feather'] ?? 2))),
-            'edge_cleanup' => min(5.0, max(0.0, round((float) ($frame['edge_cleanup'] ?? 0)))),
+            'edge_cleanup' => min(5.0, max(0.0, round((float) ($frame['edge_cleanup'] ?? 0) * 10) / 10)),
             'protected_areas' => $areas($frame['protected_areas'] ?? null),
             'remove_areas' => $areas($frame['remove_areas'] ?? null),
+            'remove_seeds' => $points($frame['remove_seeds'] ?? null),
+            'protect_seeds' => $points($frame['protect_seeds'] ?? null),
+            'keep_seeds' => $points($frame['keep_seeds'] ?? null),
         ];
     }
 
@@ -209,6 +231,104 @@ class FrameMaskService
         $avgG = (int) round($gs / $n);
         $avgB = (int) round($bs / $n);
 
+        // ===== REGION BRUSH (Remove / Protect / Keep-Restore) =====
+        // Sapuan kuas disimpan sebagai SEED POINT. Seluruh region terhubung
+        // (4-arah, mirip warna seed-nya sendiri) ikut diproses sampai
+        // bertemu boundary warna berbeda / area lindungan / batas frame.
+        // Ukuran brush TIDAK membatasi ukuran region. Harus identik dengan
+        // frameMask.ts.
+        $tolR = max($tol * 2, 12);
+        $empty = [];
+        $seedToWork = function (float $ax, float $ay) use ($scale, $hw, $hh, $fxs, $fys, $cos, $sin, $cx, $cy, $bx0, $by0, $bx1, $by1, $bw, $inside): ?array {
+            // Seed disimpan dari sudut kiri-atas frame pada ruang KONTEN
+            $alx = $ax * $scale - $hw;
+            $aly = $ay * $scale - $hh;
+            $lx = $alx * $fxs;
+            $ly = $aly * $fys;
+            $dx = $lx * $cos - $ly * $sin;
+            $dy = $lx * $sin + $ly * $cos;
+            $gx = (int) round($cx + $dx);
+            $gy = (int) round($cy + $dy);
+            if ($gx < $bx0 || $gy < $by0 || $gx > $bx1 || $gy > $by1) {
+                return null;
+            }
+            $idx = ($gy - $by0) * $bw + ($gx - $bx0);
+            if (! isset($inside[$idx])) {
+                return null;
+            }
+            return [$gx, $gy];
+        };
+        $floodRegion = function (array &$out, array $walls, int $sx, int $sy) use ($work, $gw, $bw, $bx0, $by0, $bx1, $by1, $inside, $tolR): void {
+            $startIdx = ($sy - $by0) * $bw + ($sx - $bx0);
+            if (isset($out[$startIdx]) || isset($walls[$startIdx]) || ! isset($inside[$startIdx])) {
+                return;
+            }
+            $c0 = imagecolorat($work, $sx, $sy);
+            $r0 = ($c0 >> 16) & 0xFF;
+            $g0 = ($c0 >> 8) & 0xFF;
+            $b0 = $c0 & 0xFF;
+            $out[$startIdx] = 1;
+            $stack = [$startIdx];
+            while ($stack !== []) {
+                $idx = array_pop($stack);
+                $gx = $bx0 + ($idx % $bw);
+                $gy = $by0 + intdiv($idx, $bw);
+                foreach ([[-1, 0], [1, 0], [0, -1], [0, 1]] as [$ox, $oy]) {
+                    $nx = $gx + $ox;
+                    $ny = $gy + $oy;
+                    if ($nx < $bx0 || $ny < $by0 || $nx > $bx1 || $ny > $by1) {
+                        continue;
+                    }
+                    $nidx = ($ny - $by0) * $bw + ($nx - $bx0);
+                    if (isset($out[$nidx]) || isset($walls[$nidx]) || ! isset($inside[$nidx])) {
+                        continue;
+                    }
+                    $c = imagecolorat($work, $nx, $ny);
+                    $diff = max(
+                        abs((($c >> 16) & 0xFF) - $r0),
+                        abs((($c >> 8) & 0xFF) - $g0),
+                        abs(($c & 0xFF) - $b0)
+                    );
+                    if ($diff > $tolR) {
+                        continue;
+                    }
+                    $out[$nidx] = 1;
+                    $stack[] = $nidx;
+                }
+            }
+        };
+
+        // Urutan prioritas: Keep > Protect > Remove > Smart Clear.
+        $keepGrid = [];
+        foreach ($f['keep_seeds'] as $s) {
+            $pt = $seedToWork((float) $s['x'], (float) $s['y']);
+            if ($pt !== null) {
+                $floodRegion($keepGrid, $empty, $pt[0], $pt[1]);
+            }
+        }
+        $seedProt = [];
+        foreach ($f['protect_seeds'] as $s) {
+            $pt = $seedToWork((float) $s['x'], (float) $s['y']);
+            if ($pt !== null) {
+                $floodRegion($seedProt, $empty, $pt[0], $pt[1]);
+            }
+        }
+        // Guard gabungan: rect protect + region protect + region keep -
+        // menghalangi SEMUA bentuk clear (termasuk Full Clear & Edge Cleanup).
+        $guard = [];
+        foreach ($inside as $idx => $_) {
+            if (isset($prot[$idx]) || isset($seedProt[$idx]) || isset($keepGrid[$idx])) {
+                $guard[$idx] = 1;
+            }
+        }
+        $remAll = $rem;
+        foreach ($f['remove_seeds'] as $s) {
+            $pt = $seedToWork((float) $s['x'], (float) $s['y']);
+            if ($pt !== null) {
+                $floodRegion($remAll, $guard, $pt[0], $pt[1]);
+            }
+        }
+
         // Tiga strategi clear:
         // 1. Full Clear (clear_zone >= 100): bolong seluruh frame tanpa syarat.
         // 2. MODE ISI PENUH: bila mayoritas area frame satu warna (rasio
@@ -244,19 +364,21 @@ class FrameMaskService
 
         if ($fullClear) {
             foreach (array_keys($inside) as $idx) {
-                $cleared[$idx] = 1;
+                if (! isset($guard[$idx])) {
+                    $cleared[$idx] = 1;
+                }
             }
         } elseif ($insideCount > 0 && $sameCount / $insideCount >= $fillRatio) {
             $fillMode = true;
             foreach ($diffs as $idx => $diff) {
-                if ($diff <= $tolFill && ! isset($prot[$idx])) {
+                if ($diff <= $tolFill && ! isset($guard[$idx])) {
                     $cleared[$idx] = 1;
                 }
             }
         } else {
             foreach (array_keys($seed) as $idx) {
-                if (isset($prot[$idx])) {
-                    continue; // Protect menang meski di dalam hard zone
+                if (isset($guard[$idx])) {
+                    continue; // Protect/Keep menang meski di dalam hard zone
                 }
                 if ($diffs[$idx] <= $tolHard) {
                     $cleared[$idx] = 1;
@@ -279,8 +401,8 @@ class FrameMaskService
                 if (isset($cleared[$nidx]) || ! isset($inside[$nidx])) {
                     continue;
                 }
-                if (isset($prot[$nidx])) {
-                    continue; // Protect Area menahan automatic clearing
+                if (isset($guard[$nidx])) {
+                    continue; // Protect/Keep menahan automatic clearing
                 }
                 $ndx = ($nx + 0.5) - $cx;
                 $ndy = ($ny + 0.5) - $cy;
@@ -317,7 +439,7 @@ class FrameMaskService
         for ($pass = 0; $pass < 2; $pass++) {
             $snap = $cleared;
             foreach ($inside as $idx => $_) {
-                if (isset($snap[$idx]) || isset($prot[$idx])) {
+                if (isset($snap[$idx]) || isset($guard[$idx])) {
                     continue;
                 }
                 $dP = $diffs[$idx];
@@ -351,9 +473,9 @@ class FrameMaskService
             }
         }
 
-        // Manual Remove Area: paksa clear (Protect Area tetap menang bila bentrok)
-        foreach ($rem as $idx => $_) {
-            if (! isset($prot[$idx]) && isset($inside[$idx])) {
+        // Manual Remove Area + Remove Brush: paksa clear (Guard tetap menang)
+        foreach ($remAll as $idx => $_) {
+            if (! isset($guard[$idx]) && isset($inside[$idx])) {
                 $cleared[$idx] = 1;
             }
         }
@@ -365,19 +487,24 @@ class FrameMaskService
             $this->dropSmallIslands($cleared, $seed, $bw, $bx0, $by0, $bx1, $by1, $minArea);
         }
 
-        // EDGE CLEANUP: dilasi lubang N piksel kerja HANYA di boundary mask -
-        // menelan garis tipis / halo warna / serpihan desain yang masih
-        // menempel di tepi area kamera hasil Smart Clear, tanpa deteksi
-        // ulang. Protect Area tidak pernah ter-clear dan area di luar frame
-        // tidak tersentuh. Bukan penghalus (itu tugas Feather). Harus
-        // identik dengan frameMask.ts.
-        $ec = (int) $f['edge_cleanup'];
-        if ($ec > 0) {
+        // EDGE CLEANUP: dilasi lubang HANYA di boundary mask - menelan garis
+        // tipis / halo warna / serpihan desain yang masih menempel di tepi
+        // area kamera hasil Smart Clear, tanpa deteksi ulang. Mendukung
+        // nilai fraksional (step 0.2 px): pass penuh = floor(N), sisa
+        // desimal menjadi pass sebagian berupa kekuatan alpha di ring
+        // boundary. Protect Area tidak pernah ter-clear dan area di luar
+        // frame tidak tersentuh. Bukan penghalus (itu tugas Feather).
+        // Harus identik dengan frameMask.ts.
+        $ecRaw = (float) $f['edge_cleanup'];
+        $ecFull = (int) floor($ecRaw);
+        $ecFrac = $ecRaw - $ecFull;
+        $ecStrength = [];
+        if ($ecRaw > 0) {
             $d8 = [[-1, -1], [0, -1], [1, -1], [-1, 0], [1, 0], [-1, 1], [0, 1], [1, 1]];
-            for ($pass = 0; $pass < $ec; $pass++) {
+            $dilateEdge = function (bool $commit, float $weight = 1.0) use (&$cleared, &$ecStrength, $inside, $guard, $bw, $bx0, $by0, $bx1, $by1, $d8): void {
                 $snap = $cleared;
                 foreach ($inside as $idx => $_) {
-                    if (isset($snap[$idx]) || isset($prot[$idx])) {
+                    if (isset($snap[$idx]) || isset($guard[$idx])) {
                         continue;
                     }
                     $gx = $bx0 + ($idx % $bw);
@@ -394,10 +521,21 @@ class FrameMaskService
                             break;
                         }
                     }
-                    if ($touch) {
+                    if (! $touch) {
+                        continue;
+                    }
+                    if ($commit) {
                         $cleared[$idx] = 1;
+                    } else {
+                        $ecStrength[$idx] = max($ecStrength[$idx] ?? 0.0, $weight);
                     }
                 }
+            };
+            for ($pass = 0; $pass < $ecFull; $pass++) {
+                $dilateEdge(true);
+            }
+            if ($ecFrac > 0) {
+                $dilateEdge(false, $ecFrac);
             }
         }
 
@@ -405,6 +543,16 @@ class FrameMaskService
         $holeGrid = [];
         foreach ($cleared as $idx => $_) {
             $holeGrid[$idx] = 1.0;
+        }
+        foreach ($ecStrength as $idx => $s) {
+            if ($s > ($holeGrid[$idx] ?? 0.0)) {
+                $holeGrid[$idx] = $s;
+            }
+        }
+        // Keep / Restore menang atas SEMUA proses: kembalikan desain secara
+        // penuh (alpha 0) bahkan setelah feather, agar tepi restore tegas.
+        foreach ($keepGrid as $idx => $_) {
+            $holeGrid[$idx] = 0.0;
         }
         $fr = (int) round($f['feather'] * $scale);
         if ($fr > 0) {

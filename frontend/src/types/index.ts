@@ -45,6 +45,18 @@ export interface CameraFrame {
   protected_areas: ClearArea[]
   /** Area tambahan yang dipaksa menjadi area kamera */
   remove_areas: ClearArea[]
+  /** Seed kuas Remove: seluruh region terhubung dari titik ini dipaksa clear */
+  remove_seeds: BrushPoint[]
+  /** Seed kuas Protect: seluruh region terhubung dari titik ini dilindungi */
+  protect_seeds: BrushPoint[]
+  /** Seed kuas Keep/Restore: region terhubung dari titik ini dikembalikan jadi desain */
+  keep_seeds: BrushPoint[]
+}
+
+/** Titik seed kuas brush — pemicu region terhubung, bukan batas akhir. */
+export interface BrushPoint {
+  x: number
+  y: number
 }
 
 /** Alias kompatibilitas untuk konfigurasi tersimpan di template */

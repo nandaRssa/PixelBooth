@@ -645,6 +645,112 @@ class SessionTest extends TestCase
         }
     }
 
+    public function test_complete_brush_region_remove_protect_keep_prioritas(): void
+    {
+        // Template 800x1200: bg gelap + slot putih (300,500)-(500,700) +
+        // kotak abu-abu (450,550)-(499,599) DI LUAR hard clear zone (cz 20%).
+        // Smart clear (mode isi penuh) mempertahankan kotak abu karena
+        // beda warna; kuas Remove memaksa regionnya terhapus, sementara
+        // Protect dan Keep masing-masing menahannya (prioritas guard).
+        $cases = [
+            // [slug, remove_seeds, protect_seeds, keep_seeds, abuDihapus]
+            ['brush-a', [['x' => 60, 'y' => 30]], [], [], false],
+            ['brush-b', [['x' => 170, 'y' => 70]], [], [], true],
+            ['brush-c', [['x' => 170, 'y' => 70]], [['x' => 170, 'y' => 70]], [], false],
+            ['brush-d', [['x' => 170, 'y' => 70]], [], [['x' => 170, 'y' => 70]], false],
+        ];
+
+        foreach ($cases as [$slug, $remSeeds, $protSeeds, $keepSeeds, $abuDihapus]) {
+            $w = 800;
+            $h = 1200;
+            $img = imagecreatetruecolor($w, $h);
+            imagefilledrectangle($img, 0, 0, $w - 1, $h - 1, imagecolorallocate($img, 32, 32, 32));
+            imagefilledrectangle($img, 300, 500, 500, 700, imagecolorallocate($img, 255, 255, 255));
+            imagefilledrectangle($img, 450, 550, 499, 599, imagecolorallocate($img, 208, 208, 208));
+            ob_start();
+            imagepng($img);
+            $pngData = ob_get_clean();
+            imagedestroy($img);
+            Storage::disk('public')->put("templates/{$slug}.png", $pngData);
+
+            $template = Template::create([
+                'name' => "Template {$slug}",
+                'slug' => $slug,
+                'template_file' => "templates/{$slug}.png",
+                'canvas_width' => $w,
+                'canvas_height' => $h,
+                'frame_count' => 1,
+                'frame_configuration' => [[
+                    'id' => 1,
+                    'order' => 0,
+                    'x' => 300,
+                    'y' => 500,
+                    'width' => 200,
+                    'height' => 200,
+                    'rotation' => 0,
+                    'flip_h' => false,
+                    'flip_v' => false,
+                    'clear_zone' => 20,
+                    'clear_expansion' => 25,
+                    'region_sensitivity' => 50,
+                    'min_region_size' => 1,
+                    'edge_protection' => 0,
+                    'feather' => 0,
+                    'edge_cleanup' => 0,
+                    'protected_areas' => [],
+                    'remove_areas' => [],
+                    'remove_seeds' => $remSeeds,
+                    'protect_seeds' => $protSeeds,
+                    'keep_seeds' => $keepSeeds,
+                ]],
+                'status' => 'active',
+            ]);
+
+            // Foto capture: merah solid
+            $photo = imagecreatetruecolor(200, 200);
+            imagefilledrectangle($photo, 0, 0, 199, 199, imagecolorallocate($photo, 255, 0, 0));
+            ob_start();
+            imagejpeg($photo, null, 95);
+            $photoData = ob_get_clean();
+            imagedestroy($photo);
+            $photoBase64 = 'data:image/jpeg;base64,' . base64_encode($photoData);
+
+            $session = $this->postJson('/api/sessions', [
+                'template_id' => $template->id,
+            ], $this->headers())->json('data');
+
+            $this->postJson("/api/sessions/{$session['id']}/capture", [
+                'image_base64' => $photoBase64,
+            ], $this->headers())
+                ->assertOk()
+                ->assertJsonPath('data.all_done', true);
+
+            $response = $this->postJson("/api/sessions/{$session['id']}/complete", [], $this->headers());
+            $response->assertOk();
+
+            $finalPath = Storage::disk('public')->path($response->json('data.photo.storage_path'));
+            $final = imagecreatefromjpeg($finalPath);
+
+            // Area putih selalu ter-clear
+            $cw = imagecolorat($final, 320, 520);
+            $this->assertGreaterThan(180, ($cw >> 16) & 0xFF, "Slot putih harus ter-clear ({$slug})");
+
+            // Kotak abu-abu sesuai skenario
+            $cg = imagecolorat($final, 470, 570);
+            $rG = ($cg >> 16) & 0xFF;
+            $gG = ($cg >> 8) & 0xFF;
+            if ($abuDihapus) {
+                $this->assertGreaterThan(180, $rG, "Kuas Remove harus menghapus region abu ({$slug})");
+                $this->assertLessThan(120, $gG, "Region abu harus menjadi area kamera ({$slug})");
+            } else {
+                $this->assertGreaterThan(150, $gG, "Region abu harus dipertahankan ({$slug})");
+                $this->assertGreaterThan(150, $cg & 0xFF, "Region abu harus dipertahankan ({$slug})");
+            }
+
+            imagedestroy($final);
+        }
+    }
+
     public function test_cancel_menghapus_sesi_dan_file_temporary(): void
     {
         $template = $this->makeTemplate();
