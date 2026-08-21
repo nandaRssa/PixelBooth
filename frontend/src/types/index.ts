@@ -41,6 +41,8 @@ export interface CameraFrame {
   feather: number
   /** Edge Cleanup: ikis boundary mask (px resolusi kerja, 0-5) — hapus sisa tipis */
   edge_cleanup: number
+  /** Confidence hasil auto detection (0-100); null untuk frame manual */
+  confidence?: number | null
   /** Area yang dilindungi dari clear (kecuali di Hard Clear Zone) */
   protected_areas: ClearArea[]
   /** Area tambahan yang dipaksa menjadi area kamera */

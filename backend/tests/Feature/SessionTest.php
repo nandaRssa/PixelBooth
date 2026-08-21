@@ -940,6 +940,100 @@ class SessionTest extends TestCase
         imagedestroy($final);
     }
 
+    public function test_edge_cleanup_bekerja_pada_batas_region_brush_remove(): void
+    {
+        // Edge Cleanup harus ikut mengikis tepi region yang dibuat kuas
+        // Remove (sebelumnya EC berjalan sebelum force-clear sehingga tidak
+        // berefek). Garis hitam tipis di dalam slot putih: tanpa EC bertahan,
+        // dengan EC=3 tergerus dari sisi region remove.
+        $cases = [
+            // [slug, edge_cleanup, garisHidup]
+            ['ecbrush-off', 0, true],
+            ['ecbrush-on', 3, false],
+        ];
+
+        foreach ($cases as [$slug, $ec, $garisHidup]) {
+            $w = 800;
+            $h = 1200;
+            $img = imagecreatetruecolor($w, $h);
+            imagefilledrectangle($img, 0, 0, $w - 1, $h - 1, imagecolorallocate($img, 32, 32, 32));
+            imagefilledrectangle($img, 300, 500, 500, 700, imagecolorallocate($img, 255, 255, 255));
+            // Garis hitam vertikal 10px di dalam slot (x 490-499)
+            imagefilledrectangle($img, 490, 500, 499, 700, imagecolorallocate($img, 10, 10, 10));
+            ob_start();
+            imagepng($img);
+            $pngData = ob_get_clean();
+            imagedestroy($img);
+            Storage::disk('public')->put("templates/{$slug}.png", $pngData);
+
+            $template = Template::create([
+                'name' => "Template {$slug}",
+                'slug' => $slug,
+                'template_file' => "templates/{$slug}.png",
+                'canvas_width' => $w,
+                'canvas_height' => $h,
+                'frame_count' => 1,
+                'frame_configuration' => [[
+                    'id' => 1,
+                    'order' => 0,
+                    'x' => 300,
+                    'y' => 500,
+                    'width' => 200,
+                    'height' => 200,
+                    'rotation' => 0,
+                    'flip_h' => false,
+                    'flip_v' => false,
+                    'clear_zone' => 20,
+                    'clear_expansion' => 25,
+                    'region_sensitivity' => 50,
+                    'min_region_size' => 1,
+                    'edge_protection' => 0,
+                    'feather' => 0,
+                    'edge_cleanup' => $ec,
+                    'protected_areas' => [],
+                    'remove_areas' => [],
+                    'remove_seeds' => [['x' => 60, 'y' => 30, 's' => 1]],
+                    'protect_seeds' => [],
+                    'keep_seeds' => [],
+                ]],
+                'status' => 'active',
+            ]);
+
+            $photo = imagecreatetruecolor(200, 200);
+            imagefilledrectangle($photo, 0, 0, 199, 199, imagecolorallocate($photo, 255, 0, 0));
+            ob_start();
+            imagejpeg($photo, null, 95);
+            $photoData = ob_get_clean();
+            imagedestroy($photo);
+            $photoBase64 = 'data:image/jpeg;base64,' . base64_encode($photoData);
+
+            $session = $this->postJson('/api/sessions', [
+                'template_id' => $template->id,
+            ], $this->headers())->json('data');
+
+            $this->postJson("/api/sessions/{$session['id']}/capture", [
+                'image_base64' => $photoBase64,
+            ], $this->headers())->assertOk();
+
+            $response = $this->postJson("/api/sessions/{$session['id']}/complete", [], $this->headers());
+            $response->assertOk();
+
+            $final = imagecreatefromjpeg(Storage::disk('public')->path($response->json('data.photo.storage_path')));
+
+            // Tengah garis: cukup dalam dari smear upscaling mask,
+            // cukup dangkal agar EC=3 menggerusnya dari sisi region remove
+            $cl = imagecolorat($final, 495, 600);
+            $rL = ($cl >> 16) & 0xFF;
+            if ($garisHidup) {
+                $this->assertLessThan(150, $rL, "Garis harus bertahan tanpa EC ({$slug})");
+            } else {
+                $this->assertGreaterThan(180, $rL, "Edge Cleanup harus menggerus garis di batas region remove ({$slug})");
+            }
+
+            imagedestroy($final);
+        }
+    }
+
     public function test_cancel_menghapus_sesi_dan_file_temporary(): void
     {
         $template = $this->makeTemplate();

@@ -62,6 +62,10 @@ export function normalizeFrame(frame: Partial<CameraFrame>): CameraFrame {
     edge_protection: clamp(Number(frame.edge_protection ?? 60), 0, 100),
     feather: clamp(Number(frame.feather ?? 2), 0, 20),
     edge_cleanup: clamp(Math.round(Number(frame.edge_cleanup ?? 0) * 10) / 10, 0, 5),
+    confidence:
+      typeof frame.confidence === 'number' && Number.isFinite(frame.confidence)
+        ? Math.round(frame.confidence * 10) / 10
+        : null,
     protected_areas: areas(frame.protected_areas),
     remove_areas: areas(frame.remove_areas),
     remove_seeds: points(frame.remove_seeds),
@@ -630,6 +634,14 @@ export function computeHoleMask(
     }
   }
 
+  // Force clear kuas/rect remove — HARUS sebelum anti-fringe & Edge
+  // Cleanup agar pembersihan tepi juga bekerja pada batas region hasil
+  // kuas Remove (dan rim pulau Keep di dalamnya). Hanya Protect yang
+  // absolut; region Keep boleh ditimpa (strok terakhir menang).
+  for (let i = 0; i < remAll.length; i++) {
+    if (remAll[i] && !prot[i] && !seedProt[i] && inside[i]) cleared[i] = 1
+  }
+
   // PEMBERSIHAN TEPI (anti-fringe): serap pita transisi anti-alias di batas
   // antara area clear dan warna kuat di seberangnya, sehingga tidak ada sisa
   // tipis warna slot yang menempel di pinggiran elemen/border. Kandidat =
@@ -660,13 +672,6 @@ export function computeHoleMask(
         break
       }
     }
-  }
-
-  // Manual Remove Area + Remove Brush: paksa clear (Guard tetap menang)
-  for (let i = 0; i < remAll.length; i++) {
-    // Force clear kuas/rect remove: hanya Protect yang absolut — region
-    // Keep boleh ditimpa (strok terakhir menang).
-    if (remAll[i] && !prot[i] && !seedProt[i] && inside[i]) cleared[i] = 1
   }
 
   // Minimum Region Size: buang pulau kecil tanpa seed (tidak relevan di

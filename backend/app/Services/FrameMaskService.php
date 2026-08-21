@@ -93,6 +93,10 @@ class FrameMaskService
             'edge_protection' => min(100.0, max(0.0, (float) ($frame['edge_protection'] ?? 60))),
             'feather' => min(20.0, max(0.0, (float) ($frame['feather'] ?? 2))),
             'edge_cleanup' => min(5.0, max(0.0, round((float) ($frame['edge_cleanup'] ?? 0) * 10) / 10)),
+            // Confidence hasil auto detection (0-100), null untuk frame manual
+            'confidence' => isset($frame['confidence']) && is_numeric($frame['confidence'])
+                ? round((float) $frame['confidence'], 1)
+                : null,
             'protected_areas' => $areas($frame['protected_areas'] ?? null),
             'remove_areas' => $areas($frame['remove_areas'] ?? null),
             'remove_seeds' => $points($frame['remove_seeds'] ?? null),
@@ -661,6 +665,15 @@ class FrameMaskService
             }
         }
 
+        // Force clear kuas/rect remove - HARUS sebelum anti-fringe & Edge
+        // Cleanup agar pembersihan tepi juga bekerja pada batas region
+        // hasil kuas Remove. Hanya Protect yang absolut.
+        foreach ($remAll as $idx => $_) {
+            if (! isset($prot[$idx]) && ! isset($seedProt[$idx]) && isset($inside[$idx])) {
+                $cleared[$idx] = 1;
+            }
+        }
+
         // PEMBERSIHAN TEPI (anti-fringe): serap pita transisi anti-alias di
         // batas antara area clear dan warna kuat di seberangnya, sehingga
         // tidak ada sisa tipis warna slot yang menempel di pinggiran elemen.
@@ -703,14 +716,6 @@ class FrameMaskService
                     $cleared[$idx] = 1; // pita transisi -> ikut clear sampai warna kuat
                     break;
                 }
-            }
-        }
-
-        // Manual Remove Area + Remove Brush: paksa clear. Hanya Protect
-        // yang absolut - region Keep boleh ditimpa (strok terakhir menang).
-        foreach ($remAll as $idx => $_) {
-            if (! isset($prot[$idx]) && ! isset($seedProt[$idx]) && isset($inside[$idx])) {
-                $cleared[$idx] = 1;
             }
         }
 

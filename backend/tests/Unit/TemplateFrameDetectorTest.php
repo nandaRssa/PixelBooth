@@ -139,4 +139,178 @@ class TemplateFrameDetectorTest extends TestCase
 
         $this->assertNull($result);
     }
+
+    // ------------------------------------------------------------------
+    // Test sistem deteksi berbasis region (Auto Frame Detection v2)
+    // ------------------------------------------------------------------
+
+    /** Simpan gambar GD ke file temp dan bersihkan resource. */
+    private function saveTemp($img): string
+    {
+        $path = tempnam(sys_get_temp_dir(), 'tpl') . '.png';
+        imagepng($img, $path);
+        imagedestroy($img);
+
+        return $path;
+    }
+
+    /** Kanvas gelap polos sebagai dasar template uji. */
+    private function darkCanvas(int $w, int $h, int $rgb = 40)
+    {
+        $img = imagecreatetruecolor($w, $h);
+        imagefilledrectangle($img, 0, 0, $w - 1, $h - 1, imagecolorallocate($img, $rgb, $rgb, $rgb));
+
+        return $img;
+    }
+
+    public function test_mempertahankan_rotasi_slot_miring(): void
+    {
+        // Slot portrait dimiringkan ~12 derajat — rotasi ASLI harus
+        // dipertahankan, tidak di-straighten, dan tetap portrait.
+        $w = 600;
+        $h = 900;
+        $img = $this->darkCanvas($w, $h);
+
+        $angle = deg2rad(12);
+        $cx = 300.0;
+        $cy = 450.0;
+        $hw = 140.0; // setengah lebar slot
+        $hh = 230.0; // setengah tinggi slot (portrait)
+        $cos = cos($angle);
+        $sin = sin($angle);
+        $pts = [];
+        foreach ([[-1, -1], [1, -1], [1, 1], [-1, 1]] as [$sx, $sy]) {
+            $pts[] = $cx + $sx * $hw * $cos - $sy * $hh * $sin;
+            $pts[] = $cy + $sx * $hw * $sin + $sy * $hh * $cos;
+        }
+        imagefilledpolygon($img, $pts, imagecolorallocate($img, 245, 245, 245));
+        $tmp = $this->saveTemp($img);
+
+        $result = (new TemplateFrameDetector())->detect($tmp);
+        @unlink($tmp);
+
+        $this->assertNotNull($result, 'Slot miring harus terdeteksi');
+        $this->assertSame(1, $result['frame_count']);
+        $slot = $result['frame_configuration'][0];
+
+        $this->assertGreaterThanOrEqual(7.0, abs($slot['rotation']), 'Rotasi harus terdeteksi');
+        $this->assertLessThanOrEqual(17.0, abs($slot['rotation']), 'Rotasi tidak boleh berlebihan');
+        $this->assertGreaterThan((float) $slot['width'], (float) $slot['height'], 'Portrait tetap portrait');
+        $this->assertGreaterThan(50.0, (float) $slot['confidence']);
+    }
+
+    public function test_garis_tipis_konsisten_memisahkan_dua_region(): void
+    {
+        // Dua area putih dipisahkan garis abu-abu tipis 3px: TIDAK boleh
+        // digabung menjadi satu frame hanya karena sama-sama terang.
+        $w = 700;
+        $h = 500;
+        $img = $this->darkCanvas($w, $h);
+        $white = imagecolorallocate($img, 240, 240, 240);
+        imagefilledrectangle($img, 60, 80, 320, 420, $white);
+        imagefilledrectangle($img, 340, 80, 640, 420, $white); // garis x=321..339 abu-abu (bg 40)
+        $tmp = $this->saveTemp($img);
+
+        $result = (new TemplateFrameDetector())->detect($tmp);
+        @unlink($tmp);
+
+        $this->assertNotNull($result);
+        $this->assertSame(2, $result['frame_count'], 'Garis pemisah harus menghasilkan 2 frame');
+
+        $slots = $result['frame_configuration'];
+        $this->assertLessThan($slots[1]['x'], $slots[0]['x']);
+        // Frame kiri berakhir sebelum garis; frame kanan mulai setelah garis
+        $this->assertLessThanOrEqual(340, $slots[0]['x'] + $slots[0]['width'], 'Frame kiri tidak boleh melintasi garis');
+        $this->assertGreaterThanOrEqual(300, $slots[1]['x'], 'Frame kanan tidak boleh melintasi garis');
+    }
+
+    public function test_bingkai_dekoratif_tidak_dianggap_area_kamera(): void
+    {
+        // Ring putih dekoratif tebal + celah warna + area foto putih di
+        // dalamnya: yang terdeteksi harus AREA DALAM, bukan keseluruhan ring.
+        $w = 800;
+        $h = 1000;
+        $img = $this->darkCanvas($w, $h);
+        $white = imagecolorallocate($img, 242, 242, 242);
+        // Ring luar putih (border 40px)
+        imagefilledrectangle($img, 60, 60, 740, 940, $white);
+        // Celah dekoratif (band oranye) menandai boundary
+        imagefilledrectangle($img, 100, 100, 700, 900, imagecolorallocate($img, 220, 130, 30));
+        // Area foto dalam
+        imagefilledrectangle($img, 150, 150, 650, 850, $white);
+        $tmp = $this->saveTemp($img);
+
+        $result = (new TemplateFrameDetector())->detect($tmp);
+        @unlink($tmp);
+
+        $this->assertNotNull($result);
+        $this->assertSame(1, $result['frame_count'], 'Hanya area dalam yang jadi frame');
+
+        $slot = $result['frame_configuration'][0];
+        // Frame harus berada DI DALAM ring (tidak menutupi ring)
+        $this->assertGreaterThanOrEqual(120, $slot['x']);
+        $this->assertGreaterThanOrEqual(120, $slot['y']);
+        $this->assertLessThanOrEqual(680, $slot['x'] + $slot['width']);
+        $this->assertLessThanOrEqual(880, $slot['y'] + $slot['height']);
+    }
+
+    public function test_slot_berwarna_non_putih_terdeteksi(): void
+    {
+        // Slot biru muda & merah muda pada background gelap: deteksi tidak
+        // boleh bergantung pada warna putih.
+        $w = 800;
+        $h = 600;
+        $img = $this->darkCanvas($w, $h);
+        imagefilledrectangle($img, 70, 100, 360, 500, imagecolorallocate($img, 175, 214, 245));
+        imagefilledrectangle($img, 440, 100, 730, 500, imagecolorallocate($img, 246, 190, 200));
+        $tmp = $this->saveTemp($img);
+
+        $result = (new TemplateFrameDetector())->detect($tmp);
+        @unlink($tmp);
+
+        $this->assertNotNull($result, 'Slot berwarna harus terdeteksi');
+        $this->assertSame(2, $result['frame_count']);
+    }
+
+    public function test_frame_ukuran_dan_orientasi_berbeda(): void
+    {
+        // Portrait + landscape dengan ukuran beda: keduanya valid.
+        $w = 900;
+        $h = 900;
+        $img = $this->darkCanvas($w, $h);
+        $white = imagecolorallocate($img, 238, 238, 238);
+        imagefilledrectangle($img, 70, 150, 330, 750, $white);   // portrait tinggi
+        imagefilledrectangle($img, 430, 300, 830, 560, $white);  // landscape lebar
+        $tmp = $this->saveTemp($img);
+
+        $result = (new TemplateFrameDetector())->detect($tmp);
+        @unlink($tmp);
+
+        $this->assertNotNull($result);
+        $this->assertSame(2, $result['frame_count']);
+
+        [$a, $b] = $result['frame_configuration'];
+        $portrait = $a['height'] > $a['width'] ? $a : $b;
+        $landscape = $portrait === $a ? $b : $a;
+        $this->assertGreaterThan((float) $portrait['width'], (float) $portrait['height']);
+        $this->assertGreaterThan((float) $landscape['height'], (float) $landscape['width']);
+    }
+
+    public function test_ornamen_kecil_bukan_frame(): void
+    {
+        // Hanya kotak-kotak kecil (ikon/ornamen): tidak boleh ada frame.
+        $w = 800;
+        $h = 1000;
+        $img = $this->darkCanvas($w, $h);
+        $white = imagecolorallocate($img, 240, 240, 240);
+        foreach ([[100, 100], [400, 200], [200, 500], [600, 700], [350, 850]] as [$x, $y]) {
+            imagefilledrectangle($img, $x, $y, $x + 26, $y + 26, $white);
+        }
+        $tmp = $this->saveTemp($img);
+
+        $result = (new TemplateFrameDetector())->detect($tmp);
+        @unlink($tmp);
+
+        $this->assertNull($result, 'Ornamen kecil tidak boleh dianggap frame');
+    }
 }

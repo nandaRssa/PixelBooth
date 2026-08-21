@@ -1248,13 +1248,13 @@ ctx.restore()
                   className="accent-cyan-400 w-4 h-4"
                 />
               </label>
-              {slider('Center Clear Priority', 'clear_zone', 5, 100, 1, '%')}
-              {slider('Clear Expansion', 'clear_expansion', 0, 200, 5, '%')}
-              {slider('Region Sensitivity', 'region_sensitivity', 0, 100, 1, '')}
-              {slider('Minimum Region Size', 'min_region_size', 0, 50, 0.5, '%')}
-              {slider('Edge Protection', 'edge_protection', 0, 100, 1, '')}
+              {slider('Center Clear Priority', 'clear_zone', 5, 100, 0.2, '%')}
+              {slider('Clear Expansion', 'clear_expansion', 0, 200, 0.2, '%')}
+              {slider('Region Sensitivity', 'region_sensitivity', 0, 100, 0.2, '')}
+              {slider('Minimum Region Size', 'min_region_size', 0, 50, 0.2, '%')}
+              {slider('Edge Protection', 'edge_protection', 0, 100, 0.2, '')}
               {slider('Edge Cleanup', 'edge_cleanup', 0, 5, 0.2, 'px')}
-              {slider('Feather', 'feather', 0, 20, 1, 'px')}
+              {slider('Feather', 'feather', 0, 20, 0.2, 'px')}
             </section>
           )}
 
@@ -1323,7 +1323,7 @@ ctx.restore()
                       type="range"
                       min={6}
                       max={96}
-                      step={2}
+                      step={0.2}
                       value={brushSize}
                       onChange={(e) => setBrushSize(Number(e.target.value))}
                       className="w-full accent-cyan-400"
