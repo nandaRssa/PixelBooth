@@ -115,10 +115,9 @@ class FrameMaskService
         $expPx = $f['clear_expansion'] / 100 * min($fw, $fh);
         $dMax = $dHard + $expPx;
 
-        // Peka warna: toleransi rendah — perubahan warna apa pun di dalam
-        // slot (bayangan, pastel, gradasi) dipertahankan, bukan dihapus.
-        // Default sens 50 -> tol 20 (sebelumnya 63).
-        $tol = 2 + $f['region_sensitivity'] * 0.36;
+        // Sangat peka warna: perubahan warna sekecil apa pun dipertahankan.
+        // Default sens 50 -> tol 10. Harus identik dengan frontend.
+        $tol = 1 + $f['region_sensitivity'] * 0.18;
         $ep = $f['edge_protection'] / 100;
 
         // Area manual disimpan dalam koordinat lokal frame dari sudut kiri-atas.
@@ -209,11 +208,63 @@ class FrameMaskService
         $avgG = (int) round($gs / $n);
         $avgB = (int) round($bs / $n);
 
-        // PRIORITAS 1: Hard Clear Zone selalu clear.
-        // PRIORITAS 2: BFS flood fill ke connected region di sekelilingnya.
-        $cleared = $seed;
-        $queue = array_keys($seed);
-        for ($qi = 0; $qi < count($queue); $qi++) {
+        // Tiga strategi clear:
+        // 1. Full Clear (clear_zone >= 100): bolong seluruh frame tanpa syarat.
+        // 2. MODE ISI PENUH: bila mayoritas area frame satu warna (rasio
+        //    piksel mirip warna seed >= 55%), bolong seluruh frame sekaligus
+        //    tanpa syarat konektivitas - noise/gradasi halus tidak memecah
+        //    lubang - kecuali piksel yang benar-benar beda warna (elemen)
+        //    dan area protect.
+        // 3. FRAME RAMAI: hard zone ternoda warna + BFS flood fill ketat.
+        $fullClear = $f['clear_zone'] >= 100;
+        $tolHard = max($tol * 2, 12);
+        $tolFill = max($tol * 4, 28);
+        $fillRatio = 0.55;
+
+        $diffs = [];
+        $insideCount = 0;
+        $sameCount = 0;
+        foreach ($inside as $idx => $_) {
+            $c = imagecolorat($work, $bx0 + ($idx % $bw), $by0 + intdiv($idx, $bw));
+            $diffs[$idx] = max(
+                abs((($c >> 16) & 0xFF) - $avgR),
+                abs((($c >> 8) & 0xFF) - $avgG),
+                abs(($c & 0xFF) - $avgB)
+            );
+            $insideCount++;
+            if ($diffs[$idx] <= $tolFill) {
+                $sameCount++;
+            }
+        }
+
+        $cleared = [];
+        $queue = [];
+        $fillMode = false;
+
+        if ($fullClear) {
+            foreach (array_keys($inside) as $idx) {
+                $cleared[$idx] = 1;
+            }
+        } elseif ($insideCount > 0 && $sameCount / $insideCount >= $fillRatio) {
+            $fillMode = true;
+            foreach ($diffs as $idx => $diff) {
+                if ($diff <= $tolFill && ! isset($prot[$idx])) {
+                    $cleared[$idx] = 1;
+                }
+            }
+        } else {
+            foreach (array_keys($seed) as $idx) {
+                if (isset($prot[$idx])) {
+                    continue; // Protect menang meski di dalam hard zone
+                }
+                if ($diffs[$idx] <= $tolHard) {
+                    $cleared[$idx] = 1;
+                    $queue[] = $idx;
+                }
+            }
+        }
+        if (! $fillMode) {
+            for ($qi = 0; $qi < count($queue); $qi++) {
             $idx = $queue[$qi];
             $gx = $bx0 + ($idx % $bw);
             $gy = $by0 + intdiv($idx, $bw);
@@ -251,6 +302,52 @@ class FrameMaskService
                 $cleared[$nidx] = 1;
                 $queue[] = $nidx;
             }
+            }
+        }
+
+        // PEMBERSIHAN TEPI (anti-fringe): serap pita transisi anti-alias di
+        // batas antara area clear dan warna kuat di seberangnya, sehingga
+        // tidak ada sisa tipis warna slot yang menempel di pinggiran elemen.
+        // Kandidat = piksel ber-diff MENENGAH (di atas ambang clear, di bawah
+        // STRONG) yang bersinggungan dengan area clear dan berbatasan langsung
+        // dengan warna kuat dua langkah lebih jauh. Inti warna kuat (hitam
+        // pekal dsb.) tidak disentuh. Harus identik dengan frameMask.ts.
+        $strong = 150;
+        for ($pass = 0; $pass < 2; $pass++) {
+            $snap = $cleared;
+            foreach ($inside as $idx => $_) {
+                if (isset($snap[$idx]) || isset($prot[$idx])) {
+                    continue;
+                }
+                $dP = $diffs[$idx];
+                if ($dP <= $tolFill || $dP >= $strong) {
+                    continue; // bukan pita transisi
+                }
+                $gx = $bx0 + ($idx % $bw);
+                $gy = $by0 + intdiv($idx, $bw);
+                foreach ([[-1, 0], [1, 0], [0, -1], [0, 1]] as [$ox, $oy]) {
+                    $nx = $gx + $ox;
+                    $ny = $gy + $oy;
+                    if ($nx < $bx0 || $ny < $by0 || $nx > $bx1 || $ny > $by1) {
+                        continue;
+                    }
+                    $nidx = ($ny - $by0) * $bw + ($nx - $bx0);
+                    if (! isset($snap[$nidx])) {
+                        continue; // harus bersinggungan dengan area clear
+                    }
+                    $qx = 2 * $gx - $nx;
+                    $qy = 2 * $gy - $ny;
+                    if ($qx < $bx0 || $qy < $by0 || $qx > $bx1 || $qy > $by1) {
+                        continue;
+                    }
+                    $qidx = ($qy - $by0) * $bw + ($qx - $bx0);
+                    if (! isset($inside[$qidx]) || $diffs[$qidx] < $strong) {
+                        continue;
+                    }
+                    $cleared[$idx] = 1; // pita transisi -> ikut clear sampai warna kuat
+                    break;
+                }
+            }
         }
 
         // Manual Remove Area: paksa clear (Protect Area tetap menang bila bentrok)
@@ -261,8 +358,9 @@ class FrameMaskService
         }
 
         // Minimum Region Size: buang pulau clear kecil yang tidak memuat seed
+        // (tidak relevan di mode isi penuh - lubang memang satu keseluruhan)
         $minArea = $f['min_region_size'] / 100 * $fw * $fh;
-        if ($minArea > 1) {
+        if (! $fillMode && $minArea > 1) {
             $this->dropSmallIslands($cleared, $seed, $bw, $bx0, $by0, $bx1, $by1, $minArea);
         }
 

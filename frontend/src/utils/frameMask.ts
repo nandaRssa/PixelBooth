@@ -125,10 +125,9 @@ export function computeHoleMask(
   const expPx = ((f.clear_expansion / 100) * Math.min(fw, fh))
   const dMax = dHard + expPx
 
-  // Peka warna: toleransi rendah — perubahan warna apa pun di dalam slot
-  // (bayangan, pastel, gradasi) dipertahankan, bukan dihapus.
-  // Default sens 50 -> tol 20 (sebelumnya 63). Harus identik dengan backend.
-  const tol = 2 + f.region_sensitivity * 0.36
+  // Sangat peka warna: perubahan warna sekecil apa pun dipertahankan.
+  // Default sens 50 -> tol 10. Harus identik dengan backend.
+  const tol = 1 + f.region_sensitivity * 0.18
   const ep = f.edge_protection / 100
 
   // Area manual disimpan dari sudut kiri-atas frame; konversi ke basis pusat.
@@ -217,38 +216,121 @@ export function computeHoleMask(
   const avgG = gs / n
   const avgB = bs / n
 
-  // PRIORITAS 1: hard zone clear. PRIORITAS 2: connected region clearing.
-  const cleared = new Uint8Array(seed)
-  const queue: number[] = []
-  for (let i = 0; i < seed.length; i++) if (seed[i]) queue.push(i)
+  // Tiga strategi clear:
+  // 1. Full Clear (clear_zone >= 100): bolong seluruh frame tanpa syarat.
+  // 2. MODE ISI PENUH: bila MAYORITAS area frame satu warna (rasio piksel
+  //    mirip warna seed >= FILL_RATIO), bolong seluruh frame sekaligus —
+  //    tanpa syarat konektivitas agar noise/gradasi halus tidak memecah
+  //    lubang — kecuali piksel yang benar-benar beda warna (elemen) & protect.
+  // 3. FRAME RAMAI: hard zone ternoda warna + flood fill ketat.
+  const fullClear = f.clear_zone >= 100
+  const tolHard = Math.max(tol * 2, 12)
+  const tolFill = Math.max(tol * 4, 28)
+  const FILL_RATIO = 0.55
 
-  for (let qi = 0; qi < queue.length; qi++) {
-    const idx = queue[qi]
-    const gx = bx0 + (idx % bw)
-    const gy = by0 + Math.floor(idx / bw)
-    for (const [ox, oy] of NEIGHBORS) {
-      const nx = gx + ox
-      const ny = gy + oy
-      if (nx < bx0 || ny < by0 || nx > bx1 || ny > by1) continue
-      const nidx = (ny - by0) * bw + (nx - bx0)
-      if (cleared[nidx] || !inside[nidx]) continue
-      if (prot[nidx]) continue // Protect Area menahan automatic clearing
-      const ndx = nx + 0.5 - cx
-      const ndy = ny + 0.5 - cy
-      const dist = Math.sqrt(ndx * ndx + ndy * ndy)
-      if (dist > dMax) continue // Clear Expansion habis
-      // Edge Protection: makin jauh dari pusat, toleransi makin ketat
-      const r = dMax > dHard ? (dist - dHard) / (dMax - dHard) : 0
-      const effTol = tol * (1 - 0.85 * ep * r)
-      const o = (ny * gw + nx) * 4
-      const diff = Math.max(
+  // Diff seluruh piksel inside terhadap warna rata-rata seed
+  const diffs = new Uint8Array(inside.length)
+  let insideCount = 0
+  let sameCount = 0
+  for (let i = 0; i < inside.length; i++) {
+    if (!inside[i]) continue
+    const o = ((by0 + Math.floor(i / bw)) * gw + (bx0 + (i % bw))) * 4
+    const diff = Math.min(
+      255,
+      Math.max(
         Math.abs(wd.data[o] - avgR),
         Math.abs(wd.data[o + 1] - avgG),
         Math.abs(wd.data[o + 2] - avgB)
       )
-      if (diff > effTol) continue // elemen desain perifer — pertahankan
-      cleared[nidx] = 1
-      queue.push(nidx)
+    )
+    diffs[i] = diff
+    insideCount++
+    if (diff <= tolFill) sameCount++
+  }
+
+  const cleared = new Uint8Array(seed.length)
+  const queue: number[] = []
+  let fillMode = false
+
+  if (fullClear) {
+    for (let i = 0; i < inside.length; i++) if (inside[i]) cleared[i] = 1
+  } else if (insideCount > 0 && sameCount / insideCount >= FILL_RATIO) {
+    fillMode = true
+    for (let i = 0; i < inside.length; i++) {
+      if (!inside[i] || prot[i]) continue
+      if (diffs[i] <= tolFill) cleared[i] = 1
+    }
+  } else {
+    for (let i = 0; i < seed.length; i++) {
+      if (!seed[i] || prot[i]) continue
+      if (diffs[i] <= tolHard) {
+        cleared[i] = 1
+        queue.push(i)
+      }
+    }
+  }
+
+  if (!fillMode) {
+    for (let qi = 0; qi < queue.length; qi++) {
+      const idx = queue[qi]
+      const gx = bx0 + (idx % bw)
+      const gy = by0 + Math.floor(idx / bw)
+      for (const [ox, oy] of NEIGHBORS) {
+        const nx = gx + ox
+        const ny = gy + oy
+        if (nx < bx0 || ny < by0 || nx > bx1 || ny > by1) continue
+        const nidx = (ny - by0) * bw + (nx - bx0)
+        if (cleared[nidx] || !inside[nidx]) continue
+        if (prot[nidx]) continue // Protect Area menahan automatic clearing
+        const ndx = nx + 0.5 - cx
+        const ndy = ny + 0.5 - cy
+        const dist = Math.sqrt(ndx * ndx + ndy * ndy)
+        if (dist > dMax) continue // Clear Expansion habis
+        // Edge Protection: makin jauh dari pusat, toleransi makin ketat
+        const r = dMax > dHard ? (dist - dHard) / (dMax - dHard) : 0
+        const effTol = tol * (1 - 0.85 * ep * r)
+        const o = (ny * gw + nx) * 4
+        const diff = Math.max(
+          Math.abs(wd.data[o] - avgR),
+          Math.abs(wd.data[o + 1] - avgG),
+          Math.abs(wd.data[o + 2] - avgB)
+        )
+        if (diff > effTol) continue // elemen desain perifer — pertahankan
+        cleared[nidx] = 1
+        queue.push(nidx)
+      }
+    }
+  }
+
+  // PEMBERSIHAN TEPI (anti-fringe): serap pita transisi anti-alias di batas
+  // antara area clear dan warna kuat di seberangnya, sehingga tidak ada sisa
+  // tipis warna slot yang menempel di pinggiran elemen/border. Kandidat =
+  // piksel dengan diff MENENGAH (di atas ambang clear, di bawah STRONG) yang
+  // bersinggungan dengan area clear dan berbatasan langsung dengan warna kuat
+  // dua langkah lebih jauh. Inti warna kuat (hitam pekal dsb.) tidak disentuh.
+  const STRONG = 150
+  for (let pass = 0; pass < 2; pass++) {
+    const snap = Uint8Array.from(cleared)
+    for (let i = 0; i < inside.length; i++) {
+      if (!inside[i] || snap[i] || prot[i]) continue
+      const dP = diffs[i]
+      if (dP <= tolFill || dP >= STRONG) continue // bukan pita transisi
+      const gx = bx0 + (i % bw)
+      const gy = by0 + Math.floor(i / bw)
+      for (const [ox, oy] of NEIGHBORS) {
+        const nx = gx + ox
+        const ny = gy + oy
+        if (nx < bx0 || ny < by0 || nx > bx1 || ny > by1) continue
+        const nidx = (ny - by0) * bw + (nx - bx0)
+        if (!snap[nidx]) continue // harus bersinggungan dengan area clear
+        const qx = 2 * gx - nx
+        const qy = 2 * gy - ny
+        if (qx < bx0 || qy < by0 || qx > bx1 || qy > by1) continue
+        const qidx = (qy - by0) * bw + (qx - bx0)
+        if (!inside[qidx] || diffs[qidx] < STRONG) continue
+        cleared[i] = 1 // pita transisi -> ikut clear sampai warna kuat
+        break
+      }
     }
   }
 
@@ -257,9 +339,10 @@ export function computeHoleMask(
     if (rem[i] && !prot[i] && inside[i]) cleared[i] = 1
   }
 
-  // Minimum Region Size: buang pulau kecil tanpa seed
+  // Minimum Region Size: buang pulau kecil tanpa seed (tidak relevan di
+  // mode isi penuh — lubang memang sengaja satu keseluruhan)
   const minArea = (f.min_region_size / 100) * fw * fh
-  if (minArea > 1) {
+  if (!fillMode && minArea > 1) {
     dropSmallIslands(cleared, seed, bw, bx0, by0, bx1, by1, minArea)
   }
 

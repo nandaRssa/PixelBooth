@@ -64,8 +64,12 @@ class SessionTest extends TestCase
      */
     private function solidTemplateWithLeftRemoveArea(bool $flipH, string $slug): Template
     {
+        // Latar gelap + kotak putih kecil tepat di bawah Hard Clear Zone agar
+        // frame tidak seragam 100% (tidak memicu mode isi penuh) sehingga uji
+        // ini tetap menguji jalur flood fill / remove area manual.
         $img = imagecreatetruecolor(800, 1200);
         imagefilledrectangle($img, 0, 0, 799, 1199, imagecolorallocate($img, 32, 32, 32));
+        imagefilledrectangle($img, 395, 595, 404, 604, imagecolorallocate($img, 255, 255, 255));
         ob_start();
         imagepng($img);
         $pngData = ob_get_clean();
@@ -325,7 +329,9 @@ class SessionTest extends TestCase
     {
         // Template 800x1200: bg gelap + placeholder putih (300,500)-(500,700)
         // + logo hijau (305,515)-(495,535) + strip biru (492,505)-(508,695).
-        // Frame manual user: (300,500) 200x200, Hard Clear Zone 50%.
+        // Frame manual user: (260,460) 280x280 — sengaja lebih besar dari slot
+        // agar porsi putih < ambang mode isi penuh sehingga uji ini tetap
+        // menguji jalur flood fill ketat. Hard Clear Zone 50%.
         $w = 800;
         $h = 1200;
         $img = imagecreatetruecolor($w, $h);
@@ -349,10 +355,10 @@ class SessionTest extends TestCase
             'frame_configuration' => [[
                 'id' => 1,
                 'order' => 0,
-                'x' => 300,
-                'y' => 500,
-                'width' => 200,
-                'height' => 200,
+                'x' => 260,
+                'y' => 460,
+                'width' => 280,
+                'height' => 280,
                 'rotation' => 0,
                 'flip_h' => false,
                 'flip_v' => false,
@@ -427,12 +433,114 @@ class SessionTest extends TestCase
         $this->assertLessThan(100, $r($c));
 
         // Clear Expansion habis: sudut bawah kiri tetap putih (di luar jangkauan)
-        $c = $px(312, 688);
+        $c = $px(305, 697);
         $this->assertGreaterThan(200, $r($c), 'Area di luar expansion tidak boleh ter-clear');
 
         // Background gelap jauh dari frame tetap utuh
         $c = $px(30, 30);
         $this->assertLessThan(80, $r($c));
+
+        imagedestroy($final);
+    }
+
+    public function test_complete_mode_isi_penuh_mayoritas_warna_sama_menghapus_seluruh_frame_kecuali_elemen(): void
+    {
+        // Template 800x1200: bg gelap + slot putih persis di area frame
+        // (300,500)-(500,700) + kotak hitam (430,630)-(469,669).
+        // Mayoritas piksel frame = putih -> mode isi penuh: seluruh frame
+        // ter-clear TANPA syarat konektivitas/expansion, KECUALI elemen yang
+        // benar-benar beda warna (kotak hitam) dan Manual Protect Area.
+        $w = 800;
+        $h = 1200;
+        $img = imagecreatetruecolor($w, $h);
+        imagefilledrectangle($img, 0, 0, $w - 1, $h - 1, imagecolorallocate($img, 32, 32, 32));
+        imagefilledrectangle($img, 300, 500, 500, 700, imagecolorallocate($img, 255, 255, 255));
+        imagefilledrectangle($img, 430, 630, 469, 669, imagecolorallocate($img, 0, 0, 0));
+        ob_start();
+        imagepng($img);
+        $pngData = ob_get_clean();
+        imagedestroy($img);
+        Storage::disk('public')->put('templates/mask-fill.png', $pngData);
+
+        $template = Template::create([
+            'name' => 'Template Mask Fill',
+            'slug' => 'template-mask-fill',
+            'template_file' => 'templates/mask-fill.png',
+            'canvas_width' => $w,
+            'canvas_height' => $h,
+            'frame_count' => 1,
+            'frame_configuration' => [[
+                'id' => 1,
+                'order' => 0,
+                'x' => 300,
+                'y' => 500,
+                'width' => 200,
+                'height' => 200,
+                'rotation' => 0,
+                'flip_h' => false,
+                'flip_v' => false,
+                'clear_zone' => 50,
+                'clear_expansion' => 25,
+                'region_sensitivity' => 50,
+                'min_region_size' => 1,
+                'edge_protection' => 0,
+                'feather' => 0,
+                'protected_areas' => [['x' => 10, 'y' => 10, 'w' => 30, 'h' => 30]],
+                'remove_areas' => [],
+            ]],
+            'status' => 'active',
+        ]);
+
+        // Foto capture: merah solid
+        $photo = imagecreatetruecolor(200, 200);
+        imagefilledrectangle($photo, 0, 0, 199, 199, imagecolorallocate($photo, 255, 0, 0));
+        ob_start();
+        imagejpeg($photo, null, 95);
+        $photoData = ob_get_clean();
+        imagedestroy($photo);
+        $photoBase64 = 'data:image/jpeg;base64,' . base64_encode($photoData);
+
+        $session = $this->postJson('/api/sessions', [
+            'template_id' => $template->id,
+        ], $this->headers())->json('data');
+
+        $this->postJson("/api/sessions/{$session['id']}/capture", [
+            'image_base64' => $photoBase64,
+        ], $this->headers())
+            ->assertOk()
+            ->assertJsonPath('data.all_done', true);
+
+        $response = $this->postJson("/api/sessions/{$session['id']}/complete", [], $this->headers());
+        $response->assertOk();
+
+        $finalPath = Storage::disk('public')->path($response->json('data.photo.storage_path'));
+        $final = imagecreatefromjpeg($finalPath);
+
+        $px = fn ($x, $y) => imagecolorat($final, $x, $y);
+        $r = fn ($c) => ($c >> 16) & 0xFF;
+        $g = fn ($c) => ($c >> 8) & 0xFF;
+        $b = fn ($c) => $c & 0xFF;
+
+        // Pojok frame jauh dari pusat: ikut ter-clear (tanpa syarat expansion)
+        $c = $px(480, 690);
+        $this->assertGreaterThan(180, $r($c), 'Mayoritas satu warna harus clear penuh');
+        $this->assertLessThan(140, $g($c));
+
+        // Kotak hitam: elemen beda warna DIPERTAHANKAN sebagai desain
+        $c = $px(450, 650);
+        $this->assertLessThan(120, $r($c), 'Kotak hitam harus dipertahankan');
+        $this->assertLessThan(120, $g($c));
+        $this->assertLessThan(120, $b($c));
+
+        // Manual Protect Area: tetap desain putih meski mayoritas clear
+        $c = $px(325, 525);
+        $this->assertGreaterThan(200, $r($c), 'Protect area harus dipertahankan');
+        $this->assertGreaterThan(200, $g($c));
+
+        // Pinggir kotak hitam: tidak ada sisa fringe putih menempel
+        $c = $px(471, 650);
+        $this->assertGreaterThan(180, $r($c), 'Tepi elemen harus bersih tanpa sisa putih');
+        $this->assertLessThan(160, $g($c));
 
         imagedestroy($final);
     }
