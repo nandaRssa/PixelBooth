@@ -658,6 +658,11 @@ class SessionTest extends TestCase
             ['brush-b', [['x' => 170, 'y' => 70]], [], [], true],
             ['brush-c', [['x' => 170, 'y' => 70]], [['x' => 170, 'y' => 70]], [], false],
             ['brush-d', [['x' => 170, 'y' => 70]], [], [['x' => 170, 'y' => 70]], false],
+            // Fleksibilitas strok terakhir menang: keep dulu lalu remove
+            // menimpa (abu terhapus), remove dulu lalu keep menimpa (abu
+            // dipulihkan). s = nomor urut strok.
+            ['brush-e', [['x' => 170, 'y' => 70, 's' => 2]], [], [['x' => 170, 'y' => 70, 's' => 1]], true],
+            ['brush-f', [['x' => 170, 'y' => 70, 's' => 1]], [], [['x' => 170, 'y' => 70, 's' => 2]], false],
         ];
 
         foreach ($cases as [$slug, $remSeeds, $protSeeds, $keepSeeds, $abuDihapus]) {

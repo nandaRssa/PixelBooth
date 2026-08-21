@@ -98,6 +98,9 @@ const TemplateFrameEditorPage: React.FC = () => {
   const [brushSize, setBrushSize] = useState(28)
   const cursorRef = useRef<{ x: number; y: number } | null>(null)
   const lastSeedRef = useRef<{ x: number; y: number } | null>(null)
+  // Nomor urut strok global: menentukan pemenang konflik Remove vs Keep
+  // (strok terakhir menang — bisa saling menimpa berulang kali).
+  const strokeSeqRef = useRef(0)
 
   const containerRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -281,7 +284,8 @@ const TemplateFrameEditorPage: React.FC = () => {
     }
 
     // --- Tint region brush (remove merah / protect kuning / keep hijau) ---
-    if (regionRef.current) {
+    // Hanya tampil saat kuas aktif; di mode select frame tampil bersih.
+    if (regionRef.current && mode !== 'select') {
       ctx.drawImage(regionRef.current, 0, 0)
     }
 
@@ -538,23 +542,32 @@ ctx.restore()
     const p = toCanvas(e.clientX, e.clientY)
     ;(e.target as HTMLCanvasElement).setPointerCapture(e.pointerId)
 
-    if ((mode === 'protect' || mode === 'remove' || mode === 'restore') && selected) {
+    if (mode === 'protect' || mode === 'remove' || mode === 'restore') {
+      // Kuas tidak butuh seleksi manual: pilih frame di bawah kursor secara
+      // otomatis agar klik/sapuan PERTAMA langsung mengebrush (bukan memindah
+      // frame). Tanpa ini klik pertama jatuh ke jalur select+move.
+      const f = selected ?? hitFrame(p)
+      if (!f) return
+      if (!selected || selected.id !== f.id) setSelectedId(f.id)
       const key: BrushKey =
         mode === 'remove' ? 'remove_seeds' : mode === 'protect' ? 'protect_seeds' : 'keep_seeds'
       // Alt / klik-kanan: hapus seed kuas di sekitar kursor (koreksi sapuan)
       if (e.altKey || e.button === 2) {
-        eraseSeeds(selected, key, p)
+        eraseSeeds(f, key, p)
         return
       }
+      // Satu sapuan = satu nomor strok; seed di sepanjang sapuan berbagi
+      // nomor yang sama dan selalu lebih baru dari strok sebelumnya.
+      strokeSeqRef.current += 1
       dragRef.current = {
         type: 'brush',
-        frameId: selected.id,
+        frameId: f.id,
         startCanvas: p,
-        startFrame: selected,
+        startFrame: f,
         brushKey: key,
       }
       lastSeedRef.current = p
-      addSeed(key, selected, p)
+      addSeed(key, f, p)
       return
     }
 
@@ -753,7 +766,7 @@ ctx.restore()
     const [lx, ly] = toContentLocal(f, p)
     if (lx < 0 || ly < 0 || lx > f.width || ly > f.height) return
     updateFrame(f.id, {
-      [key]: [...f[key], { x: Math.round(lx), y: Math.round(ly) }],
+      [key]: [...f[key], { x: Math.round(lx), y: Math.round(ly), s: strokeSeqRef.current }],
     } as Partial<CameraFrame>)
   }
 

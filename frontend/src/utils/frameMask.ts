@@ -36,7 +36,10 @@ export function normalizeFrame(frame: Partial<CameraFrame>): CameraFrame {
     const out: BrushPoint[] = []
     for (const p of v as Record<string, unknown>[]) {
       if (!p || typeof p !== 'object') continue
-      out.push({ x: Number(p.x ?? 0), y: Number(p.y ?? 0) })
+      const pt: BrushPoint = { x: Number(p.x ?? 0), y: Number(p.y ?? 0) }
+      // Urutan strok untuk resolusi Remove vs Keep (strok terakhir menang)
+      if (typeof p.s === 'number' && Number.isFinite(p.s)) pt.s = Math.round(p.s)
+      out.push(pt)
       if (out.length >= 48) break
     }
     return out
@@ -287,27 +290,107 @@ export function computeHoleMask(
     }
   }
 
-  // Urutan prioritas: Keep > Protect > Remove > Smart Clear.
-  const keepGrid = new Uint8Array(inside.length)
-  for (const s of f.keep_seeds) {
-    const pt = seedToWork(s.x, s.y)
-    if (pt) floodRegion(keepGrid, EMPTY, pt[0], pt[1])
+  /**
+   * Flood per-seed dengan klaim urutan strok: mencatat cakupan region DAN
+   * nomor strok terbesar yang mengklaim tiap piksel. Dinding = protect saja
+   * agar Remove/Keep saling menimpa (strok terakhir menang), bukan saling
+   * memblokir permanen.
+   */
+  const floodClaim = (
+    cov: Uint8Array,
+    seqArr: Int32Array,
+    walls: Uint8Array,
+    sx: number,
+    sy: number,
+    seq: number
+  ) => {
+    const startIdx = (sy - by0) * bw + (sx - bx0)
+    if (walls[startIdx] || !inside[startIdx]) return
+    const o0 = (sy * gw + sx) * 4
+    const r0 = wd.data[o0]
+    const g0 = wd.data[o0 + 1]
+    const b0 = wd.data[o0 + 2]
+    const visited = new Uint8Array(inside.length)
+    visited[startIdx] = 1
+    cov[startIdx] = 1
+    if (seq > seqArr[startIdx]) seqArr[startIdx] = seq
+    const stack: number[] = [startIdx]
+    while (stack.length > 0) {
+      const idx = stack.pop() as number
+      const gx = bx0 + (idx % bw)
+      const gy = by0 + Math.floor(idx / bw)
+      for (const [ox, oy] of NEIGHBORS) {
+        const nx = gx + ox
+        const ny = gy + oy
+        if (nx < bx0 || ny < by0 || nx > bx1 || ny > by1) continue
+        const nidx = (ny - by0) * bw + (nx - bx0)
+        if (visited[nidx] || walls[nidx] || !inside[nidx]) continue
+        const o = (ny * gw + nx) * 4
+        const diff = Math.max(
+          Math.abs(wd.data[o] - r0),
+          Math.abs(wd.data[o + 1] - g0),
+          Math.abs(wd.data[o + 2] - b0)
+        )
+        if (diff > tolR) continue
+        visited[nidx] = 1
+        cov[nidx] = 1
+        if (seq > seqArr[nidx]) seqArr[nidx] = seq
+        stack.push(nidx)
+      }
+    }
   }
+
+  // Urutan prioritas: Protect > (Remove vs Keep: STROK TERAKHIR menang,
+  // seri → Keep) > Smart Clear. Remove dan Keep bebas diulang bergantian.
   const seedProt = new Uint8Array(inside.length)
   for (const s of f.protect_seeds) {
     const pt = seedToWork(s.x, s.y)
     if (pt) floodRegion(seedProt, EMPTY, pt[0], pt[1])
   }
-  // Guard gabungan: rect protect + region protect + region keep —
-  // menghalangi SEMUA bentuk clear (termasuk Full Clear & Edge Cleanup).
+  const protGrid = new Uint8Array(inside.length)
+  for (let i = 0; i < protGrid.length; i++) {
+    protGrid[i] = prot[i] | seedProt[i] ? 1 : 0
+  }
+
+  const remCov = new Uint8Array(inside.length)
+  const remSeq = new Int32Array(inside.length)
+  for (const s of f.remove_seeds) {
+    const pt = seedToWork(s.x, s.y)
+    if (pt) floodClaim(remCov, remSeq, protGrid, pt[0], pt[1], s.s ?? 0)
+  }
+  const keepCov = new Uint8Array(inside.length)
+  const keepSeq = new Int32Array(inside.length)
+  for (const s of f.keep_seeds) {
+    const pt = seedToWork(s.x, s.y)
+    if (pt) floodClaim(keepCov, keepSeq, protGrid, pt[0], pt[1], s.s ?? 0)
+  }
+
+  // Resolusi konflik per piksel antara region Remove dan Keep.
+  const keepGrid = new Uint8Array(inside.length)
+  const remWon = new Uint8Array(inside.length)
+  for (let i = 0; i < inside.length; i++) {
+    const r = remCov[i]
+    const k = keepCov[i]
+    if (r && k) {
+      if (remSeq[i] > keepSeq[i]) remWon[i] = 1
+      else keepGrid[i] = 1
+    } else if (r) {
+      remWon[i] = 1
+    } else if (k) {
+      keepGrid[i] = 1
+    }
+  }
+
+  // Guard gabungan: rect protect + region protect + region keep (hasil
+  // resolusi) — menghalangi smart clear, absorpsi tepi, Edge Cleanup &
+  // Full Clear. TIDAK menghalangi kuas Remove (strok terakhir menang).
   const guard = new Uint8Array(inside.length)
   for (let i = 0; i < guard.length; i++) {
     guard[i] = prot[i] | seedProt[i] | keepGrid[i] ? 1 : 0
   }
   const remAll = Uint8Array.from(rem)
-  for (const s of f.remove_seeds) {
-    const pt = seedToWork(s.x, s.y)
-    if (pt) floodRegion(remAll, guard, pt[0], pt[1])
+  for (let i = 0; i < remWon.length; i++) {
+    if (remWon[i]) remAll[i] = 1
   }
 
   // Tiga strategi clear:
@@ -430,7 +513,9 @@ export function computeHoleMask(
 
   // Manual Remove Area + Remove Brush: paksa clear (Guard tetap menang)
   for (let i = 0; i < remAll.length; i++) {
-    if (remAll[i] && !guard[i] && inside[i]) cleared[i] = 1
+    // Force clear kuas/rect remove: hanya Protect yang absolut — region
+    // Keep boleh ditimpa (strok terakhir menang).
+    if (remAll[i] && !prot[i] && !seedProt[i] && inside[i]) cleared[i] = 1
   }
 
   // Minimum Region Size: buang pulau kecil tanpa seed (tidak relevan di
@@ -501,7 +586,7 @@ export function computeHoleMask(
   // Keep / Restore menang atas SEMUA proses: kembalikan desain secara
   // penuh (alpha 0) bahkan setelah feather, agar tepi restore tetap tegas.
   for (let i = 0; i < keepGrid.length; i++) {
-    if (keepGrid[i]) holeGrid[i] = 0
+    if (keepGrid[i] && !remAll[i]) holeGrid[i] = 0
   }
   const fr = Math.round(f.feather * scale)
   if (fr > 0) {

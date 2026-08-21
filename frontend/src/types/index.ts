@@ -53,10 +53,12 @@ export interface CameraFrame {
   keep_seeds: BrushPoint[]
 }
 
-/** Titik seed kuas brush — pemicu region terhubung, bukan batas akhir. */
+/** Titik seed kuas brush — pemicu region terhubung, bukan batas akhir.
+ *  s = nomor urut strok (untuk resolusi Remove vs Keep: strok terakhir menang). */
 export interface BrushPoint {
   x: number
   y: number
+  s?: number
 }
 
 /** Alias kompatibilitas untuk konfigurasi tersimpan di template */

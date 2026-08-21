@@ -60,10 +60,15 @@ class FrameMaskService
                 if (! is_array($p)) {
                     continue;
                 }
-                $out[] = [
+                $pt = [
                     'x' => max(0.0, (float) ($p['x'] ?? 0)),
                     'y' => max(0.0, (float) ($p['y'] ?? 0)),
                 ];
+                // Urutan strok untuk resolusi Remove vs Keep
+                if (isset($p['s']) && is_numeric($p['s'])) {
+                    $pt['s'] = (int) round((float) $p['s']);
+                }
+                $out[] = $pt;
                 if (count($out) >= 48) {
                     break;
                 }
@@ -298,14 +303,63 @@ class FrameMaskService
             }
         };
 
-        // Urutan prioritas: Keep > Protect > Remove > Smart Clear.
-        $keepGrid = [];
-        foreach ($f['keep_seeds'] as $s) {
-            $pt = $seedToWork((float) $s['x'], (float) $s['y']);
-            if ($pt !== null) {
-                $floodRegion($keepGrid, $empty, $pt[0], $pt[1]);
+        /**
+         * Flood per-seed dengan klaim urutan strok: mencatat cakupan region
+         * DAN nomor strok terbesar yang mengklaim tiap piksel. Dinding =
+         * protect saja agar Remove/Keep saling menimpa (strok terakhir
+         * menang), bukan saling memblokir permanen.
+         */
+        $floodClaim = function (array &$cov, array &$seqArr, array $walls, int $sx, int $sy, int $seq) use ($work, $gw, $bw, $bx0, $by0, $bx1, $by1, $inside, $tolR): void {
+            $startIdx = ($sy - $by0) * $bw + ($sx - $bx0);
+            if (isset($walls[$startIdx]) || ! isset($inside[$startIdx])) {
+                return;
             }
-        }
+            $c0 = imagecolorat($work, $sx, $sy);
+            $r0 = ($c0 >> 16) & 0xFF;
+            $g0 = ($c0 >> 8) & 0xFF;
+            $b0 = $c0 & 0xFF;
+            $visited = [$startIdx => true];
+            $cov[$startIdx] = 1;
+            if (! isset($seqArr[$startIdx]) || $seq > $seqArr[$startIdx]) {
+                $seqArr[$startIdx] = $seq;
+            }
+            $stack = [$startIdx];
+            while ($stack !== []) {
+                $idx = array_pop($stack);
+                $gx = $bx0 + ($idx % $bw);
+                $gy = $by0 + intdiv($idx, $bw);
+                foreach ([[-1, 0], [1, 0], [0, -1], [0, 1]] as [$ox, $oy]) {
+                    $nx = $gx + $ox;
+                    $ny = $gy + $oy;
+                    if ($nx < $bx0 || $ny < $by0 || $nx > $bx1 || $ny > $by1) {
+                        continue;
+                    }
+                    $nidx = ($ny - $by0) * $bw + ($nx - $bx0);
+                    if (isset($visited[$nidx]) || isset($walls[$nidx]) || ! isset($inside[$nidx])) {
+                        continue;
+                    }
+                    $c = imagecolorat($work, $nx, $ny);
+                    $diff = max(
+                        abs((($c >> 16) & 0xFF) - $r0),
+                        abs((($c >> 8) & 0xFF) - $g0),
+                        abs(($c & 0xFF) - $b0)
+                    );
+                    if ($diff > $tolR) {
+                        continue;
+                    }
+                    $visited[$nidx] = true;
+                    $cov[$nidx] = 1;
+                    if (! isset($seqArr[$nidx]) || $seq > $seqArr[$nidx]) {
+                        $seqArr[$nidx] = $seq;
+                    }
+                    $stack[] = $nidx;
+                }
+            }
+        };
+
+        // Urutan prioritas: Protect > (Remove vs Keep: STROK TERAKHIR
+        // menang, seri -> Keep) > Smart Clear. Remove dan Keep bebas
+        // diulang bergantian.
         $seedProt = [];
         foreach ($f['protect_seeds'] as $s) {
             $pt = $seedToWork((float) $s['x'], (float) $s['y']);
@@ -313,8 +367,52 @@ class FrameMaskService
                 $floodRegion($seedProt, $empty, $pt[0], $pt[1]);
             }
         }
-        // Guard gabungan: rect protect + region protect + region keep -
-        // menghalangi SEMUA bentuk clear (termasuk Full Clear & Edge Cleanup).
+        $protGrid = [];
+        foreach ($inside as $idx => $_) {
+            if (isset($prot[$idx]) || isset($seedProt[$idx])) {
+                $protGrid[$idx] = 1;
+            }
+        }
+
+        $remCov = [];
+        $remSeq = [];
+        foreach ($f['remove_seeds'] as $s) {
+            $pt = $seedToWork((float) $s['x'], (float) $s['y']);
+            if ($pt !== null) {
+                $floodClaim($remCov, $remSeq, $protGrid, $pt[0], $pt[1], (int) ($s['s'] ?? 0));
+            }
+        }
+        $keepCov = [];
+        $keepSeq = [];
+        foreach ($f['keep_seeds'] as $s) {
+            $pt = $seedToWork((float) $s['x'], (float) $s['y']);
+            if ($pt !== null) {
+                $floodClaim($keepCov, $keepSeq, $protGrid, $pt[0], $pt[1], (int) ($s['s'] ?? 0));
+            }
+        }
+
+        // Resolusi konflik per piksel antara region Remove dan Keep.
+        $keepGrid = [];
+        $remWon = [];
+        foreach ($inside as $idx => $_) {
+            $r = isset($remCov[$idx]);
+            $k = isset($keepCov[$idx]);
+            if ($r && $k) {
+                if (($remSeq[$idx] ?? 0) > ($keepSeq[$idx] ?? 0)) {
+                    $remWon[$idx] = 1;
+                } else {
+                    $keepGrid[$idx] = 1;
+                }
+            } elseif ($r) {
+                $remWon[$idx] = 1;
+            } elseif ($k) {
+                $keepGrid[$idx] = 1;
+            }
+        }
+
+        // Guard gabungan: rect protect + region protect + region keep
+        // (hasil resolusi) - menghalangi smart clear, absorpsi tepi,
+        // Edge Cleanup & Full Clear. TIDAK menghalangi kuas Remove.
         $guard = [];
         foreach ($inside as $idx => $_) {
             if (isset($prot[$idx]) || isset($seedProt[$idx]) || isset($keepGrid[$idx])) {
@@ -322,11 +420,8 @@ class FrameMaskService
             }
         }
         $remAll = $rem;
-        foreach ($f['remove_seeds'] as $s) {
-            $pt = $seedToWork((float) $s['x'], (float) $s['y']);
-            if ($pt !== null) {
-                $floodRegion($remAll, $guard, $pt[0], $pt[1]);
-            }
+        foreach ($remWon as $idx => $_) {
+            $remAll[$idx] = 1;
         }
 
         // Tiga strategi clear:
@@ -473,9 +568,10 @@ class FrameMaskService
             }
         }
 
-        // Manual Remove Area + Remove Brush: paksa clear (Guard tetap menang)
+        // Manual Remove Area + Remove Brush: paksa clear. Hanya Protect
+        // yang absolut - region Keep boleh ditimpa (strok terakhir menang).
         foreach ($remAll as $idx => $_) {
-            if (! isset($guard[$idx]) && isset($inside[$idx])) {
+            if (! isset($prot[$idx]) && ! isset($seedProt[$idx]) && isset($inside[$idx])) {
                 $cleared[$idx] = 1;
             }
         }
@@ -549,10 +645,13 @@ class FrameMaskService
                 $holeGrid[$idx] = $s;
             }
         }
-        // Keep / Restore menang atas SEMUA proses: kembalikan desain secara
-        // penuh (alpha 0) bahkan setelah feather, agar tepi restore tegas.
+        // Keep / Restore menang atas SEMUA proses kecuali kuas Remove yang
+        // lebih baru (strok terakhir menang): kembalikan desain secara
+        // penuh (alpha 0) agar tepi restore tegas.
         foreach ($keepGrid as $idx => $_) {
-            $holeGrid[$idx] = 0.0;
+            if (! isset($remAll[$idx])) {
+                $holeGrid[$idx] = 0.0;
+            }
         }
         $fr = (int) round($f['feather'] * $scale);
         if ($fr > 0) {
