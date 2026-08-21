@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   ArrowLeft,
@@ -37,6 +38,7 @@ const COUNTDOWN_SECONDS = 3
 const PhotoCapturePage: React.FC = () => {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
 
   const [session, setSession] = useState<PhotoSession | null>(null)
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
@@ -455,9 +457,12 @@ const PhotoCapturePage: React.FC = () => {
             <Button
               variant="secondary"
               size="md"
-              onClick={() =>
+              onClick={() => {
+                // Buang cache lama agar foto hasil sesi langsung tampil di galeri
+                queryClient.invalidateQueries({ queryKey: ['photos'] })
+                queryClient.invalidateQueries({ queryKey: ['folders'] })
                 navigate(folderId ? `/gallery?folder_id=${folderId}` : '/gallery')
-              }
+              }}
               leftIcon={<ExternalLink size={16} />}
             >
               Buka Galeri
