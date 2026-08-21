@@ -798,13 +798,29 @@ ctx.restore()
     return { x: cx + xr * fx, y: cy + yr * fy }
   }
 
+  // ===== Undo history =====
+  const historyRef = useRef<CameraFrame[][]>([])
+  const lastHistAtRef = useRef(0)
+
+  /** Simpan salinan kondisi frames saat ini ke stack undo (maks 60 langkah). */
+  const pushHistory = () => {
+    historyRef.current.push(frames.map((f) => ({ ...f })))
+    if (historyRef.current.length > 60) historyRef.current.shift()
+  }
+
   // ===== Frame ops =====
   const updateFrame = (fid: number, patch: Partial<CameraFrame>) => {
+    // Satu langkah undo per "burst" edit — drag/slider kontinu memanggil
+    // updateFrame puluhan kali per detik; jangan banjiri history.
+    const now = Date.now()
+    if (now - lastHistAtRef.current > 500) pushHistory()
+    lastHistAtRef.current = now
     setFrames((prev) => prev.map((f) => (f.id === fid ? { ...f, ...patch } : f)))
   }
 
   const addFrame = () => {
     if (!template) return
+    pushHistory()
     const newId = Math.max(0, ...frames.map((f) => f.id)) + 1
     const w = template.canvas_width * 0.45
     const h = template.canvas_height * 0.28
@@ -826,6 +842,7 @@ ctx.restore()
 
   const duplicateFrame = () => {
     if (!selected) return
+    pushHistory()
     const newId = Math.max(0, ...frames.map((f) => f.id)) + 1
     const copy = normalizeFrame({
       ...selected,
@@ -845,8 +862,47 @@ ctx.restore()
 
   const deleteFrame = () => {
     if (!selected) return
+    pushHistory()
     setFrames((prev) => prev.filter((f) => f.id !== selected.id))
     setSelectedId(null)
+  }
+
+  /** Undo: pulihkan snapshot terakhir yang benar-benar berbeda. */
+  const undo = () => {
+    const cur = JSON.stringify(frames)
+    while (historyRef.current.length > 0) {
+      const snap = historyRef.current.pop()!
+      if (JSON.stringify(snap) === cur) continue // lewati snapshot redundan
+      setFrames(snap)
+      setSelectedId((sid) => (snap.some((f) => f.id === sid) ? sid : null))
+      toast.info('Undo')
+      return
+    }
+    toast.info('Tidak ada lagi yang bisa di-undo')
+  }
+
+  // ===== Clipboard frame =====
+  const clipboardRef = useRef<CameraFrame | null>(null)
+
+  const copyFrame = () => {
+    if (!selected) return
+    clipboardRef.current = { ...selected }
+    toast.success(`Frame ${frames.findIndex((f) => f.id === selected.id) + 1} dicopy`)
+  }
+
+  const pasteFrame = () => {
+    if (!clipboardRef.current) return
+    pushHistory()
+    const newId = Math.max(0, ...frames.map((f) => f.id)) + 1
+    const copy = normalizeFrame({
+      ...clipboardRef.current,
+      id: newId,
+      order: frames.length,
+      x: clipboardRef.current.x + 24,
+      y: clipboardRef.current.y + 24,
+    })
+    setFrames((prev) => [...prev, copy])
+    setSelectedId(newId)
   }
 
   // ===== Dual Mode: Manual / Auto Render =====
@@ -855,6 +911,7 @@ ctx.restore()
     setDetecting(true)
     try {
       const detected = await templateApi.detectFrames(template.id)
+      pushHistory() // deteksi bisa di-undo (Ctrl+Z) bila hasilnya tidak cocok
       setFrames(detected)
       setSelectedId(null)
       if (detected.length === 0) {
@@ -887,6 +944,39 @@ ctx.restore()
       }
     }
   }
+
+  // ===== Keyboard shortcuts =====
+  // Undo Ctrl+Z · Copy Ctrl+C · Paste Ctrl+V · Duplicate Ctrl+D ·
+  // Delete/Backspace hapus frame terpilih. Diabaikan saat fokus di input.
+  const keyActionsRef = useRef({ undo, copyFrame, pasteFrame, duplicateFrame, deleteFrame })
+  keyActionsRef.current = { undo, copyFrame, pasteFrame, duplicateFrame, deleteFrame }
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return
+      const mod = e.ctrlKey || e.metaKey
+      const k = e.key.toLowerCase()
+      if (mod && k === 'z') {
+        e.preventDefault()
+        keyActionsRef.current.undo()
+      } else if (mod && k === 'c') {
+        e.preventDefault()
+        keyActionsRef.current.copyFrame()
+      } else if (mod && k === 'v') {
+        e.preventDefault()
+        keyActionsRef.current.pasteFrame()
+      } else if (mod && k === 'd') {
+        e.preventDefault()
+        keyActionsRef.current.duplicateFrame()
+      } else if (e.key === 'Delete' || e.key === 'Backspace') {
+        e.preventDefault()
+        keyActionsRef.current.deleteFrame()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
 
   // ===== Confirm Template =====
   const handleConfirm = async () => {
@@ -1071,7 +1161,7 @@ ctx.restore()
           )}
           {/* Penanda versi build — untuk memastikan bundle terbaru yang dimuat */}
           <div className="absolute bottom-2 right-3 text-[10px] text-[#555] select-none pointer-events-none">
-            editor-v18 · auto-editable
+            editor-v19 · keyboard-undo
           </div>
         </div>
 
@@ -1081,15 +1171,29 @@ ctx.restore()
           <section className="bg-[#141414] border border-[#2A2A2A] rounded-xl p-4">
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-white text-sm font-semibold">Camera Frames ({frames.length})</h3>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={addFrame}
-                leftIcon={<Plus size={14} />}
-              >
-                Add
-              </Button>
+              <div className="flex items-center gap-1.5">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={undo}
+                  disabled={historyRef.current.length === 0}
+                  leftIcon={<Undo2 size={14} />}
+                >
+                  Undo
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={addFrame}
+                  leftIcon={<Plus size={14} />}
+                >
+                  Add
+                </Button>
+              </div>
             </div>
+            <p className="text-[10px] text-[#555] mb-2 leading-relaxed">
+              Ctrl+Z undo · Ctrl+C copy · Ctrl+V paste · Ctrl+D duplikat · Backspace hapus
+            </p>
             <div className="space-y-1.5 max-h-36 overflow-y-auto">
               {frames.map((f, i) => (
                 <button
