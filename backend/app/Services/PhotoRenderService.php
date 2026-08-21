@@ -70,7 +70,11 @@ class PhotoRenderService
             imagedestroy($frameImg);
         }
 
-        // 5. Simpan file final
+        // 5. Overlay elemen desain template yang menimpa area slot,
+        //    agar tetap terlihat di atas foto (tidak tertutup foto).
+        $this->overlayDesign($canvas, $template, $slots);
+
+        // 6. Simpan file final
         $storagePath = "sessions/{$session->session_token}/final.jpg";
         $tmpPath = tempnam(sys_get_temp_dir(), 'pixfinal');
 
@@ -120,6 +124,88 @@ class PhotoRenderService
         imagedestroy($src);
 
         return $storagePath;
+    }
+
+    /**
+     * Overlay elemen desain template yang berada DI DALAM area slot foto.
+     *
+     * Setelah foto ditempel ke slot (menutupi area), piksel desain template
+     * (non-putih) yang sebelumnya menimpa placeholder akan digambar ulang di atas
+     * foto — sehingga dekorasi/bingkai tetap terlihat, tidak tertutup foto.
+     */
+    private function overlayDesign($canvas, Template $template, array $slots): void
+    {
+        if (empty($slots) || ! $template->template_file
+            || ! Storage::disk('public')->exists($template->template_file)) {
+            return;
+        }
+
+        $templateImg = $this->loadImage(Storage::disk('public')->path($template->template_file));
+        if (! $templateImg) {
+            return;
+        }
+
+        $canvasW = imagesx($canvas);
+        $canvasH = imagesy($canvas);
+        $imgW = imagesx($templateImg);
+        $imgH = imagesy($templateImg);
+        if ($canvasW <= 0 || $canvasH <= 0 || $imgW <= 0 || $imgH <= 0) {
+            imagedestroy($templateImg);
+            return;
+        }
+
+        imagealphablending($canvas, true);
+
+        foreach ($slots as $slot) {
+            $dstX = (int) $slot['x'];
+            $dstY = (int) $slot['y'];
+            $dstW = (int) $slot['width'];
+            $dstH = (int) $slot['height'];
+            if ($dstW <= 0 || $dstH <= 0) {
+                continue;
+            }
+
+            // Region gambar template yang bersesuaian (template diregangkan ke canvas)
+            $srcX = (int) round($dstX * $imgW / $canvasW);
+            $srcY = (int) round($dstY * $imgH / $canvasH);
+            $srcW = (int) round($dstW * $imgW / $canvasW);
+            $srcH = (int) round($dstH * $imgH / $canvasH);
+
+            $srcX = max(0, $srcX);
+            $srcY = max(0, $srcY);
+            $srcW = min($srcW, $imgW - $srcX);
+            $srcH = min($srcH, $imgH - $srcY);
+            if ($srcW <= 0 || $srcH <= 0) {
+                continue;
+            }
+
+            $overlay = imagecreatetruecolor($dstW, $dstH);
+            imagealphablending($overlay, false);
+            imagesavealpha($overlay, true);
+            imagecopyresampled($overlay, $templateImg, 0, 0, $srcX, $srcY, $dstW, $dstH, $srcW, $srcH);
+
+            // Piksel placeholder putih dibuat transparan; piksel desain tetap tampak
+            $transparent = imagecolorallocatealpha($overlay, 0, 0, 0, 127);
+            for ($y = 0; $y < $dstH; $y++) {
+                for ($x = 0; $x < $dstW; $x++) {
+                    $rgb = imagecolorat($overlay, $x, $y);
+                    $r = ($rgb >> 16) & 0xFF;
+                    $g = ($rgb >> 8) & 0xFF;
+                    $b = $rgb & 0xFF;
+                    $min = min($r, $g, $b);
+                    $max = max($r, $g, $b);
+                    // Placeholder = putih / abu sangat terang dengan saturasi rendah
+                    if ($min > 218 && ($max - $min) < 40) {
+                        imagesetpixel($overlay, $x, $y, $transparent);
+                    }
+                }
+            }
+
+            imagecopy($canvas, $overlay, $dstX, $dstY, 0, 0, $dstW, $dstH);
+            imagedestroy($overlay);
+        }
+
+        imagedestroy($templateImg);
     }
 
     /**
