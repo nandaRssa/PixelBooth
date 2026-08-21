@@ -47,6 +47,7 @@ export function normalizeFrame(frame: Partial<CameraFrame>): CameraFrame {
     min_region_size: clamp(Number(frame.min_region_size ?? 1), 0, 50),
     edge_protection: clamp(Number(frame.edge_protection ?? 60), 0, 100),
     feather: clamp(Number(frame.feather ?? 2), 0, 20),
+    edge_cleanup: clamp(Math.round(Number(frame.edge_cleanup ?? 0)), 0, 5),
     protected_areas: areas(frame.protected_areas),
     remove_areas: areas(frame.remove_areas),
   }
@@ -344,6 +345,44 @@ export function computeHoleMask(
   const minArea = (f.min_region_size / 100) * fw * fh
   if (!fillMode && minArea > 1) {
     dropSmallIslands(cleared, seed, bw, bx0, by0, bx1, by1, minArea)
+  }
+
+  // EDGE CLEANUP: dilasi lubang N piksel kerja HANYA di boundary mask —
+  // menelan garis tipis / halo warna / serpihan desain yang masih menempel
+  // di tepi area kamera hasil Smart Clear, tanpa deteksi ulang. Protect Area
+  // tidak pernah ter-clear dan area di luar frame tidak tersentuh. Bukan
+  // penghalus (itu tugas Feather). Harus identik dengan FrameMaskService.
+  const ec = Math.max(0, Math.min(5, Math.round(f.edge_cleanup)))
+  if (ec > 0) {
+    const D8: ReadonlyArray<readonly [number, number]> = [
+      [-1, -1],
+      [0, -1],
+      [1, -1],
+      [-1, 0],
+      [1, 0],
+      [-1, 1],
+      [0, 1],
+      [1, 1],
+    ]
+    for (let pass = 0; pass < ec; pass++) {
+      const snap = Uint8Array.from(cleared)
+      for (let i = 0; i < inside.length; i++) {
+        if (!inside[i] || snap[i] || prot[i]) continue
+        const gx = bx0 + (i % bw)
+        const gy = by0 + Math.floor(i / bw)
+        let touch = false
+        for (const [ox, oy] of D8) {
+          const nx = gx + ox
+          const ny = gy + oy
+          if (nx < bx0 || ny < by0 || nx > bx1 || ny > by1) continue
+          if (snap[(ny - by0) * bw + (nx - bx0)]) {
+            touch = true
+            break
+          }
+        }
+        if (touch) cleared[i] = 1
+      }
+    }
   }
 
   // Feather: box blur peta hole agar tepi halus

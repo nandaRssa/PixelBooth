@@ -39,6 +39,8 @@ export interface CameraFrame {
   edge_protection: number
   /** Penghalusan tepi mask (px) */
   feather: number
+  /** Edge Cleanup: ikis boundary mask (px resolusi kerja, 0-5) — hapus sisa tipis */
+  edge_cleanup: number
   /** Area yang dilindungi dari clear (kecuali di Hard Clear Zone) */
   protected_areas: ClearArea[]
   /** Area tambahan yang dipaksa menjadi area kamera */

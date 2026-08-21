@@ -68,6 +68,7 @@ class FrameMaskService
             'min_region_size' => min(50.0, max(0.0, (float) ($frame['min_region_size'] ?? 1))),
             'edge_protection' => min(100.0, max(0.0, (float) ($frame['edge_protection'] ?? 60))),
             'feather' => min(20.0, max(0.0, (float) ($frame['feather'] ?? 2))),
+            'edge_cleanup' => min(5.0, max(0.0, round((float) ($frame['edge_cleanup'] ?? 0)))),
             'protected_areas' => $areas($frame['protected_areas'] ?? null),
             'remove_areas' => $areas($frame['remove_areas'] ?? null),
         ];
@@ -362,6 +363,42 @@ class FrameMaskService
         $minArea = $f['min_region_size'] / 100 * $fw * $fh;
         if (! $fillMode && $minArea > 1) {
             $this->dropSmallIslands($cleared, $seed, $bw, $bx0, $by0, $bx1, $by1, $minArea);
+        }
+
+        // EDGE CLEANUP: dilasi lubang N piksel kerja HANYA di boundary mask -
+        // menelan garis tipis / halo warna / serpihan desain yang masih
+        // menempel di tepi area kamera hasil Smart Clear, tanpa deteksi
+        // ulang. Protect Area tidak pernah ter-clear dan area di luar frame
+        // tidak tersentuh. Bukan penghalus (itu tugas Feather). Harus
+        // identik dengan frameMask.ts.
+        $ec = (int) $f['edge_cleanup'];
+        if ($ec > 0) {
+            $d8 = [[-1, -1], [0, -1], [1, -1], [-1, 0], [1, 0], [-1, 1], [0, 1], [1, 1]];
+            for ($pass = 0; $pass < $ec; $pass++) {
+                $snap = $cleared;
+                foreach ($inside as $idx => $_) {
+                    if (isset($snap[$idx]) || isset($prot[$idx])) {
+                        continue;
+                    }
+                    $gx = $bx0 + ($idx % $bw);
+                    $gy = $by0 + intdiv($idx, $bw);
+                    $touch = false;
+                    foreach ($d8 as [$ox, $oy]) {
+                        $nx = $gx + $ox;
+                        $ny = $gy + $oy;
+                        if ($nx < $bx0 || $ny < $by0 || $nx > $bx1 || $ny > $by1) {
+                            continue;
+                        }
+                        if (isset($snap[($ny - $by0) * $bw + ($nx - $bx0)])) {
+                            $touch = true;
+                            break;
+                        }
+                    }
+                    if ($touch) {
+                        $cleared[$idx] = 1;
+                    }
+                }
+            }
         }
 
         // Feather: box blur peta hole agar tepi compositing halus

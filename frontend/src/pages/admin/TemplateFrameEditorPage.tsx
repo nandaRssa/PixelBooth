@@ -67,6 +67,7 @@ const DEFAULT_CLEAR = {
   min_region_size: 1,
   edge_protection: 60,
   feather: 2,
+  edge_cleanup: 0,
 }
 
 const TemplateFrameEditorPage: React.FC = () => {
@@ -867,7 +868,7 @@ ctx.restore()
     </div>
   )
 
-  const slider = (label: string, key: keyof Pick<CameraFrame, 'clear_zone' | 'clear_expansion' | 'region_sensitivity' | 'min_region_size' | 'edge_protection' | 'feather'>, min: number, max: number, step: number, suffix: string) =>
+  const slider = (label: string, key: keyof Pick<CameraFrame, 'clear_zone' | 'clear_expansion' | 'region_sensitivity' | 'min_region_size' | 'edge_protection' | 'feather' | 'edge_cleanup'>, min: number, max: number, step: number, suffix: string) =>
     selected && (
       <div key={key}>
         <div className="flex items-center justify-between mb-1">
@@ -1002,7 +1003,7 @@ ctx.restore()
           )}
           {/* Penanda versi build — untuk memastikan bundle terbaru yang dimuat */}
           <div className="absolute bottom-2 right-3 text-[10px] text-[#555] select-none pointer-events-none">
-            editor-v13 · edge-absorb
+            editor-v14 · edge-cleanup
           </div>
         </div>
 
@@ -1172,6 +1173,7 @@ ctx.restore()
               {slider('Region Sensitivity', 'region_sensitivity', 0, 100, 1, '')}
               {slider('Minimum Region Size', 'min_region_size', 0, 50, 0.5, '%')}
               {slider('Edge Protection', 'edge_protection', 0, 100, 1, '')}
+              {slider('Edge Cleanup', 'edge_cleanup', 0, 5, 1, 'px')}
               {slider('Feather', 'feather', 0, 20, 1, 'px')}
             </section>
           )}

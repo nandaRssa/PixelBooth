@@ -545,6 +545,106 @@ class SessionTest extends TestCase
         imagedestroy($final);
     }
 
+    public function test_complete_edge_cleanup_mengikis_sisa_tipis_di_boundary_dan_hormati_protect(): void
+    {
+        // Template 800x1200: bg gelap + slot putih (300,500)-(500,700) +
+        // garis hitam tipis (300,520)-(500,524) melintang di dalam area
+        // kamera. Flood fill mempertahankan garis itu (beda warna); Edge
+        // Cleanup mendilasi boundary mask untuk menelannya tanpa menyentuh
+        // Manual Protect Area.
+        $cases = [
+            // [slug, edge_cleanup, protected_areas]
+            ['mask-ec-off', 0, []],
+            ['mask-ec-on', 3, [['x' => 10, 'y' => 18, 'w' => 30, 'h' => 8]]],
+        ];
+
+        foreach ($cases as [$slug, $cleanup, $prot]) {
+            $w = 800;
+            $h = 1200;
+            $img = imagecreatetruecolor($w, $h);
+            imagefilledrectangle($img, 0, 0, $w - 1, $h - 1, imagecolorallocate($img, 32, 32, 32));
+            imagefilledrectangle($img, 300, 500, 500, 700, imagecolorallocate($img, 255, 255, 255));
+            imagefilledrectangle($img, 300, 520, 500, 524, imagecolorallocate($img, 0, 0, 0));
+            ob_start();
+            imagepng($img);
+            $pngData = ob_get_clean();
+            imagedestroy($img);
+            Storage::disk('public')->put("templates/{$slug}.png", $pngData);
+
+            $template = Template::create([
+                'name' => "Template {$slug}",
+                'slug' => $slug,
+                'template_file' => "templates/{$slug}.png",
+                'canvas_width' => $w,
+                'canvas_height' => $h,
+                'frame_count' => 1,
+                'frame_configuration' => [[
+                    'id' => 1,
+                    'order' => 0,
+                    'x' => 300,
+                    'y' => 500,
+                    'width' => 200,
+                    'height' => 200,
+                    'rotation' => 0,
+                    'flip_h' => false,
+                    'flip_v' => false,
+                    'clear_zone' => 50,
+                    'clear_expansion' => 100,
+                    'region_sensitivity' => 50,
+                    'min_region_size' => 1,
+                    'edge_protection' => 0,
+                    'feather' => 0,
+                    'edge_cleanup' => $cleanup,
+                    'protected_areas' => $prot,
+                    'remove_areas' => [],
+                ]],
+                'status' => 'active',
+            ]);
+
+            // Foto capture: merah solid
+            $photo = imagecreatetruecolor(200, 200);
+            imagefilledrectangle($photo, 0, 0, 199, 199, imagecolorallocate($photo, 255, 0, 0));
+            ob_start();
+            imagejpeg($photo, null, 95);
+            $photoData = ob_get_clean();
+            imagedestroy($photo);
+            $photoBase64 = 'data:image/jpeg;base64,' . base64_encode($photoData);
+
+            $session = $this->postJson('/api/sessions', [
+                'template_id' => $template->id,
+            ], $this->headers())->json('data');
+
+            $this->postJson("/api/sessions/{$session['id']}/capture", [
+                'image_base64' => $photoBase64,
+            ], $this->headers())
+                ->assertOk()
+                ->assertJsonPath('data.all_done', true);
+
+            $response = $this->postJson("/api/sessions/{$session['id']}/complete", [], $this->headers());
+            $response->assertOk();
+
+            $finalPath = Storage::disk('public')->path($response->json('data.photo.storage_path'));
+            $final = imagecreatefromjpeg($finalPath);
+
+            $c = imagecolorat($final, 400, 522);
+            $r = ($c >> 16) & 0xFF;
+
+            if ($cleanup === 0) {
+                // Tanpa cleanup: garis tipis tetap terlihat sebagai desain
+                $this->assertLessThan(100, $r, "Garis tipis harus tetap ada tanpa Edge Cleanup ({$slug})");
+            } else {
+                // Dengan cleanup: garis tertelan boundary mask -> foto terlihat
+                $this->assertGreaterThan(180, $r, "Edge Cleanup harus mengikis garis tipis ({$slug})");
+
+                // Segmen garis di dalam Protect Area: tetap desain
+                $cp = imagecolorat($final, 325, 522);
+                $this->assertLessThan(100, ($cp >> 16) & 0xFF, "Protect Area tidak boleh ter-cleanup ({$slug})");
+            }
+
+            imagedestroy($final);
+        }
+    }
+
     public function test_cancel_menghapus_sesi_dan_file_temporary(): void
     {
         $template = $this->makeTemplate();
