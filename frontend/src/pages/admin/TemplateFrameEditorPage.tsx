@@ -1207,36 +1207,39 @@ ctx.restore()
         <div className="w-80 shrink-0 overflow-y-auto pr-1 space-y-4">
           {/* Frames */}
           <section className="bg-pb-surface border border-pb-border rounded-xl p-4">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-pb-text text-sm font-semibold">Camera Frames ({frames.length})</h3>
-              <div className="flex items-center gap-1.5">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={undo}
-                  disabled={historyRef.current.length === 0}
-                  leftIcon={<Undo2 size={14} />}
-                >
-                  Undo
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={redo}
-                  disabled={redoRef.current.length === 0}
-                  leftIcon={<Redo2 size={14} />}
-                >
-                  Redo
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={addFrame}
-                  leftIcon={<Plus size={14} />}
-                >
-                  Add
-                </Button>
-              </div>
+            <h3 className="text-pb-text text-sm font-semibold mb-2">
+              Camera Frames ({frames.length})
+            </h3>
+            <div className="grid grid-cols-3 gap-1.5 mb-2">
+              <Button
+                variant="outline"
+                size="sm"
+                fullWidth
+                onClick={undo}
+                disabled={historyRef.current.length === 0}
+                leftIcon={<Undo2 size={14} />}
+              >
+                Undo
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                fullWidth
+                onClick={redo}
+                disabled={redoRef.current.length === 0}
+                leftIcon={<Redo2 size={14} />}
+              >
+                Redo
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                fullWidth
+                onClick={addFrame}
+                leftIcon={<Plus size={14} />}
+              >
+                Add
+              </Button>
             </div>
             <p className="text-[10px] text-pb-text-muted mb-2 leading-relaxed">
               Ctrl+Z undo · Ctrl+Y redo · Ctrl+C copy · Ctrl+V paste · Ctrl+D duplikat · Backspace hapus
