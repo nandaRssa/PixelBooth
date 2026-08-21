@@ -19,6 +19,7 @@ import { toast } from '@/components/ui/Toast'
 import { sessionApi } from '@/api/sessions'
 import { useFolders } from '@/hooks/useFolders'
 import { resolvePreviewSlots } from '@/utils/previewSlots'
+import { buildTemplateOverlay } from '@/utils/templateOverlay'
 import type { PhotoSession } from '@/types'
 
 // ==========================================
@@ -70,6 +71,31 @@ const PhotoCapturePage: React.FC = () => {
     const idx = (session?.current_frame ?? 1) - 1
     return previewSlots[Math.min(Math.max(idx, 0), previewSlots.length - 1)] ?? null
   }, [previewSlots, session?.current_frame])
+
+  // ===== Overlay template (desain di atas kamera, lubang foto transparan) =====
+  const [overlayUrl, setOverlayUrl] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    const tpl = session?.template
+    if (!tpl || !tpl.template_url || previewSlots.length === 0) {
+      setOverlayUrl(null)
+      return
+    }
+
+    buildTemplateOverlay(tpl.template_url, previewSlots, tpl.canvas_width, tpl.canvas_height)
+      .then((url) => {
+        if (!cancelled) setOverlayUrl(url)
+      })
+      .catch(() => {
+        // Gagal membangun overlay -> fallback ke template mentah
+        if (!cancelled) setOverlayUrl(null)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [session?.template, previewSlots])
 
   // ===== Muat sesi =====
   useEffect(() => {
@@ -429,86 +455,100 @@ const PhotoCapturePage: React.FC = () => {
               maxHeight: '78vh',
             }}
           >
-            {/* Video utama: sumber capture, tertutup overlay template */}
+            {/* Video utama: sumber capture — selalu tersembunyi.
+                Kamera selama sesi hanya tampil di dalam bingkai foto. */}
             <video
               ref={videoRef}
               playsInline
               muted
               autoPlay
               className="absolute inset-0 w-full h-full object-cover -scale-x-100"
-              style={{ filter: 'brightness(1.45) contrast(1.1) saturate(1.1)' }}
+              style={{
+                filter: 'brightness(1.45) contrast(1.1) saturate(1.1)',
+                opacity: previewSlots.length === 0 ? 1 : 0,
+              }}
             />
 
-            {template && template.template_url ? (
-              <>
-                {/* Template sebagai dasar desain */}
-                <img
-                  src={template.template_url}
-                  alt={template.name}
-                  draggable={false}
-                  className="absolute inset-0 w-full h-full object-fill pointer-events-none select-none"
-                />
+            {/* Template mentah (fallback): ditaruh di BAWAH kamera slot */}
+            {!overlayUrl && template && template.template_url && (
+              <img
+                src={template.template_url}
+                alt={template.name}
+                draggable={false}
+                className="absolute inset-0 w-full h-full object-fill pointer-events-none select-none"
+              />
+            )}
 
-                {/* Kamera di dalam tiap slot foto */}
-                {previewSlots.length > 0 && !(phase === 'captured' && capturedUrl) && (
-                  <div className="absolute inset-0 pointer-events-none">
-                    {previewSlots.map((slot, i) => (
-                      <div
-                        key={i}
-                        className="absolute"
-                        style={{
-                          left: `${(slot.x / template.canvas_width) * 100}%`,
-                          top: `${(slot.y / template.canvas_height) * 100}%`,
-                          width: `${(slot.width / template.canvas_width) * 100}%`,
-                          height: `${(slot.height / template.canvas_height) * 100}%`,
+            {/* Kamera di dalam tiap slot bingkai */}
+            {previewSlots.length > 0 && template && !(phase === 'captured' && capturedUrl) && (
+              <div className="absolute inset-0 pointer-events-none">
+                {previewSlots.map((slot, i) => (
+                  <div
+                    key={i}
+                    className="absolute"
+                    style={{
+                      left: `${(slot.x / template.canvas_width) * 100}%`,
+                      top: `${(slot.y / template.canvas_height) * 100}%`,
+                      width: `${(slot.width / template.canvas_width) * 100}%`,
+                      height: `${(slot.height / template.canvas_height) * 100}%`,
+                    }}
+                  >
+                    {cameraActive ? (
+                      <video
+                        ref={(el) => {
+                          slotVideoRefs.current[i] = el
                         }}
-                      >
-                        {cameraActive ? (
-                          <video
-                            ref={(el) => {
-                              slotVideoRefs.current[i] = el
-                            }}
-                            playsInline
-                            muted
-                            autoPlay
-                            className="w-full h-full object-cover -scale-x-100"
-                            style={{ filter: 'brightness(1.45) contrast(1.1) saturate(1.1)' }}
-                          />
-                        ) : (
-                          <div className="w-full h-full bg-[#0A0A0A]" />
-                        )}
-                      </div>
-                    ))}
+                        playsInline
+                        muted
+                        autoPlay
+                        className="w-full h-full object-cover -scale-x-100"
+                        style={{ filter: 'brightness(1.45) contrast(1.1) saturate(1.1)' }}
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-[#0A0A0A]" />
+                    )}
                   </div>
-                )}
+                ))}
+              </div>
+            )}
 
-                {/* Hasil capture tampil di dalam slot (preview final sesuai render) */}
-                {phase === 'captured' && capturedUrl && (
-                  <div className="absolute inset-0 pointer-events-none">
-                    {previewSlots.map((slot, i) => (
-                      <div
-                        key={i}
-                        className="absolute overflow-hidden"
-                        style={{
-                          left: `${(slot.x / template.canvas_width) * 100}%`,
-                          top: `${(slot.y / template.canvas_height) * 100}%`,
-                          width: `${(slot.width / template.canvas_width) * 100}%`,
-                          height: `${(slot.height / template.canvas_height) * 100}%`,
-                        }}
-                      >
-                        <img
-                          src={capturedUrl}
-                          alt="Frame"
-                          className="w-full h-full object-cover"
-                        />
-                      </div>
-                    ))}
+            {/* Hasil capture tampil di dalam slot (preview final) */}
+            {phase === 'captured' && capturedUrl && template && (
+              <div className="absolute inset-0 pointer-events-none">
+                {previewSlots.map((slot, i) => (
+                  <div
+                    key={i}
+                    className="absolute overflow-hidden"
+                    style={{
+                      left: `${(slot.x / template.canvas_width) * 100}%`,
+                      top: `${(slot.y / template.canvas_height) * 100}%`,
+                      width: `${(slot.width / template.canvas_width) * 100}%`,
+                      height: `${(slot.height / template.canvas_height) * 100}%`,
+                    }}
+                  >
+                    <img
+                      src={capturedUrl}
+                      alt="Frame"
+                      className="w-full h-full object-cover"
+                    />
                   </div>
-                )}
-              </>
-            ) : (
+                ))}
+              </div>
+            )}
+
+            {/* Overlay terproses: desain template DI ATAS kamera (lubang foto transparan) */}
+            {overlayUrl && (
+              <img
+                src={overlayUrl}
+                alt={template?.name ?? 'Template'}
+                draggable={false}
+                className="absolute inset-0 w-full h-full object-fill pointer-events-none select-none"
+              />
+            )}
+
+            {/* Fallback darurat tanpa template: kamera penuh + bingkai */}
+            {previewSlots.length === 0 && (
               <>
-                {/* Tanpa gambar template: preview polos */}
                 <div className="absolute inset-4 border-2 border-white/20 rounded-xl pointer-events-none" />
                 {capturedUrl && phase === 'captured' && (
                   <img

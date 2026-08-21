@@ -1,77 +1,59 @@
 // ==========================================
 // PIXELBOOTH — Template Overlay Builder
-// Membangun layer desain dengan LUBANG mask kamera hasil konfigurasi
-// frame manual user (Hard Clear Zone + Connected Region Clearing).
-// Desain ditaruh DI ATAS kamera; hanya area clear yang transparan —
-// elemen desain di perifer otomatis dipertahankan.
+// Membuat versi template yang area placeholder fotonya (putih) dibuat
+// transparan, sehingga saat ditaruh DI ATAS video kamera, desain template
+// (termasuk elemen yang menimpa bingkai) tetap terlihat di atas foto/kamera —
+// persis seperti hasil render final PhotoRenderService.
 // ==========================================
 
-import type { CameraFrame } from '@/types'
-import { computeHoleMask, downscaleTemplate, type WorkTemplate } from './frameMask'
+import type { PreviewSlot } from './previewSlots'
 
-/** Muat gambar dan tunggu sampai siap. */
-export function loadImage(src: string): Promise<HTMLImageElement> {
-  return new Promise((resolve, reject) => {
-    const img = new Image()
-    img.crossOrigin = 'anonymous'
-    img.onload = () => resolve(img)
-    img.onerror = () => reject(new Error('Gagal memuat gambar template'))
-    img.src = src
-  })
-}
+const PLACEHOLDER_MIN = 218
+const PLACEHOLDER_SATURATION = 40
 
-/**
- * Bangun canvas desain (canvasW x canvasH) dengan lubang mask per frame.
- * Caller menggambar canvas ini DI ATAS video/foto kamera.
- */
-export function buildOverlayCanvas(
-  templateImg: HTMLImageElement,
-  frames: CameraFrame[],
-  canvasW: number,
-  canvasH: number,
-  work?: WorkTemplate
-): HTMLCanvasElement {
-  const canvas = document.createElement('canvas')
-  canvas.width = canvasW
-  canvas.height = canvasH
-  const ctx = canvas.getContext('2d')
-  if (!ctx) throw new Error('Canvas tidak tersedia')
-
-  // Regangkan template ke ukuran canvas, sama seperti PhotoRenderService
-  ctx.drawImage(templateImg, 0, 0, canvasW, canvasH)
-
-  if (frames.length === 0) return canvas
-
-  const wt = work ?? downscaleTemplate(templateImg, canvasW, canvasH)
-  const tmp = document.createElement('canvas')
-  const tmpCtx = tmp.getContext('2d')
-  if (!tmpCtx) throw new Error('Canvas tidak tersedia')
-
-  ctx.globalCompositeOperation = 'destination-out'
-  for (const frame of frames) {
-    const mask = computeHoleMask(wt, frame)
-    if (!mask) continue
-
-    tmp.width = mask.imageData.width
-    tmp.height = mask.imageData.height
-    tmpCtx.putImageData(mask.imageData, 0, 0)
-
-    // bx/by/bw/bh sudah koordinat canvas — drawImage sekaligus meng-upscale
-    // imageData ruang kerja ke ukuran canvas. Jangan konversi kedua kali.
-    ctx.drawImage(tmp, mask.bx, mask.by, mask.bw, mask.bh)
-  }
-  ctx.globalCompositeOperation = 'source-over'
-
-  return canvas
-}
-
-/** Versi dataURL (untuk <img> overlay di PhotoCapturePage). */
 export async function buildTemplateOverlay(
   templateUrl: string,
-  frames: CameraFrame[],
+  slots: PreviewSlot[],
   canvasWidth: number,
   canvasHeight: number
 ): Promise<string> {
-  const img = await loadImage(templateUrl)
-  return buildOverlayCanvas(img, frames, canvasWidth, canvasHeight).toDataURL('image/png')
+  const img = new Image()
+  img.src = templateUrl
+  await new Promise<void>((resolve, reject) => {
+    img.onload = () => resolve()
+    img.onerror = () => reject(new Error('Gagal memuat gambar template'))
+  })
+
+  const canvas = document.createElement('canvas')
+  canvas.width = canvasWidth
+  canvas.height = canvasHeight
+  const ctx = canvas.getContext('2d')
+  if (!ctx) throw new Error('Canvas tidak tersedia')
+
+  // Regangkan template ke ukuran canvas, sama seperti PhotoRenderService::drawBase
+  ctx.drawImage(img, 0, 0, canvasWidth, canvasHeight)
+
+  for (const slot of slots) {
+    const x = Math.max(0, Math.round(slot.x))
+    const y = Math.max(0, Math.round(slot.y))
+    const w = Math.min(canvasWidth - x, Math.round(slot.width))
+    const h = Math.min(canvasHeight - y, Math.round(slot.height))
+    if (w <= 0 || h <= 0) continue
+
+    const imageData = ctx.getImageData(x, y, w, h)
+    const data = imageData.data
+    for (let i = 0; i < data.length; i += 4) {
+      const r = data[i]
+      const g = data[i + 1]
+      const b = data[i + 2]
+      const min = Math.min(r, g, b)
+      const max = Math.max(r, g, b)
+      if (min > PLACEHOLDER_MIN && max - min < PLACEHOLDER_SATURATION) {
+        data[i + 3] = 0
+      }
+    }
+    ctx.putImageData(imageData, x, y)
+  }
+
+  return canvas.toDataURL('image/png')
 }
