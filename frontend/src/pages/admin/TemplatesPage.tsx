@@ -124,8 +124,8 @@ const TemplatesPage: React.FC = () => {
       {/* ===== Header ===== */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-white text-2xl font-bold">Kelola Template</h1>
-          <p className="text-[#606060] text-sm mt-1">
+          <h1 className="text-pb-text text-2xl font-bold">Kelola Template</h1>
+          <p className="text-pb-text-muted text-sm mt-1">
             Upload → Frame Editor → Test Camera → Confirm → Siap dipakai
           </p>
         </div>
@@ -146,20 +146,20 @@ const TemplatesPage: React.FC = () => {
           { label: 'Ukuran Canvas', value: 'Bebas (pixel based)' },
           { label: 'Alur Wajib', value: 'Confirm Frame Editor sebelum sesi' },
         ].map((info) => (
-          <div key={info.label} className="bg-[#141414] border border-[#2A2A2A] rounded-xl px-4 py-4">
-            <p className="text-[#606060] text-xs mb-1">{info.label}</p>
-            <p className="text-white text-sm font-medium">{info.value}</p>
+          <div key={info.label} className="bg-pb-surface border border-pb-border rounded-xl px-4 py-4">
+            <p className="text-pb-text-muted text-xs mb-1">{info.label}</p>
+            <p className="text-pb-text text-sm font-medium">{info.value}</p>
           </div>
         ))}
       </div>
 
       {/* ===== Template List ===== */}
       {templatesQuery.isLoading ? (
-        <div className="flex items-center justify-center py-20 bg-[#141414] border border-[#2A2A2A] rounded-2xl">
-          <Spinner size="lg" className="text-white" />
+        <div className="flex items-center justify-center py-20 bg-pb-surface border border-pb-border rounded-2xl">
+          <Spinner size="lg" className="text-pb-text" />
         </div>
       ) : templates.length === 0 ? (
-        <div className="bg-[#141414] border border-[#2A2A2A] rounded-2xl">
+        <div className="bg-pb-surface border border-pb-border rounded-2xl">
           <EmptyState
             icon={<Layers size={48} />}
             title="Belum ada template"
@@ -178,8 +178,8 @@ const TemplatesPage: React.FC = () => {
               key={template.id}
               initial={{ opacity: 0, scale: 0.97 }}
               animate={{ opacity: 1, scale: 1 }}
-              className={`group relative aspect-[3/4] bg-[#141414] border rounded-xl overflow-hidden ${
-                template.status === 'draft' ? 'border-amber-500/40' : 'border-[#2A2A2A]'
+              className={`group relative aspect-[3/4] bg-pb-surface border rounded-xl overflow-hidden ${
+                template.status === 'draft' ? 'border-amber-500/40' : 'border-pb-border'
               }`}
             >
               {template.preview_url ? (
@@ -197,8 +197,8 @@ const TemplatesPage: React.FC = () => {
                   className={`absolute inset-0 w-full h-full object-cover opacity-40 ${template.status === 'draft' ? 'opacity-25' : ''}`}
                 />
               ) : (
-                <div className="absolute inset-0 flex items-center justify-center bg-[#1A1A1A]">
-                  <ImageIcon size={32} className="text-[#333]" />
+                <div className="absolute inset-0 flex items-center justify-center bg-pb-elevated">
+                  <ImageIcon size={32} className="text-pb-faint" />
                 </div>
               )}
 
@@ -209,7 +209,7 @@ const TemplatesPage: React.FC = () => {
                   Perlu Konfigurasi
                 </span>
               ) : (
-                <span className="absolute top-2 right-2 px-2 py-0.5 rounded-md bg-black/60 backdrop-blur-sm text-white text-xs font-medium">
+                <span className="absolute top-2 right-2 px-2 py-0.5 rounded-md bg-black/60 backdrop-blur-sm text-pb-text text-xs font-medium">
                   {template.frame_count} frame
                 </span>
               )}
@@ -218,7 +218,7 @@ const TemplatesPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => navigate(`/templates/${template.id}/editor`)}
-                  className="w-8 h-8 rounded-lg bg-black/60 backdrop-blur-sm text-[#A0A0A0] hover:text-cyan-400 hover:bg-black/80 transition-colors flex items-center justify-center"
+                  className="w-8 h-8 rounded-lg bg-black/60 backdrop-blur-sm text-pb-text-secondary hover:text-cyan-400 hover:bg-black/80 transition-colors flex items-center justify-center"
                   title="Buka Frame Editor"
                 >
                   <SlidersHorizontal size={14} />
@@ -226,7 +226,7 @@ const TemplatesPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setDeleteTarget(template)}
-                  className="w-8 h-8 rounded-lg bg-black/60 backdrop-blur-sm text-[#A0A0A0] hover:text-red-400 hover:bg-black/80 transition-colors flex items-center justify-center"
+                  className="w-8 h-8 rounded-lg bg-black/60 backdrop-blur-sm text-pb-text-secondary hover:text-red-400 hover:bg-black/80 transition-colors flex items-center justify-center"
                   title="Hapus Template"
                 >
                   <Trash2 size={14} />
@@ -234,8 +234,8 @@ const TemplatesPage: React.FC = () => {
               </div>
 
               <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/90 to-transparent">
-                <p className="text-white text-sm font-medium truncate">{template.name}</p>
-                <p className="text-[#A0A0A0] text-xs">
+                <p className="text-pb-text text-sm font-medium truncate">{template.name}</p>
+                <p className="text-pb-text-secondary text-xs">
                   {template.canvas_width} x {template.canvas_height}
                 </p>
                 {template.status === 'draft' && (
@@ -261,21 +261,21 @@ const TemplatesPage: React.FC = () => {
         <div className="space-y-4">
           {/* Nama */}
           <div>
-            <label className="block text-[#A0A0A0] text-xs font-medium mb-1.5">Nama Template</label>
+            <label className="block text-pb-text-secondary text-xs font-medium mb-1.5">Nama Template</label>
             <input
               type="text"
               value={form.name}
               onChange={(e) => setField('name', e.target.value)}
               placeholder="Contoh: Classic Strip 3 Frame"
-              className="w-full bg-[#0A0A0A] border border-[#2A2A2A] rounded-lg px-4 py-2.5
-                text-white text-sm placeholder:text-[#404040]
-                focus:outline-none focus:ring-1 focus:border-[#404040] focus:ring-white/10 transition-colors"
+              className="w-full bg-pb-bg border border-pb-border rounded-lg px-4 py-2.5
+                text-pb-text text-sm placeholder:text-pb-faint
+                focus:outline-none focus:ring-1 focus:border-pb-border-strong focus:ring-white/10 transition-colors"
             />
           </div>
 
           {/* File Template */}
           <div>
-            <label className="block text-[#A0A0A0] text-xs font-medium mb-1.5">
+            <label className="block text-pb-text-secondary text-xs font-medium mb-1.5">
               File Template <span className="text-red-400">*</span>
             </label>
             <input
@@ -288,14 +288,14 @@ const TemplatesPage: React.FC = () => {
             <button
               type="button"
               onClick={() => templateInputRef.current?.click()}
-              className="w-full flex items-center justify-center gap-2 border border-dashed border-[#2A2A2A] rounded-lg px-4 py-6
-                text-[#A0A0A0] hover:text-white hover:border-[#404040] hover:bg-white/5 transition-colors"
+              className="w-full flex items-center justify-center gap-2 border border-dashed border-pb-border rounded-lg px-4 py-6
+                text-pb-text-secondary hover:text-pb-text hover:border-pb-border-strong hover:bg-pb-elevated transition-colors"
             >
               {templateFile ? (
                 <>
                   <FileImage size={18} className="text-green-400" />
                   <span className="text-sm">{templateFile.name}</span>
-                  <span className="text-xs text-[#606060]">
+                  <span className="text-xs text-pb-text-muted">
                     ({(templateFile.size / 1024 / 1024).toFixed(1)} MB)
                   </span>
                 </>
@@ -310,7 +310,7 @@ const TemplatesPage: React.FC = () => {
 
           {/* File Preview (opsional) */}
           <div>
-            <label className="block text-[#A0A0A0] text-xs font-medium mb-1.5">Preview (opsional)</label>
+            <label className="block text-pb-text-secondary text-xs font-medium mb-1.5">Preview (opsional)</label>
             <input
               ref={previewInputRef}
               type="file"
@@ -321,8 +321,8 @@ const TemplatesPage: React.FC = () => {
             <button
               type="button"
               onClick={() => previewInputRef.current?.click()}
-              className="w-full flex items-center gap-2 border border-[#2A2A2A] rounded-lg px-4 py-3
-                text-[#A0A0A0] hover:text-white hover:border-[#404040] hover:bg-white/5 transition-colors"
+              className="w-full flex items-center gap-2 border border-pb-border rounded-lg px-4 py-3
+                text-pb-text-secondary hover:text-pb-text hover:border-pb-border-strong hover:bg-pb-elevated transition-colors"
             >
               {previewFile ? (
                 <>
@@ -333,7 +333,7 @@ const TemplatesPage: React.FC = () => {
                       e.stopPropagation()
                       setPreviewFile(null)
                     }}
-                    className="ml-auto text-[#606060] hover:text-red-400"
+                    className="ml-auto text-pb-text-muted hover:text-red-400"
                   >
                     <X size={14} />
                   </span>
@@ -350,37 +350,37 @@ const TemplatesPage: React.FC = () => {
           {/* Dimensi */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-[#A0A0A0] text-xs font-medium mb-1.5">Lebar (px)</label>
+              <label className="block text-pb-text-secondary text-xs font-medium mb-1.5">Lebar (px)</label>
               <input
                 type="number"
                 value={form.canvas_width}
                 onChange={(e) => setField('canvas_width', e.target.value)}
                 min={100}
-                className="w-full bg-[#0A0A0A] border border-[#2A2A2A] rounded-lg px-3 py-2.5
-                  text-white text-sm focus:outline-none focus:ring-1 focus:border-[#404040] focus:ring-white/10"
+                className="w-full bg-pb-bg border border-pb-border rounded-lg px-3 py-2.5
+                  text-pb-text text-sm focus:outline-none focus:ring-1 focus:border-pb-border-strong focus:ring-white/10"
               />
             </div>
             <div>
-              <label className="block text-[#A0A0A0] text-xs font-medium mb-1.5">Tinggi (px)</label>
+              <label className="block text-pb-text-secondary text-xs font-medium mb-1.5">Tinggi (px)</label>
               <input
                 type="number"
                 value={form.canvas_height}
                 onChange={(e) => setField('canvas_height', e.target.value)}
                 min={100}
-                className="w-full bg-[#0A0A0A] border border-[#2A2A2A] rounded-lg px-3 py-2.5
-                  text-white text-sm focus:outline-none focus:ring-1 focus:border-[#404040] focus:ring-white/10"
+                className="w-full bg-pb-bg border border-pb-border rounded-lg px-3 py-2.5
+                  text-pb-text text-sm focus:outline-none focus:ring-1 focus:border-pb-border-strong focus:ring-white/10"
               />
             </div>
           </div>
 
-          <div className="flex items-start gap-2 bg-[#0E0E0E] border border-[#2A2A2A] rounded-lg px-3 py-2.5">
+          <div className="flex items-start gap-2 bg-pb-bg border border-pb-border rounded-lg px-3 py-2.5">
             <SlidersHorizontal size={15} className="text-cyan-400 mt-0.5 shrink-0" />
-            <p className="text-[#A0A0A0] text-xs leading-relaxed">
+            <p className="text-pb-text-secondary text-xs leading-relaxed">
               Setelah upload, kamu langsung diarahkan ke{' '}
-              <span className="text-white">Frame Editor</span> untuk menentukan posisi kamera secara
+              <span className="text-pb-text">Frame Editor</span> untuk menentukan posisi kamera secara
               manual: tambah frame, geser, resize, rotasi, flip, atur masking, lalu{' '}
-              <span className="text-white">Test Camera</span> dan{' '}
-              <span className="text-white">Confirm Template</span>. Template baru berstatus{' '}
+              <span className="text-pb-text">Test Camera</span> dan{' '}
+              <span className="text-pb-text">Confirm Template</span>. Template baru berstatus{' '}
               <span className="text-amber-400">Draft</span> dan belum bisa dipakai Photo Session
               sebelum dikonfirmasi.
             </p>

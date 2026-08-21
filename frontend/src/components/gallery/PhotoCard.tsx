@@ -40,13 +40,13 @@ const PhotoCard: React.FC<PhotoCardProps> = ({
       initial={{ opacity: 0, scale: 0.96 }}
       animate={{ opacity: 1, scale: 1 }}
       className={`
-        group relative aspect-square bg-[#141414] border rounded-xl overflow-hidden cursor-pointer
+        group relative aspect-square bg-pb-surface border rounded-xl overflow-hidden cursor-pointer
         transition-colors duration-150
         ${selectionMode
           ? isSelected
             ? 'border-white ring-2 ring-white/30'
-            : 'border-[#2A2A2A]'
-          : 'border-[#2A2A2A]'
+            : 'border-pb-border'
+          : 'border-pb-border'
         }
       `}
       onClick={handleClick}
@@ -61,8 +61,8 @@ const PhotoCard: React.FC<PhotoCardProps> = ({
           }`}
         />
       ) : (
-        <div className="absolute inset-0 flex items-center justify-center bg-[#1A1A1A]">
-          <ImageIcon size={28} className="text-[#333]" />
+        <div className="absolute inset-0 flex items-center justify-center bg-pb-elevated">
+          <ImageIcon size={28} className="text-pb-faint" />
         </div>
       )}
 
@@ -86,7 +86,7 @@ const PhotoCard: React.FC<PhotoCardProps> = ({
                   onPreview(photo)
                 }}
                 className="flex-1 flex items-center justify-center gap-1.5 px-2 py-2 rounded-lg
-                  bg-white/10 backdrop-blur-sm text-white text-xs font-medium
+                  bg-white/10 backdrop-blur-sm text-pb-text text-xs font-medium
                   hover:bg-white/20 transition-colors"
               >
                 <Eye size={13} />
@@ -99,7 +99,7 @@ const PhotoCard: React.FC<PhotoCardProps> = ({
                   onMove(photo)
                 }}
                 className="flex-1 flex items-center justify-center gap-1.5 px-2 py-2 rounded-lg
-                  bg-white/10 backdrop-blur-sm text-white text-xs font-medium
+                  bg-white/10 backdrop-blur-sm text-pb-text text-xs font-medium
                   hover:bg-white/20 transition-colors"
               >
                 <FolderInput size={13} />

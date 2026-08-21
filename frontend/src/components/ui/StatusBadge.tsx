@@ -18,8 +18,8 @@ const statusConfig: Record<CameraStatus, { label: string; dotClass: string; text
   },
   disconnected: {
     label: 'Kamera Tidak Terhubung',
-    dotClass: 'bg-[#606060]',
-    textClass: 'text-[#606060]',
+    dotClass: 'bg-pb-text-muted',
+    textClass: 'text-pb-text-muted',
   },
   error: {
     label: 'Error Kamera',
@@ -33,8 +33,8 @@ const statusConfig: Record<CameraStatus, { label: string; dotClass: string; text
   },
   checking: {
     label: 'Memeriksa Kamera...',
-    dotClass: 'bg-[#A0A0A0] animate-pulse',
-    textClass: 'text-[#A0A0A0]',
+    dotClass: 'bg-pb-text-secondary animate-pulse',
+    textClass: 'text-pb-text-secondary',
   },
 }
 
@@ -66,7 +66,7 @@ const badgeVariants = {
   success: 'bg-green-500/10 text-green-400 border border-green-500/20',
   error: 'bg-red-500/10 text-red-400 border border-red-500/20',
   warning: 'bg-amber-500/10 text-amber-400 border border-amber-500/20',
-  neutral: 'bg-[#1E1E1E] text-[#A0A0A0] border border-[#2A2A2A]',
+  neutral: 'bg-pb-elevated text-pb-text-secondary border border-pb-border',
   info: 'bg-blue-500/10 text-blue-400 border border-blue-500/20',
 }
 
@@ -109,8 +109,8 @@ interface LoadingOverlayProps {
 
 export const LoadingOverlay: React.FC<LoadingOverlayProps> = ({ message = 'Memuat...' }) => (
   <div className="absolute inset-0 bg-black/60 backdrop-blur-sm flex flex-col items-center justify-center z-30 rounded-xl">
-    <Spinner size="lg" className="text-white mb-3" />
-    <p className="text-[#A0A0A0] text-sm">{message}</p>
+    <Spinner size="lg" className="text-pb-text mb-3" />
+    <p className="text-pb-text-secondary text-sm">{message}</p>
   </div>
 )
 
@@ -132,10 +132,10 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
   action,
 }) => (
   <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
-    {icon && <div className="text-[#333] mb-4">{icon}</div>}
-    <h3 className="text-white font-medium text-base mb-1">{title}</h3>
+    {icon && <div className="text-pb-faint mb-4">{icon}</div>}
+    <h3 className="text-pb-text font-medium text-base mb-1">{title}</h3>
     {description && (
-      <p className="text-[#606060] text-sm leading-relaxed mb-6 max-w-xs">{description}</p>
+      <p className="text-pb-text-muted text-sm leading-relaxed mb-6 max-w-xs">{description}</p>
     )}
     {action}
   </div>

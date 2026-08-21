@@ -79,9 +79,9 @@ const App: React.FC = () => {
               <Route path="/templates" element={<TemplatesPage />} />
               <Route path="/templates/:id/editor" element={<TemplateFrameEditorPage />} />
               <Route path="/settings" element={
-                <div className="text-white">
+                <div className="text-pb-text">
                   <h1 className="text-2xl font-bold mb-2">Pengaturan</h1>
-                  <p className="text-[#606060]">Fitur akan tersedia di fase berikutnya.</p>
+                  <p className="text-pb-text-muted">Fitur akan tersedia di fase berikutnya.</p>
                 </div>
               } />
             </Route>

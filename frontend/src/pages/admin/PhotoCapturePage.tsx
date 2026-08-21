@@ -376,7 +376,7 @@ const PhotoCapturePage: React.FC = () => {
   if (status === 'loading') {
     return (
       <div className="flex items-center justify-center py-20">
-        <Spinner size="lg" className="text-white" />
+        <Spinner size="lg" className="text-pb-text" />
       </div>
     )
   }
@@ -384,10 +384,10 @@ const PhotoCapturePage: React.FC = () => {
   // ===== Error =====
   if (status === 'error' || !session) {
     return (
-      <div className="bg-[#141414] border border-[#2A2A2A] rounded-2xl p-10 text-center max-w-md mx-auto">
-        <ImageIcon size={40} className="text-[#333] mx-auto mb-3" />
-        <h2 className="text-white font-semibold text-base mb-2">Sesi tidak ditemukan</h2>
-        <p className="text-[#606060] text-sm mb-6">
+      <div className="bg-pb-surface border border-pb-border rounded-2xl p-10 text-center max-w-md mx-auto">
+        <ImageIcon size={40} className="text-pb-faint mx-auto mb-3" />
+        <h2 className="text-pb-text font-semibold text-base mb-2">Sesi tidak ditemukan</h2>
+        <p className="text-pb-text-muted text-sm mb-6">
           Sesi mungkin telah berakhir atau dihapus.
         </p>
         <Button variant="secondary" size="md" onClick={() => navigate('/photo')}>
@@ -403,25 +403,25 @@ const PhotoCapturePage: React.FC = () => {
       <div>
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-white text-2xl font-bold">Sesi Selesai</h1>
-            <p className="text-[#606060] text-sm mt-1">Foto tersimpan di galeri.</p>
+            <h1 className="text-pb-text text-2xl font-bold">Sesi Selesai</h1>
+            <p className="text-pb-text-muted text-sm mt-1">Foto tersimpan di galeri.</p>
           </div>
         </div>
 
-        <div className="bg-[#141414] border border-[#2A2A2A] rounded-2xl p-8 flex flex-col items-center text-center">
+        <div className="bg-pb-surface border border-pb-border rounded-2xl p-8 flex flex-col items-center text-center">
           {resultPhoto.url ? (
             <img
               src={resultPhoto.url}
               alt="Foto final"
-              className="max-h-80 w-auto max-w-full rounded-xl mb-5 border border-[#2A2A2A]"
+              className="max-h-80 w-auto max-w-full rounded-xl mb-5 border border-pb-border"
             />
           ) : (
             <div className="w-20 h-20 bg-green-500/10 border border-green-500/20 rounded-2xl flex items-center justify-center mb-4">
               <Check size={36} className="text-green-400" />
             </div>
           )}
-          <h2 className="text-white font-semibold text-lg mb-1">Sesi Selesai!</h2>
-          <p className="text-[#A0A0A0] text-sm mb-6 max-w-sm">
+          <h2 className="text-pb-text font-semibold text-lg mb-1">Sesi Selesai!</h2>
+          <p className="text-pb-text-secondary text-sm mb-6 max-w-sm">
             {totalFrames} frame telah diambil. Foto final disimpan di galeri{folderName ? ` dalam folder "${folderName}"` : ''} dan siap dibagikan via QR.
           </p>
 
@@ -446,7 +446,7 @@ const PhotoCapturePage: React.FC = () => {
                 href={resultPhoto.url}
                 download
                 className="inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium
-                  bg-white text-black hover:bg-gray-200 transition-colors"
+                  bg-pb-accent text-pb-on-accent hover:opacity-85 transition-opacity"
               >
                 <Download size={16} />
                 Download Foto
@@ -506,8 +506,8 @@ const PhotoCapturePage: React.FC = () => {
       {/* ===== Header ===== */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-white text-2xl font-bold">Sesi Foto</h1>
-          <p className="text-[#606060] text-sm mt-1">
+          <h1 className="text-pb-text text-2xl font-bold">Sesi Foto</h1>
+          <p className="text-pb-text-muted text-sm mt-1">
             {template?.name ?? 'Template'} · {totalFrames} frame
           </p>
         </div>
@@ -525,7 +525,7 @@ const PhotoCapturePage: React.FC = () => {
 
       {/* ===== Progress frame ===== */}
       <div className="flex items-center gap-3 mb-6">
-        <div className="flex-1 h-2 bg-[#1E1E1E] rounded-full overflow-hidden">
+        <div className="flex-1 h-2 bg-pb-elevated rounded-full overflow-hidden">
           <div
             className="h-full bg-white rounded-full transition-all duration-300"
             style={{
@@ -533,7 +533,7 @@ const PhotoCapturePage: React.FC = () => {
             }}
           />
         </div>
-        <span className="text-[#A0A0A0] text-sm whitespace-nowrap">
+        <span className="text-pb-text-secondary text-sm whitespace-nowrap">
           Foto {allDone ? totalFrames : activeFrameIndex + 1} / {totalFrames}
         </span>
       </div>
@@ -543,7 +543,7 @@ const PhotoCapturePage: React.FC = () => {
         {/* Video / Captured */}
         <div className="lg:col-span-2 flex justify-center">
           <div
-            className="relative bg-[#0D0D0D] border border-[#2A2A2A] rounded-2xl overflow-hidden"
+            className="relative bg-pb-bg border border-pb-border rounded-2xl overflow-hidden"
             style={{
               aspectRatio: template
                 ? `${template.canvas_width} / ${template.canvas_height}`
@@ -655,8 +655,8 @@ const PhotoCapturePage: React.FC = () => {
             {/* Kamera tidak aktif */}
             {!cameraActive && !allDone && (
               <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-6">
-                <VideoOff size={36} className="text-[#333] mb-3" />
-                <p className="text-[#A0A0A0] text-sm mb-4">Kamera tidak aktif</p>
+                <VideoOff size={36} className="text-pb-faint mb-3" />
+                <p className="text-pb-text-secondary text-sm mb-4">Kamera tidak aktif</p>
                 {cameraError && <p className="text-red-400 text-xs max-w-xs mb-4">{cameraError}</p>}
                 <Button variant="secondary" size="md" onClick={startCamera} leftIcon={<Video size={16} />}>
                   Aktifkan Kamera
@@ -680,7 +680,7 @@ const PhotoCapturePage: React.FC = () => {
                     animate={{ scale: 1, opacity: 1 }}
                     className="w-28 h-28 rounded-full bg-black/50 border border-white/40 flex items-center justify-center"
                   >
-                    <span className="text-white text-6xl font-bold">{countdown}</span>
+                    <span className="text-pb-text text-6xl font-bold">{countdown}</span>
                   </motion.div>
                 </motion.div>
               )}
@@ -689,8 +689,8 @@ const PhotoCapturePage: React.FC = () => {
             {isCapturing && (
               <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-10">
                 <div className="text-center">
-                  <Spinner size="lg" className="text-white mb-2" />
-                  <p className="text-[#A0A0A0] text-sm">Memproses foto...</p>
+                  <Spinner size="lg" className="text-pb-text mb-2" />
+                  <p className="text-pb-text-secondary text-sm">Memproses foto...</p>
                 </div>
               </div>
             )}
@@ -698,13 +698,13 @@ const PhotoCapturePage: React.FC = () => {
         </div>
 
         {/* ===== Controls ===== */}
-        <div className="bg-[#141414] border border-[#2A2A2A] rounded-2xl p-5 flex flex-col">
+        <div className="bg-pb-surface border border-pb-border rounded-2xl p-5 flex flex-col">
           {allDone ? (
             <>
-              <h3 className="text-white font-semibold text-base mb-1">
+              <h3 className="text-pb-text font-semibold text-base mb-1">
                 Semua Frame Selesai
               </h3>
-              <p className="text-[#606060] text-sm mb-6">
+              <p className="text-pb-text-muted text-sm mb-6">
                 Foto final akan di-render sesuai template dan disimpan di galeri.
               </p>
               <Button
@@ -719,10 +719,10 @@ const PhotoCapturePage: React.FC = () => {
             </>
           ) : phase === 'idle' ? (
             <>
-              <h3 className="text-white font-semibold text-base mb-1">
+              <h3 className="text-pb-text font-semibold text-base mb-1">
                 Siap untuk Foto {activeFrameIndex + 1}
               </h3>
-              <p className="text-[#606060] text-sm mb-6">
+              <p className="text-pb-text-muted text-sm mb-6">
                 Kamera sudah berada di dalam bingkai. Posisikan subjek sesuai bingkai, lalu tekan
                 tombol untuk memulai hitung mundur.
               </p>
@@ -744,10 +744,10 @@ const PhotoCapturePage: React.FC = () => {
             </>
           ) : (
             <>
-              <h3 className="text-white font-semibold text-base mb-6 text-center">
+              <h3 className="text-pb-text font-semibold text-base mb-6 text-center">
                 Hitung Mundur...
               </h3>
-              <p className="text-[#606060] text-sm text-center">
+              <p className="text-pb-text-muted text-sm text-center">
                 Siapkan pose!
               </p>
             </>
@@ -756,8 +756,8 @@ const PhotoCapturePage: React.FC = () => {
           <div className="flex-1" />
 
           {/* Status frame + retake */}
-          <div className="mt-6 pt-4 border-t border-[#2A2A2A]">
-            <p className="text-[#A0A0A0] text-xs font-medium mb-2">Status Frame</p>
+          <div className="mt-6 pt-4 border-t border-pb-border">
+            <p className="text-pb-text-secondary text-xs font-medium mb-2">Status Frame</p>
             <div className="flex flex-col gap-2">
               {Array.from({ length: totalFrames }, (_, i) => {
                 const isActive = i === activeFrameIndex && !allDone
@@ -765,7 +765,7 @@ const PhotoCapturePage: React.FC = () => {
                 return (
                   <div
                     key={i}
-                    className="flex items-center justify-between bg-[#0A0A0A] border border-[#2A2A2A] rounded-lg px-3 py-2"
+                    className="flex items-center justify-between bg-pb-bg border border-pb-border rounded-lg px-3 py-2"
                   >
                     <div className="flex items-center gap-2">
                       {isActive ? (
@@ -773,9 +773,9 @@ const PhotoCapturePage: React.FC = () => {
                       ) : hasPhoto ? (
                         <Check size={14} className="text-green-400" />
                       ) : (
-                        <span className="w-2 h-2 rounded-full bg-[#333]" />
+                        <span className="w-2 h-2 rounded-full bg-pb-border-light" />
                       )}
-                      <span className="text-white text-sm">Foto {i + 1}</span>
+                      <span className="text-pb-text text-sm">Foto {i + 1}</span>
                     </div>
                     {hasPhoto && (
                       <Button
@@ -795,15 +795,15 @@ const PhotoCapturePage: React.FC = () => {
           </div>
 
           {/* Pilihan folder penyimpanan */}
-          <div className="mt-6 pt-4 border-t border-[#2A2A2A]">
-            <label className="block text-[#A0A0A0] text-xs font-medium mb-1.5 flex items-center gap-1.5">
+          <div className="mt-6 pt-4 border-t border-pb-border">
+            <label className="block text-pb-text-secondary text-xs font-medium mb-1.5 flex items-center gap-1.5">
               <FolderPlus size={13} />
               Simpan Hasil ke Folder
             </label>
             {foldersQuery.isLoading ? (
-              <div className="flex items-center gap-2 bg-[#0A0A0A] border border-[#2A2A2A] rounded-lg px-3 py-2.5">
-                <Spinner size="sm" className="text-white" />
-                <span className="text-[#606060] text-xs">Memuat folder...</span>
+              <div className="flex items-center gap-2 bg-pb-bg border border-pb-border rounded-lg px-3 py-2.5">
+                <Spinner size="sm" className="text-pb-text" />
+                <span className="text-pb-text-muted text-xs">Memuat folder...</span>
               </div>
             ) : (
               <select
@@ -812,9 +812,9 @@ const PhotoCapturePage: React.FC = () => {
                   handleChangeFolder(e.target.value === '' ? null : Number(e.target.value))
                 }
                 disabled={isSavingFolder || allDone}
-                className="w-full bg-[#0A0A0A] border border-[#2A2A2A] rounded-lg px-3 py-2.5
-                  text-white text-sm focus:outline-none focus:ring-1 focus:border-[#404040] focus:ring-white/10
-                  disabled:opacity-50 [&>option]:bg-[#0A0A0A]"
+                className="w-full bg-pb-bg border border-pb-border rounded-lg px-3 py-2.5
+                  text-pb-text text-sm focus:outline-none focus:ring-1 focus:border-pb-border-strong focus:ring-white/10
+                  disabled:opacity-50 [&>option]:bg-pb-bg"
               >
                 <option value="">Galeri (Tanpa Folder)</option>
                 {(foldersQuery.data ?? []).map((folder) => (
@@ -833,9 +833,9 @@ const PhotoCapturePage: React.FC = () => {
 
           {/* Template info */}
           {template && (
-            <div className="mt-6 pt-4 border-t border-[#2A2A2A]">
-              <p className="text-[#606060] text-xs mb-1">Template</p>
-              <p className="text-white text-sm font-medium truncate">{template.name}</p>
+            <div className="mt-6 pt-4 border-t border-pb-border">
+              <p className="text-pb-text-muted text-xs mb-1">Template</p>
+              <p className="text-pb-text text-sm font-medium truncate">{template.name}</p>
             </div>
           )}
         </div>

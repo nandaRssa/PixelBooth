@@ -44,17 +44,17 @@ const PhotoPreviewModal: React.FC<PhotoPreviewModalProps> = ({
           >
             {/* Toolbar */}
             <div className="flex items-center justify-between mb-3">
-              <p className="text-white text-sm font-medium truncate">{photo.filename}</p>
+              <p className="text-pb-text text-sm font-medium truncate">{photo.filename}</p>
               <button
                 onClick={onClose}
-                className="touch-target w-9 h-9 rounded-lg bg-white/10 text-white hover:bg-white/20 transition-colors"
+                className="touch-target w-9 h-9 rounded-lg bg-white/10 text-pb-text hover:bg-white/20 transition-colors"
               >
                 <X size={16} />
               </button>
             </div>
 
             {/* Image */}
-            <div className="flex-1 min-h-0 bg-[#0A0A0A] border border-[#2A2A2A] rounded-xl overflow-hidden flex items-center justify-center">
+            <div className="flex-1 min-h-0 bg-pb-bg border border-pb-border rounded-xl overflow-hidden flex items-center justify-center">
               {photo.url ? (
                 <img
                   src={photo.url}
@@ -62,7 +62,7 @@ const PhotoPreviewModal: React.FC<PhotoPreviewModalProps> = ({
                   className="max-w-full max-h-[70vh] object-contain"
                 />
               ) : (
-                <p className="text-[#606060] text-sm">Gambar tidak tersedia</p>
+                <p className="text-pb-text-muted text-sm">Gambar tidak tersedia</p>
               )}
             </div>
 

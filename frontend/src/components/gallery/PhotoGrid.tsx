@@ -50,14 +50,14 @@ const PhotoGrid: React.FC<PhotoGridProps> = ({
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-20">
-        <Spinner size="lg" className="text-white" />
+        <Spinner size="lg" className="text-pb-text" />
       </div>
     )
   }
 
   if (photos.length === 0) {
     return (
-      <div className="bg-[#141414] border border-[#2A2A2A] rounded-2xl">
+      <div className="bg-pb-surface border border-pb-border rounded-2xl">
         <EmptyState
           icon={<ImageIcon size={48} />}
           title="Belum ada foto"
@@ -78,13 +78,13 @@ const PhotoGrid: React.FC<PhotoGridProps> = ({
             <button
               type="button"
               onClick={onSelectAll}
-              className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[#1E1E1E] border border-[#2A2A2A]
-                text-white text-sm font-medium hover:bg-[#252525] transition-colors"
+              className="flex items-center gap-2 px-3 py-2 rounded-lg bg-pb-elevated border border-pb-border
+                text-pb-text text-sm font-medium hover:bg-pb-elevated transition-colors"
             >
               {allSelected ? <CheckSquare size={16} /> : <Square size={16} />}
               {allSelected ? 'Batalkan Semua' : 'Pilih Semua'}
             </button>
-            <span className="text-[#A0A0A0] text-sm">{selectedIds.size} dipilih</span>
+            <span className="text-pb-text-secondary text-sm">{selectedIds.size} dipilih</span>
             <div className="flex-1" />
             <Button
               variant="secondary"
@@ -107,8 +107,8 @@ const PhotoGrid: React.FC<PhotoGridProps> = ({
             <button
               type="button"
               onClick={() => setSelectionMode(false)}
-              className="touch-target w-9 h-9 rounded-lg bg-[#1E1E1E] border border-[#2A2A2A]
-                text-[#A0A0A0] hover:text-white hover:bg-[#252525] transition-colors"
+              className="touch-target w-9 h-9 rounded-lg bg-pb-elevated border border-pb-border
+                text-pb-text-secondary hover:text-pb-text hover:bg-pb-elevated transition-colors"
               title="Keluar dari mode pilih"
             >
               <X size={16} />
@@ -116,7 +116,7 @@ const PhotoGrid: React.FC<PhotoGridProps> = ({
           </div>
         ) : (
           <>
-            <p className="text-[#606060] text-sm">{photos.length} foto</p>
+            <p className="text-pb-text-muted text-sm">{photos.length} foto</p>
             <Button
               variant="ghost"
               size="md"

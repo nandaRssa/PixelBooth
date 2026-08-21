@@ -46,20 +46,20 @@ const FolderQrModal: React.FC<FolderQrModalProps> = ({ isOpen, onClose, folder }
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="QR Code Folder" size="sm">
       <div className="flex flex-col items-center text-center">
-        <div className="flex items-center gap-2 text-[#A0A0A0] text-sm mb-5">
+        <div className="flex items-center gap-2 text-pb-text-secondary text-sm mb-5">
           <FolderIcon size={16} />
-          <span className="font-medium text-white">{folder.name}</span>
+          <span className="font-medium text-pb-text">{folder.name}</span>
         </div>
 
-        <div className="w-52 rounded-xl overflow-hidden border border-[#2A2A2A] shadow-lg bg-white mb-5">
+        <div className="w-52 rounded-xl overflow-hidden border border-pb-border shadow-lg bg-white mb-5">
           {folder.qr_url ? (
             <img src={folder.qr_url} alt="QR Code folder" className="w-full h-auto" />
           ) : (
-            <div className="w-full h-72 bg-[#1A1A1A]" />
+            <div className="w-full h-72 bg-pb-elevated" />
           )}
         </div>
 
-        <p className="text-[#606060] text-xs leading-relaxed mb-5 max-w-xs">
+        <p className="text-pb-text-muted text-xs leading-relaxed mb-5 max-w-xs">
           Scan QR ini untuk mengakses galeri folder via perangkat customer.
         </p>
 

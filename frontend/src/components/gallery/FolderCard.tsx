@@ -26,18 +26,18 @@ const FolderCard: React.FC<FolderCardProps> = ({
     <motion.div
       initial={{ opacity: 0, scale: 0.96 }}
       animate={{ opacity: 1, scale: 1 }}
-      className="group relative bg-[#141414] border border-[#2A2A2A] rounded-xl p-5
-        hover:border-[#3A3A3A] hover:bg-[#1A1A1A] transition-all duration-200 cursor-pointer"
+      className="group relative bg-pb-surface border border-pb-border rounded-xl p-5
+        hover:border-pb-border-strong hover:bg-pb-elevated transition-all duration-200 cursor-pointer"
       onClick={() => onOpen(folder)}
     >
       {/* Icon */}
-      <div className="w-12 h-12 rounded-xl bg-white/5 flex items-center justify-center mb-4 group-hover:bg-white/10 transition-colors">
-        <FolderIcon size={22} className="text-[#A0A0A0] group-hover:text-white transition-colors" />
+      <div className="w-12 h-12 rounded-xl bg-pb-elevated flex items-center justify-center mb-4 group-hover:bg-pb-border-light transition-colors">
+        <FolderIcon size={22} className="text-pb-text-secondary group-hover:text-pb-text transition-colors" />
       </div>
 
       {/* Nama + stats */}
-      <h3 className="text-white font-medium text-sm truncate mb-1">{folder.name}</h3>
-      <div className="flex items-center gap-3 text-[#606060] text-xs">
+      <h3 className="text-pb-text font-medium text-sm truncate mb-1">{folder.name}</h3>
+      <div className="flex items-center gap-3 text-pb-text-muted text-xs">
         <span className="flex items-center gap-1">
           <FolderOpen size={12} />
           {(folder.children?.length ?? 0)} sub-folder
@@ -56,8 +56,8 @@ const FolderCard: React.FC<FolderCardProps> = ({
             e.stopPropagation()
             onShowQr(folder)
           }}
-          className="touch-target w-8 h-8 rounded-lg bg-[#0A0A0A] border border-[#2A2A2A]
-            text-[#A0A0A0] hover:text-white hover:border-[#3A3A3A] transition-colors"
+          className="touch-target w-8 h-8 rounded-lg bg-pb-bg border border-pb-border
+            text-pb-text-secondary hover:text-pb-text hover:border-pb-border-strong transition-colors"
           title="Lihat QR Code"
         >
           <QrCode size={14} />
@@ -68,8 +68,8 @@ const FolderCard: React.FC<FolderCardProps> = ({
             e.stopPropagation()
             onRename(folder)
           }}
-          className="touch-target w-8 h-8 rounded-lg bg-[#0A0A0A] border border-[#2A2A2A]
-            text-[#A0A0A0] hover:text-white hover:border-[#3A3A3A] transition-colors"
+          className="touch-target w-8 h-8 rounded-lg bg-pb-bg border border-pb-border
+            text-pb-text-secondary hover:text-pb-text hover:border-pb-border-strong transition-colors"
           title="Ubah Nama"
         >
           <Pencil size={14} />
@@ -80,8 +80,8 @@ const FolderCard: React.FC<FolderCardProps> = ({
             e.stopPropagation()
             onDelete(folder)
           }}
-          className="touch-target w-8 h-8 rounded-lg bg-[#0A0A0A] border border-[#2A2A2A]
-            text-[#A0A0A0] hover:text-red-400 hover:border-red-500/30 transition-colors"
+          className="touch-target w-8 h-8 rounded-lg bg-pb-bg border border-pb-border
+            text-pb-text-secondary hover:text-red-400 hover:border-red-500/30 transition-colors"
           title="Hapus Folder"
         >
           <Trash2 size={14} />

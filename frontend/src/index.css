@@ -5,17 +5,57 @@
    PIXELBOOTH — Design System
    ========================================== */
 
+/* ==========================================
+   THEME PALETTE (runtime switchable)
+   Default: gelap. html.light = mode siang.
+   Token Tailwind pb-* merujuk variabel ini,
+   jadi seluruh utility ikut berganti saat toggle.
+   ========================================== */
+
+:root {
+  --pb-bg: #0a0a0a;
+  --pb-surface: #141414;
+  --pb-elevated: #1e1e1e;
+  --pb-border: #2a2a2a;
+  --pb-border-light: #333333;
+  --pb-border-strong: #404040;
+  --pb-text: #fafafa;
+  --pb-text-secondary: #a0a0a0;
+  --pb-text-muted: #606060;
+  --pb-faint: #404040;
+  --pb-accent: #ffffff;
+  --pb-on-accent: #0a0a0a;
+}
+
+html.light {
+  --pb-bg: #f4f4f6;
+  --pb-surface: #ffffff;
+  --pb-elevated: #ebebef;
+  --pb-border: #e3e3e8;
+  --pb-border-light: #d6d6dd;
+  --pb-border-strong: #b9b9c3;
+  --pb-text: #18181c;
+  --pb-text-secondary: #50505b;
+  --pb-text-muted: #85858f;
+  --pb-faint: #b6b6c0;
+  --pb-accent: #18181c;
+  --pb-on-accent: #ffffff;
+}
+
 @theme {
   /* === Color Palette === */
-  --color-pb-bg: #0A0A0A;
-  --color-pb-surface: #141414;
-  --color-pb-elevated: #1E1E1E;
-  --color-pb-border: #2A2A2A;
-  --color-pb-border-light: #333333;
-  --color-pb-text: #FAFAFA;
-  --color-pb-text-secondary: #A0A0A0;
-  --color-pb-text-muted: #606060;
-  --color-pb-accent: #FFFFFF;
+  --color-pb-bg: var(--pb-bg);
+  --color-pb-surface: var(--pb-surface);
+  --color-pb-elevated: var(--pb-elevated);
+  --color-pb-border: var(--pb-border);
+  --color-pb-border-light: var(--pb-border-light);
+  --color-pb-border-strong: var(--pb-border-strong);
+  --color-pb-text: var(--pb-text);
+  --color-pb-text-secondary: var(--pb-text-secondary);
+  --color-pb-text-muted: var(--pb-text-muted);
+  --color-pb-faint: var(--pb-faint);
+  --color-pb-accent: var(--pb-accent);
+  --color-pb-on-accent: var(--pb-on-accent);
   --color-pb-danger: #EF4444;
   --color-pb-success: #22C55E;
   --color-pb-warning: #F59E0B;
@@ -43,8 +83,8 @@
 
 html {
   font-family: var(--font-sans);
-  background-color: #0A0A0A;
-  color: #FAFAFA;
+  background-color: var(--pb-bg);
+  color: var(--pb-text);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -53,9 +93,10 @@ body {
   margin: 0;
   padding: 0;
   min-height: 100vh;
-  background-color: #0A0A0A;
-  color: #FAFAFA;
+  background-color: var(--pb-bg);
+  color: var(--pb-text);
   overflow-x: hidden;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 #root {
@@ -78,12 +119,12 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #333;
+  background: var(--pb-border-light);
   border-radius: 100px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #555;
+  background: var(--pb-border-strong);
 }
 
 /* ==========================================
@@ -176,8 +217,8 @@ body {
 }
 
 .card-hover:hover {
-  border-color: rgba(255, 255, 255, 0.15);
-  background-color: rgba(255, 255, 255, 0.05);
+  border-color: var(--pb-border-strong);
+  background-color: var(--pb-elevated);
   transform: translateY(-1px);
 }
 

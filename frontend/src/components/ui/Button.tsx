@@ -25,11 +25,11 @@ interface ButtonProps {
 }
 
 const variantStyles: Record<ButtonVariant, string> = {
-  primary: 'bg-white text-black hover:bg-gray-100 active:bg-gray-200',
-  secondary: 'bg-[#1E1E1E] text-white border border-[#2A2A2A] hover:bg-[#252525] hover:border-[#333]',
+  primary: 'bg-pb-accent text-pb-on-accent hover:opacity-85 active:opacity-75',
+  secondary: 'bg-pb-elevated text-pb-text border border-pb-border hover:bg-pb-elevated hover:border-pb-border-light',
   danger: 'bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 hover:border-red-500/30',
-  ghost: 'text-[#A0A0A0] hover:text-white hover:bg-white/5',
-  outline: 'border border-white/20 text-white hover:bg-white/5 hover:border-white/40',
+  ghost: 'text-pb-text-secondary hover:text-pb-text hover:bg-pb-elevated',
+  outline: 'border border-pb-border-strong text-pb-text hover:bg-pb-elevated hover:border-pb-text-muted',
 }
 
 const sizeStyles: Record<ButtonSize, string> = {

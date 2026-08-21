@@ -250,23 +250,23 @@ const GalleryPage: React.FC = () => {
       <div className="flex items-center justify-between mb-6">
         <div className="min-w-0">
           {/* Breadcrumb */}
-          <div className="flex items-center gap-1.5 text-sm text-[#606060] mb-1">
+          <div className="flex items-center gap-1.5 text-sm text-pb-text-muted mb-1">
             <button
               type="button"
               onClick={goToRoot}
-              className="flex items-center gap-1 hover:text-white transition-colors"
+              className="flex items-center gap-1 hover:text-pb-text transition-colors"
             >
               <Home size={14} />
               <span>Galeri</span>
             </button>
             {breadcrumb.map((crumb, index) => (
               <React.Fragment key={crumb.id}>
-                <ChevronRight size={14} className="text-[#404040]" />
+                <ChevronRight size={14} className="text-pb-faint" />
                 <button
                   type="button"
                   onClick={() => goToCrumb(index)}
-                  className={`truncate max-w-[160px] hover:text-white transition-colors ${
-                    index === breadcrumb.length - 1 ? 'text-white font-medium' : ''
+                  className={`truncate max-w-[160px] hover:text-pb-text transition-colors ${
+                    index === breadcrumb.length - 1 ? 'text-pb-text font-medium' : ''
                   }`}
                 >
                   {crumb.name}
@@ -275,12 +275,12 @@ const GalleryPage: React.FC = () => {
             ))}
           </div>
 
-          <h1 className="text-white text-2xl font-bold">
+          <h1 className="text-pb-text text-2xl font-bold">
             {breadcrumb.length > 0
               ? breadcrumb[breadcrumb.length - 1].name
               : 'Galeri'}
           </h1>
-          <p className="text-[#606060] text-sm mt-1">
+          <p className="text-pb-text-muted text-sm mt-1">
             {activeFolderId
               ? 'Folder dan foto dalam folder ini'
               : 'Kelola folder dan foto hasil photobooth'}
@@ -311,14 +311,14 @@ const GalleryPage: React.FC = () => {
       {/* ===== Sub-folders ===== */}
       {foldersQuery.isLoading ? (
         <div className="flex items-center justify-center py-20">
-          <Spinner size="lg" className="text-white" />
+          <Spinner size="lg" className="text-pb-text" />
         </div>
       ) : folders.length > 0 ? (
         <div className="mb-10">
-          <h2 className="text-white text-sm font-semibold mb-3 flex items-center gap-2">
-            <FolderOpen size={16} className="text-[#A0A0A0]" />
+          <h2 className="text-pb-text text-sm font-semibold mb-3 flex items-center gap-2">
+            <FolderOpen size={16} className="text-pb-text-secondary" />
             Sub-Folder
-            <span className="text-[#606060] font-normal">{folders.length}</span>
+            <span className="text-pb-text-muted font-normal">{folders.length}</span>
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
             {folders.map((folder) => (
@@ -339,7 +339,7 @@ const GalleryPage: React.FC = () => {
           animate={{ opacity: 1 }}
           className="mb-10"
         >
-          <div className="bg-[#141414] border border-[#2A2A2A] rounded-2xl">
+          <div className="bg-pb-surface border border-pb-border rounded-2xl">
             <EmptyState
               icon={<FolderOpen size={48} />}
               title={activeFolderId ? 'Belum ada sub-folder' : 'Belum ada folder'}
@@ -365,10 +365,10 @@ const GalleryPage: React.FC = () => {
 
       {/* ===== Photo grid — semua foto di root, atau foto dalam folder ===== */}
       <div className={activeFolderId ? '' : 'mt-8'}>
-        <h2 className="text-white text-sm font-semibold mb-3 flex items-center gap-2">
-          <ImageIcon size={16} className="text-[#A0A0A0]" />
+        <h2 className="text-pb-text text-sm font-semibold mb-3 flex items-center gap-2">
+          <ImageIcon size={16} className="text-pb-text-secondary" />
           {activeFolderId ? 'Foto' : 'Tanpa Folder'}
-          <span className="text-[#606060] font-normal">
+          <span className="text-pb-text-muted font-normal">
             {photosQuery.isLoading ? '' : photos.length}
           </span>
         </h2>
@@ -461,6 +461,7 @@ const GalleryPage: React.FC = () => {
         folders={allFoldersQuery.data ?? []}
         isLoadingFolders={allFoldersQuery.isLoading}
         isMoving={movePhoto.isPending}
+        excludeFolderIds={moveTarget?.folder_id != null ? [moveTarget.folder_id] : []}
       />
 
       <MovePhotoModal
@@ -471,6 +472,14 @@ const GalleryPage: React.FC = () => {
         isLoadingFolders={allFoldersQuery.isLoading}
         isMoving={bulkMovePhotos.isPending}
         count={selectedIds.size}
+        excludeFolderIds={
+          (() => {
+            const sel = photos.filter((p) => selectedIds.has(p.id))
+            if (sel.length === 0) return []
+            const first = sel[0].folder_id
+            return first != null && sel.every((p) => p.folder_id === first) ? [first] : []
+          })()
+        }
       />
 
       <ConfirmModal

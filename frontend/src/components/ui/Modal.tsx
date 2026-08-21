@@ -51,19 +51,19 @@ export const Modal: React.FC<ModalProps> = ({
             className={`
               fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50
               w-[calc(100vw-2rem)] ${sizeMap[size]}
-              bg-[#141414] border border-[#2A2A2A] rounded-xl shadow-2xl
+              bg-pb-surface border border-pb-border rounded-xl shadow-2xl
             `}
           >
             {/* Header */}
             {(title || showClose) && (
-              <div className="flex items-center justify-between px-6 py-4 border-b border-[#2A2A2A]">
+              <div className="flex items-center justify-between px-6 py-4 border-b border-pb-border">
                 {title && (
-                  <h3 className="text-white font-semibold text-base">{title}</h3>
+                  <h3 className="text-pb-text font-semibold text-base">{title}</h3>
                 )}
                 {showClose && (
                   <button
                     onClick={onClose}
-                    className="text-[#606060] hover:text-white transition-colors ml-auto"
+                    className="text-pb-text-muted hover:text-pb-text transition-colors ml-auto"
                   >
                     <X size={18} />
                   </button>
@@ -108,7 +108,7 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
 }) => {
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={title} size="sm">
-      <p className="text-[#A0A0A0] text-sm leading-relaxed mb-6">{message}</p>
+      <p className="text-pb-text-secondary text-sm leading-relaxed mb-6">{message}</p>
       <div className="flex gap-3">
         <Button
           variant="secondary"

@@ -1040,19 +1040,19 @@ ctx.restore()
   if (templateQuery.isLoading || !template) {
     return (
       <div className="flex items-center justify-center py-20">
-        <Spinner size="lg" className="text-white" />
+        <Spinner size="lg" className="text-pb-text" />
       </div>
     )
   }
 
   const numInput = (label: string, value: number, onChange: (v: number) => void) => (
     <div>
-      <label className="block text-[#606060] text-[11px] font-medium mb-1">{label}</label>
+      <label className="block text-pb-text-muted text-[11px] font-medium mb-1">{label}</label>
       <input
         type="number"
         value={Math.round(value)}
         onChange={(e) => onChange(Number(e.target.value))}
-        className="w-full bg-[#0A0A0A] border border-[#2A2A2A] rounded-lg px-2 py-1.5 text-white text-xs focus:outline-none focus:border-[#404040]"
+        className="w-full bg-pb-bg border border-pb-border rounded-lg px-2 py-1.5 text-pb-text text-xs focus:outline-none focus:border-pb-border-strong"
       />
     </div>
   )
@@ -1061,8 +1061,8 @@ ctx.restore()
     selected && (
       <div key={key}>
         <div className="flex items-center justify-between mb-1">
-          <label className="text-[#A0A0A0] text-xs font-medium">{label}</label>
-          <span className="text-white text-xs tabular-nums">
+          <label className="text-pb-text-secondary text-xs font-medium">{label}</label>
+          <span className="text-pb-text text-xs tabular-nums">
             {Number.isInteger(selected[key]) ? selected[key] : Number(selected[key].toFixed(1))}
             {suffix}
           </span>
@@ -1088,8 +1088,8 @@ ctx.restore()
             Kembali
           </Button>
           <div>
-            <h1 className="text-white text-xl font-bold leading-tight">Frame Editor</h1>
-            <p className="text-[#606060] text-xs mt-0.5">{template.name}</p>
+            <h1 className="text-pb-text text-xl font-bold leading-tight">Frame Editor</h1>
+            <p className="text-pb-text-muted text-xs mt-0.5">{template.name}</p>
           </div>
           <span className="ml-2 px-2 py-0.5 rounded-md bg-amber-500/15 border border-amber-500/30 text-amber-400 text-xs font-medium">
             Draft — belum siap dipakai
@@ -1097,7 +1097,7 @@ ctx.restore()
         </div>
 
         {/* ===== Mode Manual / Auto Render ===== */}
-        <div className="flex rounded-xl border border-[#2A2A2A] overflow-hidden bg-[#0A0A0A] shrink-0">
+        <div className="flex rounded-xl border border-pb-border overflow-hidden bg-pb-bg shrink-0">
           <button
             type="button"
             onClick={() => switchFrameMode('manual')}
@@ -1105,13 +1105,13 @@ ctx.restore()
             className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50 ${
               frameMode === 'manual'
                 ? 'bg-cyan-500/20 text-cyan-300'
-                : 'text-[#A0A0A0] hover:text-white'
+                : 'text-pb-text-secondary hover:text-pb-text'
             }`}
           >
             <MousePointer2 size={15} />
             Manual
           </button>
-          <div className="w-px bg-[#2A2A2A]" />
+          <div className="w-px bg-pb-border" />
           <button
             type="button"
             onClick={() => switchFrameMode('auto')}
@@ -1119,7 +1119,7 @@ ctx.restore()
             className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50 ${
               frameMode === 'auto'
                 ? 'bg-violet-500/20 text-violet-300'
-                : 'text-[#A0A0A0] hover:text-white'
+                : 'text-pb-text-secondary hover:text-pb-text'
             }`}
           >
             <Wand2 size={15} />
@@ -1157,7 +1157,7 @@ ctx.restore()
 
       <div className="flex gap-4 flex-1 min-h-0">
         {/* ===== Canvas ===== */}
-        <div ref={containerRef} className="relative flex-1 bg-[#0D0D0D] border border-[#2A2A2A] rounded-2xl overflow-hidden min-h-0">
+        <div ref={containerRef} className="relative flex-1 bg-pb-bg border border-pb-border rounded-2xl overflow-hidden min-h-0">
           <canvas
             ref={canvasRef}
             className="absolute inset-0 touch-none"
@@ -1177,7 +1177,7 @@ ctx.restore()
           {detecting && (
             <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-black/60">
               <Spinner size="lg" className="text-cyan-400" />
-              <p className="text-white text-sm font-medium">Detecting Frames...</p>
+              <p className="text-pb-text text-sm font-medium">Detecting Frames...</p>
             </div>
           )}
           {frameMode === 'auto' && !detecting && (
@@ -1188,8 +1188,8 @@ ctx.restore()
           )}
           {frames.length === 0 && !detecting && (
             <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-              <Layers size={40} className="text-[#333] mb-3" />
-              <p className="text-[#A0A0A0] text-sm mb-4">Belum ada camera frame.</p>
+              <Layers size={40} className="text-pb-faint mb-3" />
+              <p className="text-pb-text-secondary text-sm mb-4">Belum ada camera frame.</p>
               <div className="pointer-events-auto">
                 <Button variant="primary" size="md" onClick={addFrame} leftIcon={<Plus size={16} />}>
                   Tambah Frame
@@ -1198,7 +1198,7 @@ ctx.restore()
             </div>
           )}
           {/* Penanda versi build — untuk memastikan bundle terbaru yang dimuat */}
-          <div className="absolute bottom-2 right-3 text-[10px] text-[#555] select-none pointer-events-none">
+          <div className="absolute bottom-2 right-3 text-[10px] text-pb-text-muted select-none pointer-events-none">
             editor-v19 · keyboard-undo
           </div>
         </div>
@@ -1206,9 +1206,9 @@ ctx.restore()
         {/* ===== Sidebar ===== */}
         <div className="w-80 shrink-0 overflow-y-auto pr-1 space-y-4">
           {/* Frames */}
-          <section className="bg-[#141414] border border-[#2A2A2A] rounded-xl p-4">
+          <section className="bg-pb-surface border border-pb-border rounded-xl p-4">
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-white text-sm font-semibold">Camera Frames ({frames.length})</h3>
+              <h3 className="text-pb-text text-sm font-semibold">Camera Frames ({frames.length})</h3>
               <div className="flex items-center gap-1.5">
                 <Button
                   variant="outline"
@@ -1238,7 +1238,7 @@ ctx.restore()
                 </Button>
               </div>
             </div>
-            <p className="text-[10px] text-[#555] mb-2 leading-relaxed">
+            <p className="text-[10px] text-pb-text-muted mb-2 leading-relaxed">
               Ctrl+Z undo · Ctrl+Y redo · Ctrl+C copy · Ctrl+V paste · Ctrl+D duplikat · Backspace hapus
             </p>
             <div className="space-y-1.5 max-h-36 overflow-y-auto">
@@ -1252,19 +1252,19 @@ ctx.restore()
                   }}
                   className={`w-full flex items-center justify-between rounded-lg px-3 py-2 text-left text-sm transition-colors ${
                     f.id === selectedId
-                      ? 'bg-cyan-500/15 border border-cyan-500/40 text-white'
-                      : 'bg-[#0A0A0A] border border-[#2A2A2A] text-[#A0A0A0] hover:text-white'
+                      ? 'bg-cyan-500/15 border border-cyan-500/40 text-pb-text'
+                      : 'bg-pb-bg border border-pb-border text-pb-text-secondary hover:text-pb-text'
                   }`}
                 >
                   <span>Frame {i + 1}</span>
-                  <span className="text-[11px] text-[#606060] tabular-nums">
+                  <span className="text-[11px] text-pb-text-muted tabular-nums">
                     {Math.round(f.width)}×{Math.round(f.height)}
                     {f.rotation !== 0 ? ` · ${f.rotation}°` : ''}
                     {f.flip_h || f.flip_v ? ' · flipped' : ''}
                   </span>
                 </button>
               ))}
-              {frames.length === 0 && <p className="text-[#606060] text-xs">Belum ada frame.</p>}
+              {frames.length === 0 && <p className="text-pb-text-muted text-xs">Belum ada frame.</p>}
             </div>
             {selected && (
               <div className="grid grid-cols-2 gap-2 mt-3">
@@ -1290,8 +1290,8 @@ ctx.restore()
 
           {/* Transform */}
           {selected && (
-            <section className="bg-[#141414] border border-[#2A2A2A] rounded-xl p-4">
-              <h3 className="text-white text-sm font-semibold mb-3">Transformasi Frame</h3>
+            <section className="bg-pb-surface border border-pb-border rounded-xl p-4">
+              <h3 className="text-pb-text text-sm font-semibold mb-3">Transformasi Frame</h3>
               <div className="grid grid-cols-4 gap-2 mb-3">
                 {numInput('X', selected.x, (v) => updateFrame(selected.id, { x: v }))}
                 {numInput('Y', selected.y, (v) => updateFrame(selected.id, { y: v }))}
@@ -1302,7 +1302,7 @@ ctx.restore()
               {/* Rotation slider kontinu: tengah = 0° */}
               <div className="mb-3">
                 <div className="flex items-center justify-between mb-1">
-                  <label className="text-[#A0A0A0] text-xs font-medium">Rotation / Tilt</label>
+                  <label className="text-pb-text-secondary text-xs font-medium">Rotation / Tilt</label>
                   <div className="flex items-center gap-1.5">
                     <input
                       type="number"
@@ -1316,9 +1316,9 @@ ctx.restore()
                         v = Math.max(-180, Math.min(180, v))
                         updateFrame(selected.id, { rotation: v })
                       }}
-                      className="w-16 bg-[#0A0A0A] border border-[#2A2A2A] rounded-md px-1.5 py-0.5 text-white text-xs text-right tabular-nums focus:outline-none focus:border-[#404040]"
+                      className="w-16 bg-pb-bg border border-pb-border rounded-md px-1.5 py-0.5 text-pb-text text-xs text-right tabular-nums focus:outline-none focus:border-pb-border-strong"
                     />
-                    <span className="text-[#606060] text-xs">°</span>
+                    <span className="text-pb-text-muted text-xs">°</span>
                   </div>
                 </div>
                 <input
@@ -1330,7 +1330,7 @@ ctx.restore()
                   onChange={(e) => updateFrame(selected.id, { rotation: Number(e.target.value) })}
                   className="w-full accent-cyan-400"
                 />
-                <div className="flex justify-between text-[10px] text-[#606060] mt-0.5">
+                <div className="flex justify-between text-[10px] text-pb-text-muted mt-0.5">
                   <span>-180°</span>
                   <span>0°</span>
                   <span>+180°</span>
@@ -1344,7 +1344,7 @@ ctx.restore()
                   className={`flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium transition-colors ${
                     selected.flip_h
                       ? 'bg-cyan-500/20 border border-cyan-500/50 text-cyan-300'
-                      : 'bg-[#0A0A0A] border border-[#2A2A2A] text-[#A0A0A0] hover:text-white'
+                      : 'bg-pb-bg border border-pb-border text-pb-text-secondary hover:text-pb-text'
                   }`}
                 >
                   <FlipHorizontal size={14} />
@@ -1356,7 +1356,7 @@ ctx.restore()
                   className={`flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium transition-colors ${
                     selected.flip_v
                       ? 'bg-cyan-500/20 border border-cyan-500/50 text-cyan-300'
-                      : 'bg-[#0A0A0A] border border-[#2A2A2A] text-[#A0A0A0] hover:text-white'
+                      : 'bg-pb-bg border border-pb-border text-pb-text-secondary hover:text-pb-text'
                   }`}
                 >
                   <FlipVertical size={14} />
@@ -1368,12 +1368,12 @@ ctx.restore()
 
           {/* Fine Tune Remove */}
           {selected && (
-            <section className="bg-[#141414] border border-[#2A2A2A] rounded-xl p-4 space-y-3">
-              <h3 className="text-white text-sm font-semibold">Fine Tune Remove</h3>
+            <section className="bg-pb-surface border border-pb-border rounded-xl p-4 space-y-3">
+              <h3 className="text-pb-text text-sm font-semibold">Fine Tune Remove</h3>
               <label className="flex items-center justify-between cursor-pointer">
-                <span className="text-[#A0A0A0] text-xs font-medium flex items-center gap-1.5">
+                <span className="text-pb-text-secondary text-xs font-medium flex items-center gap-1.5">
                   Full Clear
-                  <span className="text-[#606060] text-[10px] normal-case">(bolong 1 frame penuh)</span>
+                  <span className="text-pb-text-muted text-[10px] normal-case">(bolong 1 frame penuh)</span>
                 </span>
                 <input
                   type="checkbox"
@@ -1396,16 +1396,16 @@ ctx.restore()
 
           {/* Manual Protect / Remove / Restore — Brush Region */}
           {selected && (
-            <section className="bg-[#141414] border border-[#2A2A2A] rounded-xl p-4">
-              <h3 className="text-white text-sm font-semibold mb-3">Brush Area</h3>
+            <section className="bg-pb-surface border border-pb-border rounded-xl p-4">
+              <h3 className="text-pb-text text-sm font-semibold mb-3">Brush Area</h3>
               <div className="grid grid-cols-4 gap-1.5 mb-3">
                 <button
                   type="button"
                   onClick={() => setMode('select')}
                   className={`flex flex-col items-center gap-1 rounded-lg px-1 py-2 text-[10px] font-medium transition-colors ${
                     mode === 'select'
-                      ? 'bg-white/10 border border-white/30 text-white'
-                      : 'bg-[#0A0A0A] border border-[#2A2A2A] text-[#A0A0A0]'
+                      ? 'bg-white/10 border border-white/30 text-pb-text'
+                      : 'bg-pb-bg border border-pb-border text-pb-text-secondary'
                   }`}
                 >
                   <MousePointer2 size={14} />
@@ -1417,7 +1417,7 @@ ctx.restore()
                   className={`flex flex-col items-center gap-1 rounded-lg px-1 py-2 text-[10px] font-medium transition-colors ${
                     mode === 'remove'
                       ? 'bg-red-500/20 border border-red-500/50 text-red-300'
-                      : 'bg-[#0A0A0A] border border-[#2A2A2A] text-[#A0A0A0]'
+                      : 'bg-pb-bg border border-pb-border text-pb-text-secondary'
                   }`}
                 >
                   <Eraser size={14} />
@@ -1429,7 +1429,7 @@ ctx.restore()
                   className={`flex flex-col items-center gap-1 rounded-lg px-1 py-2 text-[10px] font-medium transition-colors ${
                     mode === 'protect'
                       ? 'bg-amber-500/20 border border-amber-500/50 text-amber-300'
-                      : 'bg-[#0A0A0A] border border-[#2A2A2A] text-[#A0A0A0]'
+                      : 'bg-pb-bg border border-pb-border text-pb-text-secondary'
                   }`}
                 >
                   <Shield size={14} />
@@ -1441,7 +1441,7 @@ ctx.restore()
                   className={`flex flex-col items-center gap-1 rounded-lg px-1 py-2 text-[10px] font-medium transition-colors ${
                     mode === 'restore'
                       ? 'bg-green-500/20 border border-green-500/50 text-green-300'
-                      : 'bg-[#0A0A0A] border border-[#2A2A2A] text-[#A0A0A0]'
+                      : 'bg-pb-bg border border-pb-border text-pb-text-secondary'
                   }`}
                 >
                   <Undo2 size={14} />
@@ -1452,8 +1452,8 @@ ctx.restore()
                 <>
                   <div className="mb-2">
                     <div className="flex items-center justify-between mb-1">
-                      <label className="text-[#A0A0A0] text-xs font-medium">Brush Size</label>
-                      <span className="text-white text-xs tabular-nums">{brushSize}px</span>
+                      <label className="text-pb-text-secondary text-xs font-medium">Brush Size</label>
+                      <span className="text-pb-text text-xs tabular-nums">{brushSize}px</span>
                     </div>
                     <input
                       type="range"
@@ -1465,7 +1465,7 @@ ctx.restore()
                       className="w-full accent-cyan-400"
                     />
                   </div>
-                  <p className="text-[#606060] text-[11px] leading-relaxed mb-2">
+                  <p className="text-pb-text-muted text-[11px] leading-relaxed mb-2">
                     {mode === 'remove' && 'Usap area yang ingin dijadikan kamera — seluruh region terhubung ikut terhapus sampai batas warna berbeda.'}
                     {mode === 'protect' && 'Usap elemen desain yang ingin dipertahankan — seluruh region-nya dilindungi dari clear.'}
                     {mode === 'restore' && 'Usap desain yang terlanjur ter-clear — seluruh region-nya dikembalikan tampil.'}
@@ -1501,9 +1501,9 @@ ctx.restore()
           )}
 
           {/* Preview */}
-          <section className="bg-[#141414] border border-[#2A2A2A] rounded-xl p-4">
+          <section className="bg-pb-surface border border-pb-border rounded-xl p-4">
             <label className="flex items-center justify-between cursor-pointer">
-              <span className="text-[#A0A0A0] text-xs font-medium flex items-center gap-1.5">
+              <span className="text-pb-text-secondary text-xs font-medium flex items-center gap-1.5">
                 <Eye size={14} />
                 Preview Mask Real-time
               </span>
@@ -1514,7 +1514,7 @@ ctx.restore()
                 className="accent-cyan-400 w-4 h-4"
               />
             </label>
-            <p className="text-[#606060] text-[11px] mt-2 leading-relaxed">
+            <p className="text-pb-text-muted text-[11px] mt-2 leading-relaxed">
               Desain selalu berada DI ATAS kamera. Elemen desain di luar Hard Clear Zone otomatis
               dipertahankan — kamera di-mask di bawahnya.
             </p>

@@ -79,7 +79,7 @@ const ToastComponent: React.FC<ToastItemProps> = ({ toast, onDismiss }) => {
       <p className={`text-sm flex-1 leading-relaxed ${config.text}`}>{toast.message}</p>
       <button
         onClick={() => onDismiss(toast.id)}
-        className="text-[#606060] hover:text-white transition-colors flex-shrink-0"
+        className="text-pb-text-muted hover:text-pb-text transition-colors flex-shrink-0"
       >
         <X size={14} />
       </button>

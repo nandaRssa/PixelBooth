@@ -5,8 +5,11 @@ import {
   LayoutGrid,
   Camera,
   Layers,
+  Moon,
   Settings,
+  Sun,
 } from 'lucide-react'
+import { getTheme, setTheme, type ThemeMode } from '@/utils/theme'
 
 // ==========================================
 // Admin Layout — Sidebar + Main Content
@@ -25,16 +28,39 @@ const navItems: NavItem[] = [
 ]
 
 export const AdminLayout: React.FC = () => {
+  const [theme, setThemeState] = React.useState<ThemeMode>(getTheme)
+
+  const toggleTheme = () => {
+    const next: ThemeMode = theme === 'dark' ? 'light' : 'dark'
+    setTheme(next)
+    setThemeState(next)
+  }
+
   return (
-    <div className="min-h-screen bg-[#0A0A0A] flex">
+    <div className="min-h-screen bg-pb-bg flex">
       {/* Sidebar */}
-      <aside className="w-64 bg-[#0D0D0D] border-r border-[#1A1A1A] flex flex-col fixed h-full z-10">
+      <aside className="w-64 bg-pb-bg border-r border-pb-border flex flex-col fixed h-full z-10">
         {/* Logo */}
-        <div className="px-6 py-6 border-b border-[#1A1A1A]">
-          <h1 className="text-white font-bold text-lg tracking-tight">
-            Pixel<span className="text-[#A0A0A0]">Booth</span>
-          </h1>
-          <p className="text-[#606060] text-xs mt-0.5">Sistem Photobooth Profesional</p>
+        <div className="px-6 py-6 border-b border-pb-border">
+          <div className="flex items-start justify-between gap-2">
+            <div>
+              <h1 className="text-pb-text font-bold text-lg tracking-tight">
+                Pixel<span className="text-pb-text-secondary">Booth</span>
+              </h1>
+              <p className="text-pb-text-muted text-xs mt-0.5">Sistem Photobooth Profesional</p>
+            </div>
+            {/* Toggle Mode Siang/Malam */}
+            <button
+              type="button"
+              onClick={toggleTheme}
+              aria-label={theme === 'dark' ? 'Mode siang' : 'Mode malam'}
+              title={theme === 'dark' ? 'Mode siang' : 'Mode malam'}
+              className="flex items-center justify-center w-8 h-8 rounded-lg shrink-0
+                text-pb-text-secondary hover:text-pb-text hover:bg-pb-elevated transition-colors"
+            >
+              {theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
+            </button>
+          </div>
         </div>
 
         {/* Navigation */}
@@ -47,8 +73,8 @@ export const AdminLayout: React.FC = () => {
                 flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium
                 transition-all duration-150 group
                 ${isActive
-                  ? 'bg-white text-black'
-                  : 'text-[#A0A0A0] hover:text-white hover:bg-white/5'
+                  ? 'bg-pb-accent text-pb-on-accent'
+                  : 'text-pb-text-secondary hover:text-pb-text hover:bg-pb-elevated'
                 }
               `}
             >
@@ -59,13 +85,13 @@ export const AdminLayout: React.FC = () => {
         </nav>
 
         {/* Footer */}
-        <div className="px-3 py-4 border-t border-[#1A1A1A]">
+        <div className="px-3 py-4 border-t border-pb-border">
           <NavLink
             to="/settings"
             className={({ isActive }) => `
               flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium
               transition-all duration-150
-              ${isActive ? 'bg-white text-black' : 'text-[#A0A0A0] hover:text-white hover:bg-white/5'}
+              ${isActive ? 'bg-pb-accent text-pb-on-accent' : 'text-pb-text-secondary hover:text-pb-text hover:bg-pb-elevated'}
             `}
           >
             <Settings size={20} />

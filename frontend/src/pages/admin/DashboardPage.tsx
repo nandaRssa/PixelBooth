@@ -48,11 +48,11 @@ const DashboardPage: React.FC = () => {
         animate={{ opacity: 1, y: 0 }}
         className="mb-12"
       >
-        <p className="text-[#606060] text-sm mb-1">{greeting},</p>
-        <h1 className="text-white text-3xl font-bold tracking-tight">
+        <p className="text-pb-text-muted text-sm mb-1">{greeting},</p>
+        <h1 className="text-pb-text text-3xl font-bold tracking-tight">
           PixelBooth
         </h1>
-        <p className="text-[#A0A0A0] text-base mt-2">
+        <p className="text-pb-text-secondary text-base mt-2">
           Apa yang ingin Anda kelola hari ini?
         </p>
       </motion.div>
@@ -72,21 +72,21 @@ const DashboardPage: React.FC = () => {
               onClick={() => navigate(item.to)}
               className={`
                 text-left p-6 rounded-2xl bg-gradient-to-br ${item.color}
-                border border-[#2A2A2A] hover:border-[#3A3A3A]
+                border border-pb-border hover:border-pb-border-strong
                 transition-all duration-200 cursor-pointer group
               `}
             >
               {/* Icon */}
-              <div className="w-12 h-12 bg-white/5 rounded-xl flex items-center justify-center mb-4 group-hover:bg-white/10 transition-colors">
-                <Icon size={22} className="text-white" />
+              <div className="w-12 h-12 bg-pb-elevated rounded-xl flex items-center justify-center mb-4 group-hover:bg-pb-border-light transition-colors">
+                <Icon size={22} className="text-pb-text" />
               </div>
 
               {/* Content */}
-              <h2 className="text-white font-semibold text-base mb-2">{item.title}</h2>
-              <p className="text-[#606060] text-sm leading-relaxed">{item.description}</p>
+              <h2 className="text-pb-text font-semibold text-base mb-2">{item.title}</h2>
+              <p className="text-pb-text-muted text-sm leading-relaxed">{item.description}</p>
 
               {/* Arrow */}
-              <div className="flex items-center gap-1 mt-4 text-[#404040] group-hover:text-[#808080] transition-colors">
+              <div className="flex items-center gap-1 mt-4 text-pb-faint group-hover:text-pb-text-secondary transition-colors">
                 <span className="text-xs font-medium">Buka</span>
                 <ArrowRight size={12} />
               </div>
@@ -109,10 +109,10 @@ const DashboardPage: React.FC = () => {
         ].map((stat) => (
           <div
             key={stat.label}
-            className="bg-[#141414] border border-[#1E1E1E] rounded-xl px-4 py-4"
+            className="bg-pb-surface border border-pb-border rounded-xl px-4 py-4"
           >
-            <p className="text-[#606060] text-xs mb-1">{stat.label}</p>
-            <p className="text-white text-2xl font-bold">{stat.value}</p>
+            <p className="text-pb-text-muted text-xs mb-1">{stat.label}</p>
+            <p className="text-pb-text text-2xl font-bold">{stat.value}</p>
           </div>
         ))}
       </motion.div>
