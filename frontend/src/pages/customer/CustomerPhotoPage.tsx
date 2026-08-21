@@ -127,10 +127,11 @@ const CustomerPhotoPage: React.FC = () => {
         </div>
 
         {/* Actions */}
-        <div className="flex gap-3">
+        <div className="flex items-center justify-center gap-3 w-full">
           <Button
             variant="primary"
             size="lg"
+            fullWidth
             onClick={handleDownload}
             leftIcon={<Download size={18} />}
           >
@@ -139,6 +140,7 @@ const CustomerPhotoPage: React.FC = () => {
           <Button
             variant="secondary"
             size="lg"
+            fullWidth
             onClick={handleShare}
             leftIcon={<Share2 size={18} />}
           >

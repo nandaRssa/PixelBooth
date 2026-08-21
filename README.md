@@ -1,197 +1,210 @@
 <p align="center">
-  <img src="docs/assets/logo.png" alt="PixelBooth Logo" width="120" />
+  <img src="frontend/public/favicon.svg" alt="PixelBooth Logo" width="100" />
 </p>
 
-<h1 align="center">PixelBooth</h1>
+<h1 align="center">PixelBooth Sistem Photobooth Profesional Berbasis Web</h1>
 
 <p align="center">
-  <strong>Sistem Photobooth Profesional Berbasis Web</strong><br/>
-  React + TypeScript · Laravel · PostgreSQL · Google Drive · DSLR Integration
+  <strong>Platform Photobooth Modern, Interaktif, dan Terintegrasi Hardware</strong><br/>
+  React 18 · TypeScript · Tailwind CSS v4 · Laravel 11 · MySQL / SQLite / PostgreSQL · Hardware Bridge (DSLR & Bluetooth)
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/React-18-61DAFB?logo=react" />
-  <img src="https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript" />
-  <img src="https://img.shields.io/badge/Laravel-11-FF2D20?logo=laravel" />
-  <img src="https://img.shields.io/badge/PostgreSQL-17-4169E1?logo=postgresql" />
-  <img src="https://img.shields.io/badge/Vite-6-646CFF?logo=vite" />
-  <img src="https://img.shields.io/badge/TailwindCSS-4-06B6D4?logo=tailwindcss" />
+  <img src="https://img.shields.io/badge/React-18.3-61DAFB?logo=react" />
+  <img src="https://img.shields.io/badge/TypeScript-5.7-3178C6?logo=typescript" />
+  <img src="https://img.shields.io/badge/Vite-6.1-646CFF?logo=vite" />
+  <img src="https://img.shields.io/badge/TailwindCSS-4.0-06B6D4?logo=tailwindcss" />
+  <img src="https://img.shields.io/badge/Laravel-11.x-FF2D20?logo=laravel" />
+  <img src="https://img.shields.io/badge/Python_Bridge-3.10+-3776AB?logo=python" />
 </p>
 
 ---
 
-## Daftar Isi
+## 📋 Daftar Isi
 
-- [Overview](#overview)
-- [Fitur Utama](#fitur-utama)
-- [Arsitektur Sistem](#arsitektur-sistem)
-- [Tech Stack](#tech-stack)
-- [Struktur Proyek](#struktur-proyek)
-- [Instalasi](#instalasi)
-- [Environment Setup](#environment-setup)
-- [Database Setup](#database-setup)
-- [Google Drive Configuration](#google-drive-configuration)
-- [Hardware Bridge](#hardware-bridge)
-- [DSLR Configuration](#dslr-configuration)
-- [Bluetooth Remote](#bluetooth-remote)
-- [iPad Safari Setup](#ipad-safari-setup)
-- [API Documentation](#api-documentation)
-- [Troubleshooting](#troubleshooting)
-- [Deployment](#deployment)
-- [Contributing](#contributing)
+- [Ringkasan & Gambaran Umum](#-ringkasan--gambaran-umum)
+- [Capaian & Fitur Utama](#-capaian--fitur-utama)
+- [Panduan Fungsi Kontrol & Tombol Aplikasi](#-panduan-fungsi-kontrol--tombol-aplikasi)
+- [Bahasa & Stack Teknologi](#-bahasa--stack-teknologi)
+- [Integrasi & Konektivitas Perangkat (Hardware)](#-integrasi--konektivitas-perangkat-hardware)
+- [Arsitektur Sistem & Alur Kerja](#-arsitektur-sistem--alur-kerja)
+- [Struktur Proyek](#-struktur-proyek)
+- [Panduan Instalasi & Jalankan Sistem](#-panduan-instalasi--jalankan-sistem)
+- [Panduan Penggunaan iPad & Remote Bluetooth](#-panduan-penggunaan-ipad--remote-bluetooth)
+- [Cloud Hosting & Storage Gratisan](#-cloud-hosting--storage-gratisan)
+- [Lisensi & Pengembang](#-lisensi--pengembang)
 
 ---
 
-## Overview
+## 🌟 Ringkasan & Gambaran Umum
 
-**PixelBooth** adalah sistem photobooth profesional berbasis web yang dirancang untuk dioperasikan melalui **iPad Safari** sebagai interface utama. Sistem ini terintegrasi penuh dengan kamera DSLR (Canon EOS 70D), Bluetooth remote shutter, Google Drive untuk backup otomatis, dan manajemen galeri lengkap dengan sistem QR Code.
+**PixelBooth** adalah aplikasi photobooth profesional berbasis web (_Web-Based Photobooth Kiosk System_) yang dirancang khusus untuk dioperasikan melalui **iPad, Tablet, Touchscreen Monitor, maupun Desktop/PC**.
 
-Project ini dibangun sebagai **portfolio Full-Stack Software Engineering + Hardware Integration** dengan standar produksi yang dapat langsung digunakan secara operasional.
-
----
-
-## Fitur Utama
-
-### 📸 Photobooth Engine
-- Pemilihan template secara interaktif
-- Sesi foto multi-frame dengan countdown otomatis
-- Preview & retake per frame
-- Rendering template otomatis setelah sesi selesai
-- Webcam mock untuk development, DSLR untuk produksi
-
-### 🖼️ Gallery & Folder Management
-- Manajemen folder layaknya file manager
-- Upload, preview, move, delete foto
-- Bulk select & bulk actions
-- Thumbnail otomatis
-
-### 📱 QR Code System
-- QR unik per foto dan per folder
-- Customer page yang mobile-friendly
-- Download & share langsung dari QR
-- Token-based (tidak mengekspos ID database)
-
-### 🎨 Template Engine
-- Upload template dari Canva (PNG/JPG)
-- Template Editor visual dengan drag & resize frame
-- Konfigurasi frame berbasis JSON
-- Rendering final foto dengan overlay template
-
-### ☁️ Google Drive Sync
-- OAuth2 authentication
-- Sinkronisasi otomatis setelah foto disimpan
-- Maintain folder structure di Drive
-- Retry otomatis jika gagal
-
-### 🔌 Hardware Integration
-- Canon EOS 70D via Hardware Bridge (Python + gphoto2)
-- Bluetooth remote shutter support
-- Real-time camera status di UI
-- Fallback ke webcam jika DSLR tidak tersambung
-
-### 🔐 Security
-- Akses tanpa login — dioptimalkan untuk kios iPad operasional
-- Customer/public access via QR token
-- Rate limiting & file validation
-- Secure token untuk semua public links
+Sistem ini menggabungkan kemudahan antarmuka modern (dengan dukungan **Mode Default** dan **Mode Fullscreen Minimalis**), rendering frame gambar resolusi tinggi otomatis, manajemen galeri berbasis QR Code, serta integrasi hardware langsung ke kamera DSLR dan remote shutter Bluetooth.
 
 ---
 
-## Arsitektur Sistem
+## 🚀 Capaian & Fitur Utama
+
+### 1. 📸 Photobooth Session Engine
+
+- **Mulai Sesi Otomatis:** Klik template dari layar menu langsung membuat sesi dan membuka ruang kamera tanpa tombol berbelit-belit.
+- **Dua Mode Display:**
+  - **Default Mode:** Antarmuka lengkap dengan sidebar navigasi dan panel samping.
+  - **Fullscreen Mode (Minimalis Kios iPad):** Tampilan layar penuh tanpa navbar/footer, terfokus pada Live Preview kamera, frame template, dan kontrol tombol yang ramah sentuhan.
+- **Sesi Foto Multi-Frame & Hitung Mundur:** Hitung mundur visual 3-detik otomatis sebelum setiap pemotretan.
+- **Ulangi Foto (Retake Per-Frame):** Fitur retake frame foto individual baik saat pertengahan sesi pemotretan maupun setelah pemotretan selesai.
+- **Auto Render Canvas Engine:** Menggabungkan foto-foto dari kamera dengan overlay frame PNG resolusi tinggi secara otomatis.
+
+### 2. 🔌 Integrasi Hardware & Kamera
+
+- **DSLR Integration via Hardware Bridge:** Terkoneksi dengan kamera DSLR (Canon EOS / Nikon / Sony) via kabel USB melalui Flask/Python Bridge service (`http://localhost:5000`).
+- **Webcam Fallback:** Menggunakan kamera internal laptop/iPad untuk _Live Preview_ real-time.
+- **Bluetooth Remote Shutter Support:** Bebas jepret foto menggunakan tombol remote Bluetooth selfie stick / presenter slide (`Space`, `Enter`, `Volume Up`, `PageDown`).
+
+### 3. 🖼️ Galeri & Folder Management
+
+- **Hierarki Folder & Sub-Folder:** Pengorganisasian foto berbasis folder layaknya file manager desktop.
+- **Manajemen Massal (Bulk Action):** Fitur _Pilih Semua_, _Batalkan_, _Hapus Banyak Foto_, dan _Pindahkan Foto_.
+- **Desain Bebas Menimpa (Zero-Collision Layout):** Kartu folder dan kartu foto yang terstruktur rapi untuk resolusi iPad (Portrait & Landscape), Laptop, dan Desktop.
+
+### 4. 📱 QR Code Delivery & Customer Access
+
+- **QR Code Per Foto & Per Folder:** Customer cukup melakukan _scan QR_ menggunakan HP untuk membuka halaman unduh khusus.
+- **Public Customer Page:** Halaman responsif untuk mempratinjau, mengunduh foto kualitas tinggi, dan membagikan (_share_) foto ke media sosial.
+
+### 5. 🎨 Frame Template Editor
+
+- **Visual Frame Builder:** Drag, drop, & resize slot bingkai foto di atas kanvas template.
+- **Mode Render Manual vs Auto Render:** Fleksibilitas pengaturan rasio dan posisi foto.
+
+### 6. 🎨 Sistem Desain & Tema Berkelas (Sunset Ember & WCAG AAA)
+
+- **Tema Terang & Gelap:** Pengalihan tema seamless dengan warna kontras tinggi (Lulus standar WCAG AAA).
+- **Aksen Sunset Ember Gradient (`#FF5A36` -> `#FF9836`):** Tampilan tombol dan aksen yang mewah dengan bayangan berpijar (_glowing orange shadow_).
+- **Interactive Micro-Animations:** Animasi memantul (_spring physics_) saat hover pada setiap kartu dan tombol.
+
+---
+
+## 🎛️ Panduan Fungsi Kontrol & Tombol Aplikasi
+
+Berikut adalah penjelasan lengkap mengenai masing-masing tombol dan kontrol antarmuka di PixelBooth:
+
+### 1. 📱 Halaman Menu Photo (`/photo`)
+
+- **Kartu Template:** Diklik langsung untuk memilih bingkai foto dan otomatis memulai sesi pemotretan baru tanpa perlu tombol konfirmasi tambahan.
+- **Dropdown Folder Tujuan:** Pilihan folder penyimpan foto hasil akhir. Seluruh foto yang selesai dipotret akan otomatis masuk ke dalam folder yang dipilih.
+
+### 2. 📸 Halaman Sesi Pemotretan (`/photo/session/:id` & `/photo/session-fs/:id`)
+
+- **Tombol Potret (Shutter Kamera / Ikon Kamera):** Menekan tombol ini (atau menekan Remote Bluetooth / `Space` / `Enter`) akan memulai hitung mundur 3-2-1 dan memotret foto pada bingkai aktif.
+- **Chip / Panel "Ulangi Foto" (Retake Frame #X):** Tombol yang memungkinkan Anda atau pelanggan mengulang pemotretan pada slot foto tertentu saja (misal: hanya mengulang foto ke-2) tanpa perlu mengulang seluruh sesi dari awal.
+- **Tombol Keluar (`[X]` / Kembalikan Sesi):** Membatalkan sesi foto yang sedang berjalan dan kembali ke menu utama.
+- **Tombol Test Camera:** Menguji koneksi dan menyalakan/mematikan preview kamera internal.
+
+### 3. 🖼️ Halaman Galeri (`/gallery`)
+
+- **Tombol "Buat Folder":** Membuka dialog modal untuk membuat folder baru atau sub-folder turunan.
+- **Tombol "Segarkan" (`RefreshCw`):** Memuat ulang daftar folder dan foto dari server secara langsung.
+- **Kartu Folder (Sub-Folder Card):**
+  - **Ikon QR Code (Cyan):** Membuka pop-up QR Code khusus seluruh album/folder tersebut untuk discan oleh pelanggan via smartphone.
+  - **Ikon Pensil / Edit (Secondary):** Mengubah nama (_rename_) folder.
+  - **Ikon Tempat Sampah / Hapus (Merah):** Menghapus folder beserta seluruh foto di dalamnya.
+- **Kartu Foto (Photo Card Overlay):**
+  - **Tombol "Lihat" (`Eye` Icon Cyan):** Membuka foto dalam modal preview resolusi penuh.
+  - **Tombol "Pindah" (`FolderInput` Icon Amber):** Memindahkan foto ke folder tujuan lain.
+  - **Tombol "Hapus" (`Trash2` Icon Merah):** Menghapus file foto dari galeri.
+- **Baris Kontrol Seleksi Massal (Bulk Selection Mode):**
+  - **Tombol "Pilih Semua":** Menandai seluruh foto yang ada di layar sekaligus.
+  - **Tombol "Batalkan":** Keluar dari mode centang foto.
+  - **Tombol "Pindahkan Terpilih":** Memindahkan semua foto yang dicentang ke folder lain sekaligus.
+  - **Tombol "Hapus Terpilih":** Menghapus seluruh foto yang dicentang sekaligus.
+
+### 4. 🎨 Halaman Kelola Template (`/templates`)
+
+- **Tombol "Upload Template":** Mengunggah file desain bingkai baru buatan Canva/Photoshop (format PNG transparan atau JPG).
+- **Ikon Sliders / Edit Frame (`SlidersHorizontal`):** Membuka halaman **Template Frame Editor** visual.
+- **Ikon Hapus Template (`Trash2` Merah):** Menghapus bingkai template dari sistem.
+
+### 5. 🛠️ Halaman Template Frame Editor (`/templates/editor/:id`)
+
+- **Tombol Mode "Manual":** Mode pengaturan posisi bingkai secara bebas. Anda bisa menggeser, memperbesar, atau memperkecil posisi slot foto dengan drag & drop mouse/sentuhan.
+- **Tombol Mode "Auto Render":** Mode pendeteksi otomatis yang menyesuaikan rasio dan koordinat slot bingkai foto secara presisi.
+- **Tombol "Tambah Slot Frame":** Menambahkan slot foto baru di atas kanvas template.
+- **Tombol "Simpan Konfigurasi":** Menyimpan koordinat JSON slot bingkai ke database.
+
+### 6. ⚙️ Halaman Pengaturan (`/settings`)
+
+- **Pilihan Display Mode:**
+  - **Default Mode:** Menampilkan navigasi lengkap dengan sidebar kiri dan header.
+  - **Fullscreen Mode:** Menghilangkan seluruh sidebar/navbar agar aplikasi menjadi layar penuh minimalis (sangat disarankan untuk Kios iPad operasional acara).
+
+---
+
+## 💻 Bahasa & Stack Teknologi
+
+| Layer                  | Teknologi & Bahasa                         | Deskripsi / Kegunaan                                    |
+| ---------------------- | ------------------------------------------ | ------------------------------------------------------- |
+| **Frontend Language**  | **TypeScript 5.7+ / JavaScript**           | Logika antarmuka tipe-aman (_type-safe_)                |
+| **Frontend Framework** | **React 18.3 (Vite 6)**                    | Library antarmuka reaktif & kencang                     |
+| **Styling & CSS**      | **Tailwind CSS v4 + Vanilla CSS**          | Token desain kustom, variabel CSS, micro-animation      |
+| **Animation Engine**   | **Framer Motion 12+**                      | Animasi modal, transisi halaman, & spring hover lift    |
+| **Backend Language**   | **PHP 8.2+**                               | Server API RESTful                                      |
+| **Backend Framework**  | **Laravel 11.x**                           | Controller, Routing, API Resources, Queue & Jobs        |
+| **Database**           | **MySQL / SQLite / PostgreSQL**            | Penyimpanan data folder, foto, template, dan sesi       |
+| **Image Processing**   | **Intervention Image v3**                  | Engine pemotong & penggabung foto frame resolusi tinggi |
+| **Hardware Service**   | **Python 3.10+ (Flask + gphoto2)**         | Bridge komunikasi USB DSLR ke API Laravel               |
+| **QR Engine**          | **qrcode.react (FE) / Simple-QRCode (BE)** | Pembuat QR Code vektorSVG instan                        |
+
+---
+
+## 🔌 Integrasi & Konektivitas Perangkat (Hardware)
+
+Sistem **PixelBooth** dirancang modular sehingga dapat dihubungkan dengan berbagai kombinasi hardware:
 
 ```
-                    ┌──────────────────────┐
-                    │      iPad Safari     │
-                    │  React + TypeScript  │
-                    │  Tailwind CSS + Vite │
-                    └──────────┬───────────┘
-                               │ HTTPS
-                    ┌──────────▼───────────┐
-                    │    Laravel REST API   │
-                    │  Auth · Gallery       │
-                    │  Template · Session   │
-                    │  QR · Google Drive    │
-                    └──┬──────────────┬────┘
-                       │              │
-              ┌────────▼─┐      ┌─────▼───────┐
-              │PostgreSQL│      │ Google Drive │
-              └────────┬─┘      └─────────────┘
-                       │
-              ┌────────▼─────────┐
-              │  Hardware Bridge │
-              │  Python + gphoto2│
-              └───────┬──────────┘
-                      │
-            ┌─────────┴──────────┐
-            │                    │
-        Canon EOS 70D      Bluetooth Remote
+                          ┌───────────────────────────┐
+                          │    iPad / Tablet / PC     │
+                          │   (Browser Safari / Chrome) │
+                          └─────────────┬─────────────┘
+                                        │
+           ┌────────────────────────────┼────────────────────────────┐
+           │                            │                            │
+ ┌─────────▼──────────┐       ┌─────────▼──────────┐       ┌─────────▼──────────┐
+ │ Remote Bluetooth   │       │ Kamera DSLR USB    │       │ Cloud / Storage    │
+ │ (Volume/Space/Enter)│      │ (Canon/Nikon/Sony) │       │ (Cloudflare R2 / S3)│
+ └────────────────────┘       └─────────┬──────────┘       └────────────────────┘
+                                        │
+                              ┌─────────▼──────────┐
+                              │  Hardware Bridge   │
+                              │  (Python gphoto2)  │
+                              └────────────────────┘
 ```
+
+1. **Kamera DSLR (Canon / Nikon / Sony):**
+   - Dihubungkan via kabel USB ke PC host.
+   - Dikontrol oleh service `hardware-bridge` (Python) untuk pengambilan gambar resolusi fisik tertinggi.
+2. **Kamera Internal / Webcam (iPad / Tablet / Laptop):**
+   - Digunakan sebagai _Live Preview_ real-time di layar sentuh iPad.
+3. **Remote Shutter Bluetooth:**
+   - Kompatibel dengan remote selfie stick Bluetooth / Presenter Slide.
+   - Menekan tombol remote otomatis memicu hitung mundur foto (_hands-free_).
+4. **Printer Thermal / Photo Printer:**
+   - Dapat mencetak langsung dari browser menggunakan driver printer standar (AirPrint iPad / Windows Print).
+5. **Cloud Storage (Cloudflare R2 / AWS S3 / Google Drive):**
+   - Mendukung penyimpanan ribuan foto tanpa membebankan memori iPad.
 
 ---
 
-## Tech Stack
+## 🛠️ Panduan Instalasi & Jalankan Sistem
 
-| Layer | Teknologi |
-|-------|-----------|
-| Frontend | React 18, TypeScript 5, Vite 6, Tailwind CSS 4 |
-| State Management | Zustand, TanStack Query |
-| Backend | Laravel 11, PHP 8.2 |
-| Database | PostgreSQL 17 |
-| Auth | Laravel Sanctum |
-| Hardware Bridge | Python 3, gphoto2 |
-| QR Code | simplesoftwareio/simple-qrcode (BE), qrcode.react (FE) |
-| Image Processing | Intervention Image (Laravel) |
-| Cloud Sync | Google Drive API v3 |
-| Deployment | (TBD — VPS / Docker) |
-
----
-
-## Struktur Proyek
-
-```
-PixelBooth/
-├── frontend/          # React + TypeScript + Vite
-│   ├── src/
-│   │   ├── api/       # Axios API clients
-│   │   ├── components/# Reusable components
-│   │   ├── pages/     # Route pages
-│   │   ├── stores/    # Zustand stores
-│   │   ├── hooks/     # Custom hooks
-│   │   ├── types/     # TypeScript types
-│   │   └── utils/     # Helpers
-│   └── ...
-├── backend/           # Laravel 11
-│   ├── app/
-│   │   ├── Http/Controllers/Api/
-│   │   ├── Models/
-│   │   ├── Services/
-│   │   └── Jobs/
-│   ├── database/
-│   │   ├── migrations/
-│   │   └── seeders/
-│   └── ...
-├── hardware-bridge/   # Python DSLR bridge
-│   ├── main.py
-│   ├── camera.py
-│   ├── bluetooth.py
-│   └── requirements.txt
-├── docs/              # Dokumentasi
-├── .gitignore
-└── README.md
-```
-
----
-
-## Instalasi
-
-### Prasyarat
+### Prasyarat System
 
 - **PHP** >= 8.2
 - **Composer** >= 2.x
-- **Node.js** >= 20.x & npm >= 10.x
-- **PostgreSQL** >= 15
-- **Python** >= 3.10 (untuk hardware bridge)
-- **Git**
+- **Node.js** >= 20.x & **npm** >= 10.x
+- **MySQL / SQLite / PostgreSQL**
+- **Python** >= 3.10 _(opsional untuk integrasi DSLR)_
 
 ### 1. Clone Repository
 
@@ -200,276 +213,61 @@ git clone https://github.com/nandaRssa/PixelBooth.git
 cd PixelBooth
 ```
 
-### 2. Setup Frontend
-
-```bash
-cd frontend
-npm install
-cp .env.example .env.local
-# Edit .env.local dengan URL API yang sesuai
-npm run dev
-```
-
-### 3. Setup Backend
+### 2. Jalankan Backend (Laravel API)
 
 ```bash
 cd backend
 composer install
 cp .env.example .env
 php artisan key:generate
-# Edit .env dengan konfigurasi database dan lainnya
 php artisan migrate --seed
 php artisan storage:link
 php artisan serve
+# Backend berjalan di http://127.0.0.1:8000
 ```
 
-### 4. Setup Hardware Bridge
+### 3. Jalankan Frontend (React + Vite)
 
 ```bash
-cd hardware-bridge
-python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
-pip install -r requirements.txt
-cp .env.example .env
-python main.py
+cd ../frontend
+npm install
+npm run dev
+# Frontend berjalan di http://localhost:5173
 ```
 
 ---
 
-## Environment Setup
+## 📱 Panduan Penggunaan iPad & Remote Bluetooth
 
-### Frontend (`.env.local`)
+### Buka Aplikasi di iPad:
 
-```env
-VITE_API_URL=http://localhost:8000/api
-VITE_APP_NAME=PixelBooth
-VITE_HARDWARE_BRIDGE_URL=http://localhost:5000
-```
+1. Pastikan iPad dan Laptop/Server terhubung pada jaringan **Wi-Fi yang sama**.
+2. Buka **Safari** di iPad, lalu akses URL IP Lokal (misal: `http://192.168.1.10:5173`).
+3. Untuk tampilan penuh tanpa bar browser:
+   - Tekan tombol **Share (Bagikan)** di Safari → Pilih **Add to Home Screen (Tambah ke Layar Utama)**.
+   - Buka ikon **PixelBooth** dari layar utama iPad.
+4. Masuk ke menu **Pengaturan** -> Ubah **Display Mode** ke **Fullscreen**.
 
-### Backend (`.env`)
+### Menggunakan Remote Bluetooth:
 
-```env
-APP_NAME=PixelBooth
-APP_ENV=local
-APP_KEY=
-APP_DEBUG=true
-APP_URL=http://localhost:8000
-
-DB_CONNECTION=pgsql
-DB_HOST=127.0.0.1
-DB_PORT=5432
-DB_DATABASE=pixelbooth
-DB_USERNAME=postgres
-DB_PASSWORD=your_password
-
-HARDWARE_BRIDGE_URL=http://localhost:5000
-HARDWARE_BRIDGE_SECRET=your_bridge_secret
-
-GOOGLE_CLIENT_ID=
-GOOGLE_CLIENT_SECRET=
-GOOGLE_REDIRECT_URI=http://localhost:8000/api/google/callback
-
-SANCTUM_STATEFUL_DOMAINS=localhost:5173
-SESSION_DOMAIN=localhost
-```
+1. Hubungkan Remote Bluetooth (_selfie shutter_) ke iPad via Bluetooth Settings.
+2. Saat berada di layar sesi pemotretan, tekan tombol remote untuk mulai hitung mundur foto tanpa menyentuh layar!
 
 ---
 
-## Database Setup
+## 🌐 Cloud Hosting & Storage Gratisan (Rekomendasi)
 
-Development lokal memakai **SQLite** (tanpa instalasi server tambahan).
-Untuk production, gunakan **PostgreSQL** seperti pada plan awal.
+Untuk menjalankan PixelBooth secara online agar dapat diakses dari luar:
 
-```bash
-# === Opsi A — Development (SQLite) ===
-cd backend
-# Pastikan DB_CONNECTION=sqlite pada .env (sudah default di .env.example)
-php artisan migrate --seed
-php artisan storage:link
-
-# === Opsi B — Production (PostgreSQL) ===
-psql -U postgres -c "CREATE DATABASE pixelbooth;"
-# Set DB_CONNECTION=pgsql dan isi kredensial di .env
-php artisan migrate --seed
-```
-
-Seeder otomatis membuat:
-- **Admin default** — Email: `admin@pixelbooth.com` · Password: `admin123`
-- **3 template demo**
-- **Demo galeri** (folder + foto placeholder) untuk keperluan development
-
-> ⚠️ Ganti password admin setelah pertama kali login.
+1. **Frontend Hosting (100% Gratis):**
+   - **Vercel** / **Netlify** / **Cloudflare Pages** (SSL HTTPS Otomatis, CDN super kencang).
+2. **Backend API Hosting:**
+   - **Render.com** / **Koyeb** / **Fly.io** (Free tier Web Service).
+3. **Penyimpanan Foto Cloud:**
+   - **Cloudflare R2 (SANGAT DIREKOMENDASIKAN):** 10 GB Storage Gratis per bulan & **0 Rupiah Biaya Bandwidth (No Egress Fee)** saat customer scan QR Code foto!
 
 ---
 
-## Google Drive Configuration
+## 📄 Lisensi & Pengembang
 
-1. Buka [Google Cloud Console](https://console.cloud.google.com)
-2. Buat project baru: `PixelBooth`
-3. Enable **Google Drive API**
-4. Buat OAuth 2.0 credentials
-5. Tambahkan redirect URI: `http://localhost:8000/api/google/callback`
-6. Salin `Client ID` dan `Client Secret` ke `.env` backend
-
----
-
-## Hardware Bridge
-
-Hardware bridge adalah service Python yang berjalan di mesin yang sama dengan DSLR.
-
-### Instalasi Dependencies
-
-```bash
-cd hardware-bridge
-pip install -r requirements.txt
-```
-
-Requirements:
-- `flask` — HTTP server
-- `gphoto2` — DSLR communication (Linux/Mac)
-- `Pillow` — image processing
-- `python-dotenv` — env management
-- `PyBluez` (optional) — Bluetooth communication
-
-### Menjalankan Bridge
-
-```bash
-python main.py
-# Bridge berjalan di http://localhost:5000
-```
-
-### Endpoint Hardware Bridge
-
-| Method | Endpoint | Deskripsi |
-|--------|----------|-----------|
-| GET | `/status` | Status bridge & kamera |
-| GET | `/camera/status` | Status kamera saja |
-| POST | `/camera/capture` | Trigger capture |
-| GET | `/camera/latest` | Download foto terbaru |
-| POST | `/bluetooth/listen` | Mulai listen Bluetooth |
-
----
-
-## DSLR Configuration
-
-Target kamera: **Canon EOS 70D**
-
-### Koneksi
-
-- USB 3.0 ke komputer/server
-- Driver: gphoto2 (Linux/Mac) atau WIA (Windows)
-- Mode kamera: **Manual (M)**
-
-### Pengaturan Kamera yang Direkomendasikan
-
-| Setting | Value |
-|---------|-------|
-| Mode | Manual (M) |
-| ISO | 400-800 |
-| Aperture | f/4 - f/8 |
-| Shutter | 1/125 |
-| White Balance | Auto / Daylight |
-| Image Format | JPEG Large Fine |
-| Auto Focus | One-Shot |
-
----
-
-## Bluetooth Remote
-
-Bluetooth remote yang kompatibel bekerja sebagai **HID keyboard device**.
-
-Tombol remote biasanya mengirimkan keyboard event (Space, Enter, atau Volume Up/Down).
-
-Frontend akan listen keyboard event untuk trigger countdown.
-
-```javascript
-// Event yang di-listen:
-window.addEventListener('keydown', (e) => {
-  if (e.key === ' ' || e.key === 'Enter') {
-    triggerCountdown();
-  }
-});
-```
-
----
-
-## iPad Safari Setup
-
-1. Pastikan iPad dan server berada di **jaringan WiFi yang sama**
-2. Akses melalui IP lokal: `http://192.168.x.x:5173`
-3. Untuk fullscreen: tambahkan ke Home Screen melalui Safari → Share → Add to Home Screen
-4. Pastikan permission kamera diizinkan (untuk webcam mode)
-
----
-
-## API Documentation
-
-Dokumentasi API lengkap tersedia di [`docs/api.md`](docs/api.md)
-
-### Base URL
-```
-http://localhost:8000/api
-```
-
-### Endpoint Utama
-
-| Method | Endpoint | Deskripsi |
-|--------|----------|-----------|
-| GET | `/templates` | List template |
-| POST | `/templates` | Upload template |
-| GET | `/folders` | List folder |
-| POST | `/folders` | Buat folder |
-| GET | `/photos` | List foto |
-| POST | `/sessions` | Mulai sesi foto |
-| POST | `/sessions/{id}/capture` | Trigger capture |
-| POST | `/sessions/{id}/complete` | Selesaikan sesi |
-| GET | `/public/photo/{token}` | Customer photo page |
-| GET | `/public/folder/{token}` | Customer folder page |
-
-> Fitur login dihapus — seluruh endpoint dapat diakses tanpa autentikasi.
-
----
-
-## Troubleshooting
-
-### Kamera tidak terdeteksi
-- Pastikan USB tersambung
-- Cek `gphoto2 --auto-detect`
-- Matikan aplikasi kamera bawaan sistem
-
-### PostgreSQL connection error
-- Pastikan service PostgreSQL berjalan
-- Cek kredensial di `.env`
-- Verifikasi: `psql -U postgres -c "\l"`
-
-### CORS error di frontend
-- Pastikan `SANCTUM_STATEFUL_DOMAINS` di `.env` sudah benar
-- Cek konfigurasi CORS di `config/cors.php`
-
-### Google Drive upload gagal
-- Verifikasi OAuth credentials
-- Cek token tidak expired
-- Periksa quota Google Drive
-
----
-
-## Deployment
-
-> Dokumentasi deployment tersedia di [`docs/deployment.md`](docs/deployment.md)
-
----
-
-## Contributing
-
-Project ini dibangun untuk tujuan portofolio. Jika ingin berkontribusi:
-
-1. Fork repository
-2. Buat branch: `git checkout -b feature/nama-fitur`
-3. Commit dengan pesan yang jelas
-4. Push dan buat Pull Request
-
----
-
-<p align="center">
-  Dibuat dengan ❤️ oleh <a href="https://github.com/nandaRssa">Nanda Raissa</a>
-</p>
+Dikembangkan dengan ❤️ oleh **[Nanda Raissa](https://github.com/nandaRssa)** — Sistem Photobooth Profesional Full-Stack.

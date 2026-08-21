@@ -95,9 +95,9 @@ interface ToastContainerProps {
 
 export const ToastContainer: React.FC<ToastContainerProps> = ({ toasts, onDismiss }) => {
   return (
-    // Bawah-tengah: tidak menutupi sidebar/tombol kanan, header, atau canvas atas.
+    // Bawah-kanan pojok: tidak menutupi area tengah atau kontrol utama.
     // Container pointer-events-none agar klik tembus saat tidak ada toast.
-    <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-[100] flex flex-col items-center gap-2 pointer-events-none">
+    <div className="fixed bottom-6 right-6 z-[100] flex flex-col items-end gap-2 pointer-events-none">
       <AnimatePresence mode="popLayout">
         {toasts.map((toast) => (
           <ToastComponent key={toast.id} toast={toast} onDismiss={onDismiss} />

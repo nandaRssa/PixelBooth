@@ -12,6 +12,8 @@ import PhotoMenuPage from '@/pages/admin/PhotoMenuPage'
 import PhotoCapturePage from '@/pages/admin/PhotoCapturePage'
 import TemplatesPage from '@/pages/admin/TemplatesPage'
 import TemplateFrameEditorPage from '@/pages/admin/TemplateFrameEditorPage'
+import SettingsPage from '@/pages/admin/SettingsPage'
+import FullscreenSessionPage from '@/pages/admin/FullscreenSessionPage'
 
 // Customer Pages
 import CustomerPhotoPage from '@/pages/customer/CustomerPhotoPage'
@@ -78,13 +80,11 @@ const App: React.FC = () => {
               <Route path="/photo/session/:id" element={<PhotoCapturePage />} />
               <Route path="/templates" element={<TemplatesPage />} />
               <Route path="/templates/:id/editor" element={<TemplateFrameEditorPage />} />
-              <Route path="/settings" element={
-                <div className="text-pb-text">
-                  <h1 className="text-2xl font-bold mb-2">Pengaturan</h1>
-                  <p className="text-pb-text-muted">Fitur akan tersedia di fase berikutnya.</p>
-                </div>
-              } />
+              <Route path="/settings" element={<SettingsPage />} />
             </Route>
+
+            {/* Fullscreen Session — tanpa AdminLayout (tanpa sidebar/navbar) */}
+            <Route path="/photo/session-fs/:id" element={<FullscreenSessionPage />} />
 
             {/* Catch all — redirect ke root */}
             <Route path="*" element={<Navigate to="/" replace />} />

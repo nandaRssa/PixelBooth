@@ -84,10 +84,10 @@ export const AdminLayout: React.FC = () => {
               to={item.to}
               title={item.label}
               className={({ isActive }) => `
-                flex items-center justify-center lg:justify-start gap-3 px-3 py-2.5 rounded-lg text-sm font-medium
-                transition-all duration-150 group
+                flex items-center justify-center lg:justify-start gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold
+                transition-all duration-200 group hover:translate-x-1.5
                 ${isActive
-                  ? 'bg-pb-accent text-pb-on-accent'
+                  ? 'bg-gradient-to-r from-[#FF5A36] to-[#FF8836] text-white shadow-md shadow-orange-500/25'
                   : 'text-pb-text-secondary hover:text-pb-text hover:bg-pb-elevated'
                 }
               `}
@@ -104,9 +104,9 @@ export const AdminLayout: React.FC = () => {
             to="/settings"
             title="Pengaturan"
             className={({ isActive }) => `
-              flex items-center justify-center lg:justify-start gap-3 px-3 py-2.5 rounded-lg text-sm font-medium
-              transition-all duration-150
-              ${isActive ? 'bg-pb-accent text-pb-on-accent' : 'text-pb-text-secondary hover:text-pb-text hover:bg-pb-elevated'}
+              flex items-center justify-center lg:justify-start gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold
+              transition-all duration-200 hover:translate-x-1.5
+              ${isActive ? 'bg-gradient-to-r from-[#FF5A36] to-[#FF8836] text-white shadow-md shadow-orange-500/25' : 'text-pb-text-secondary hover:text-pb-text hover:bg-pb-elevated'}
             `}
           >
             <Settings size={20} />

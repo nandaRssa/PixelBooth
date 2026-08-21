@@ -39,9 +39,12 @@ const PhotoCard: React.FC<PhotoCardProps> = ({
     <motion.div
       initial={{ opacity: 0, scale: 0.96 }}
       animate={{ opacity: 1, scale: 1 }}
+      whileHover={{ y: -5, scale: 1.02 }}
+      whileTap={{ scale: 0.98 }}
+      transition={{ type: 'spring', stiffness: 350, damping: 25 }}
       className={`
         group relative aspect-square bg-pb-surface border rounded-xl overflow-hidden cursor-pointer
-        transition-colors duration-150
+        shadow-xs hover:shadow-xl transition-colors duration-200
         ${selectionMode
           ? isSelected
             ? 'border-white ring-2 ring-white/30'
@@ -76,47 +79,49 @@ const PhotoCard: React.FC<PhotoCardProps> = ({
 
       {/* Overlay aksi (hanya di mode normal) */}
       {!selectionMode && (
-        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-150">
-          <div className="absolute bottom-0 left-0 right-0 p-3">
-            <div className="flex items-center gap-1.5">
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onPreview(photo)
-                }}
-                className="flex-1 flex items-center justify-center gap-1.5 px-2 py-2 rounded-lg
-                  bg-white/10 backdrop-blur-sm text-pb-text text-xs font-medium
-                  hover:bg-white/20 transition-colors"
-              >
-                <Eye size={13} />
-                Lihat
-              </button>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onMove(photo)
-                }}
-                className="flex-1 flex items-center justify-center gap-1.5 px-2 py-2 rounded-lg
-                  bg-white/10 backdrop-blur-sm text-pb-text text-xs font-medium
-                  hover:bg-white/20 transition-colors"
-              >
-                <FolderInput size={13} />
-                Pindah
-              </button>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onDelete(photo)
-                }}
-                className="touch-target w-9 h-9 rounded-lg bg-red-500/20 backdrop-blur-sm text-red-300
-                  hover:bg-red-500/40 hover:text-red-200 transition-colors"
-              >
-                <Trash2 size={14} />
-              </button>
-            </div>
+        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-200 flex flex-col justify-end p-2.5">
+          <div className="flex items-center gap-1.5 w-full">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation()
+                onPreview(photo)
+              }}
+              className="flex-1 flex items-center justify-center gap-1 px-2 py-2 rounded-lg
+                bg-black/75 backdrop-blur-md text-white border border-white/20
+                text-xs font-semibold hover:bg-black hover:text-cyan-300 active:scale-95 transition-all shadow-md"
+              title="Lihat Foto"
+            >
+              <Eye size={13} className="text-cyan-300" />
+              <span>Lihat</span>
+            </button>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation()
+                onMove(photo)
+              }}
+              className="flex-1 flex items-center justify-center gap-1 px-2 py-2 rounded-lg
+                bg-black/75 backdrop-blur-md text-white border border-white/20
+                text-xs font-semibold hover:bg-black hover:text-amber-300 active:scale-95 transition-all shadow-md"
+              title="Pindahkan Foto"
+            >
+              <FolderInput size={13} className="text-amber-300" />
+              <span>Pindah</span>
+            </button>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation()
+                onDelete(photo)
+              }}
+              className="w-8.5 h-8.5 rounded-lg bg-black/75 backdrop-blur-md text-red-400 border border-white/20
+                hover:bg-red-600 hover:text-white active:scale-95 transition-all shadow-md flex items-center justify-center shrink-0"
+              title="Hapus Foto"
+              aria-label="Hapus Foto"
+            >
+              <Trash2 size={14} />
+            </button>
           </div>
         </div>
       )}

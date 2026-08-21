@@ -67,13 +67,13 @@ const DashboardPage: React.FC = () => {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.08 }}
-              whileHover={{ y: -2 }}
+              whileHover={{ y: -6, scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               onClick={() => navigate(item.to)}
               className={`
                 text-left p-6 rounded-2xl bg-gradient-to-br ${item.color}
-                border border-pb-border hover:border-pb-border-strong
-                transition-all duration-200 cursor-pointer group
+                border border-pb-border hover:border-pb-border-strong shadow-xs hover:shadow-xl
+                transition-colors duration-200 cursor-pointer group
               `}
             >
               {/* Icon */}

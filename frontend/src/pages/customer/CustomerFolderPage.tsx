@@ -167,10 +167,12 @@ const CustomerFolderPage: React.FC = () => {
               className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-[calc(100vw-2rem)] max-w-lg"
             >
               <div className="flex items-center justify-between mb-3">
-                <p className="text-pb-text text-sm font-medium">{folder.name}</p>
+                <p className="text-pb-text text-sm font-medium truncate">{folder.name}</p>
                 <button
+                  type="button"
                   onClick={() => setPreview(null)}
-                  className="touch-target w-9 h-9 rounded-lg bg-white/10 text-pb-text hover:bg-white/20 transition-colors"
+                  className="w-8 h-8 rounded-lg bg-pb-elevated border border-pb-border hover:border-pb-border-strong text-pb-text-secondary hover:text-pb-text flex items-center justify-center transition-colors shrink-0 ml-auto"
+                  title="Tutup"
                 >
                   <X size={16} />
                 </button>

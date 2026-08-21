@@ -62,10 +62,13 @@ export const Modal: React.FC<ModalProps> = ({
                 )}
                 {showClose && (
                   <button
+                    type="button"
                     onClick={onClose}
-                    className="text-pb-text-muted hover:text-pb-text transition-colors ml-auto"
+                    className="w-8 h-8 rounded-lg bg-pb-elevated border border-pb-border hover:border-pb-border-strong text-pb-text-secondary hover:text-pb-text flex items-center justify-center transition-colors ml-auto shrink-0"
+                    title="Tutup"
+                    aria-label="Tutup"
                   >
-                    <X size={18} />
+                    <X size={16} />
                   </button>
                 )}
               </div>

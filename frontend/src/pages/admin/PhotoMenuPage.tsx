@@ -3,12 +3,9 @@ import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
   AlertTriangle,
-  Camera,
-  Check,
   FolderPlus,
   ImageIcon,
   Layers,
-  Play,
   Video,
   VideoOff,
   Wifi,
@@ -19,11 +16,12 @@ import { toast } from '@/components/ui/Toast'
 import { useTemplates, useHardwareStatus } from '@/hooks/useTemplates'
 import { useFolders } from '@/hooks/useFolders'
 import { useCreateSession } from '@/hooks/useSessions'
+import { getSessionDisplayMode } from '@/utils/sessionDisplay'
 import type { Template } from '@/types'
 
 // ==========================================
 // Photo / Photobooth Menu Page
-// Pilih template + mulai sesi.
+// Pilih template -> langsung mulai sesi.
 // Sumber kamera utama: webcam device (browser).
 // DSLR via hardware bridge bersifat opsional.
 // ==========================================
@@ -62,8 +60,8 @@ function useWebcamAvailability() {
 
 const PhotoMenuPage: React.FC = () => {
   const navigate = useNavigate()
-  const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null)
   const [selectedFolderId, setSelectedFolderId] = useState<number | null>(null)
+  const [startingTemplateId, setStartingTemplateId] = useState<number | null>(null)
 
   const templatesQuery = useTemplates()
   const foldersQuery = useFolders(null)
@@ -78,18 +76,26 @@ const PhotoMenuPage: React.FC = () => {
 
   const dslrConnected = hardware?.camera === 'connected'
 
-  const handleStartSession = async () => {
-    if (!selectedTemplate) return
+  const handleSelectTemplate = async (template: Template) => {
+    if (startingTemplateId) return
+    setStartingTemplateId(template.id)
 
     try {
       const session = await createSession.mutateAsync({
-        templateId: selectedTemplate.id,
+        templateId: template.id,
         folderId: selectedFolderId,
       })
-      toast.success(`Sesi dimulai dengan template "${selectedTemplate.name}".`)
-      navigate(`/photo/session/${session.id}`)
+      toast.success(`Sesi dimulai dengan template "${template.name}".`)
+
+      const mode = getSessionDisplayMode()
+      if (mode === 'fullscreen') {
+        navigate(`/photo/session-fs/${session.id}`)
+      } else {
+        navigate(`/photo/session/${session.id}`)
+      }
     } catch {
       toast.error('Gagal memulai sesi. Coba lagi.')
+      setStartingTemplateId(null)
     }
   }
 
@@ -99,7 +105,7 @@ const PhotoMenuPage: React.FC = () => {
       <div className="flex items-center justify-between mb-6 shrink-0">
         <div>
           <h1 className="text-pb-text text-2xl font-bold">Photo</h1>
-          <p className="text-pb-text-muted text-sm mt-1">Mulai sesi pemotretan photobooth</p>
+          <p className="text-pb-text-muted text-sm mt-1">Pilih template untuk langsung memulai sesi pemotretan</p>
         </div>
         <CameraStatusBadge
           status={
@@ -152,186 +158,136 @@ const PhotoMenuPage: React.FC = () => {
         ) : null}
       </div>
 
-      {/* ===== Info Singkat ===== */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 shrink-0">
-        {[
-          { label: 'Format yang Didukung', value: 'PNG, JPG, WEBP' },
-          { label: 'Ukuran Canvas', value: 'Bebas (pixel based)' },
-          { label: 'Alur Wajib', value: 'Confirm Frame Editor sebelum sesi' },
-        ].map((info) => (
-          <div key={info.label} className="bg-pb-surface border border-pb-border rounded-xl px-4 py-4">
-            <p className="text-pb-text-muted text-xs mb-1">{info.label}</p>
-            <p className="text-pb-text text-sm font-medium">{info.value}</p>
-          </div>
-        ))}
-      </div>
+      {/* ===== Pilihan Folder Tujuan ===== */}
+      <div className="mb-6 bg-pb-surface border border-pb-border rounded-2xl p-5 shrink-0 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <p className="text-pb-text font-medium text-sm">Target Penyimpanan</p>
+          <p className="text-pb-text-muted text-xs mt-0.5">Pilih folder galeri tujuan sebelum memilih template foto.</p>
 
-      {/* ===== Aksi Mulai Sesi ===== */}
-      <div className="mb-6 bg-pb-surface border border-pb-border rounded-2xl p-5 shrink-0">
-        <div className="flex flex-col lg:flex-row lg:items-center gap-4">
-          <div className="flex-1 min-w-0">
-            {selectedTemplate ? (
-              <>
-                <p className="text-pb-text font-medium text-sm">
-                  Template terpilih: {selectedTemplate.name}
-                </p>
-                <p className="text-pb-text-muted text-xs mt-0.5">
-                  {selectedTemplate.frame_count} frame · {selectedTemplate.canvas_width} x {selectedTemplate.canvas_height}
-                </p>
-              </>
-            ) : (
-              <>
-                <p className="text-pb-text font-medium text-sm">Siap memotret?</p>
-                <p className="text-pb-text-muted text-xs mt-0.5">Pilih template untuk memulai sesi baru.</p>
-              </>
-            )}
+          {webcamAvailable === false && (
+            <p className="flex items-center gap-1.5 text-amber-400 text-xs mt-1.5">
+              <AlertTriangle size={12} />
+              Webcam tidak terdeteksi — izinkan akses kamera di browser.
+            </p>
+          )}
+        </div>
 
-            {webcamAvailable === false && (
-              <p className="flex items-center gap-1.5 text-amber-400 text-xs mt-1.5">
-                <AlertTriangle size={12} />
-                Webcam tidak terdeteksi — izinkan akses kamera di browser.
-              </p>
-            )}
-            {dslrConnected && (
-              <p className="flex items-center gap-1.5 text-pb-text-secondary text-xs mt-1.5">
-                <Camera size={12} />
-                Capture akan menggunakan webcam device.
-              </p>
-            )}
-          </div>
-
-          {/* Pilihan folder penyimpanan */}
-          <div className="w-full lg:w-72">
-            <label className="block text-pb-text-secondary text-xs font-medium mb-1.5 flex items-center gap-1.5">
-              <FolderPlus size={13} />
-              Simpan Hasil ke Folder
-            </label>
-            {foldersQuery.isLoading ? (
-              <div className="flex items-center gap-2 bg-pb-bg border border-pb-border rounded-lg px-4 py-2.5">
-                <Spinner size="sm" className="text-pb-text" />
-                <span className="text-pb-text-muted text-sm">Memuat folder...</span>
-              </div>
-            ) : (
-              <select
-                value={selectedFolderId ?? ''}
-                onChange={(e) =>
-                  setSelectedFolderId(e.target.value === '' ? null : Number(e.target.value))
-                }
-                className="w-full bg-pb-bg border border-pb-border rounded-lg px-3 py-2.5
-                  text-pb-text text-sm focus:outline-none focus:ring-1 focus:border-pb-border-strong focus:ring-white/10
-                  [&>option]:bg-pb-bg"
-              >
-                <option value="">Galeri (Tanpa Folder)</option>
-                {folders.map((folder) => (
-                  <option key={folder.id} value={folder.id}>
-                    {folder.name}
-                  </option>
-                ))}
-              </select>
-            )}
-          </div>
-
-          <Button
-            variant="primary"
-            size="lg"
-            onClick={handleStartSession}
-            disabled={!selectedTemplate || createSession.isPending}
-            loading={createSession.isPending}
-            leftIcon={<Play size={18} />}
-          >
-            Mulai Sesi Baru
-          </Button>
+        <div className="w-full sm:w-72">
+          <label className="block text-pb-text-secondary text-xs font-medium mb-1.5 flex items-center gap-1.5">
+            <FolderPlus size={13} />
+            Simpan Hasil ke Folder
+          </label>
+          {foldersQuery.isLoading ? (
+            <div className="flex items-center gap-2 bg-pb-bg border border-pb-border rounded-lg px-4 py-2.5">
+              <Spinner size="sm" className="text-pb-text" />
+              <span className="text-pb-text-muted text-sm">Memuat folder...</span>
+            </div>
+          ) : (
+            <select
+              value={selectedFolderId ?? ''}
+              onChange={(e) =>
+                setSelectedFolderId(e.target.value === '' ? null : Number(e.target.value))
+              }
+              className="w-full bg-pb-bg border border-pb-border rounded-lg px-3 py-2.5
+                text-pb-text text-sm focus:outline-none focus:ring-1 focus:border-pb-border-strong focus:ring-white/10
+                [&>option]:bg-pb-bg"
+            >
+              <option value="">Galeri (Tanpa Folder)</option>
+              {folders.map((folder) => (
+                <option key={folder.id} value={folder.id}>
+                  {folder.name}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
       </div>
 
       {/* ===== Daftar Template (scroll area) ===== */}
       <div className="flex-1 min-h-0 overflow-y-auto pb-6">
-      {/* ===== Pilih Template ===== */}
-      <h2 className="text-pb-text text-sm font-semibold mb-3 flex items-center gap-2">
-        <Layers size={16} className="text-pb-text-secondary" />
-        Pilih Template
-        <span className="text-pb-text-muted font-normal">
-          {templatesQuery.isLoading ? '' : templates.length}
-        </span>
-      </h2>
-      {templatesQuery.isLoading ? (
-        <div className="flex items-center justify-center py-16 bg-pb-surface border border-pb-border rounded-2xl">
-          <Spinner size="lg" className="text-pb-text" />
-        </div>
-      ) : templates.length === 0 ? (
-        <div className="bg-pb-surface border border-pb-border rounded-2xl p-8 text-center">
-          <ImageIcon size={40} className="text-pb-faint mx-auto mb-3" />
-          <p className="text-pb-text font-medium mb-1">Belum ada template</p>
-          <p className="text-pb-text-muted text-sm mb-5">
-            Unggah template desain di menu Kelola Template terlebih dahulu.
-          </p>
-          <Button variant="outline" size="md" onClick={() => navigate('/templates')}>
-            Kelola Template
-          </Button>
-        </div>
-      ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3">
-          {templates.map((template) => {
-            const isSelected = selectedTemplate?.id === template.id
-            return (
-              <motion.button
-                key={template.id}
-                type="button"
-                initial={{ opacity: 0, scale: 0.97 }}
-                animate={{ opacity: 1, scale: 1 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={() => setSelectedTemplate(isSelected ? null : template)}
-                className={`
-                  relative aspect-[3/4] bg-pb-surface border rounded-xl overflow-hidden text-left
-                  transition-colors duration-150
-                  ${isSelected
-                    ? 'border-pb-accent ring-2 ring-pb-accent/30'
-                    : 'border-pb-border hover:border-pb-border-strong'}
-                `}
-              >
-                {template.preview_url ? (
-                  <img
-                    src={template.preview_url}
-                    alt={template.name}
-                    className="absolute inset-0 w-full h-full object-cover"
-                  />
-                ) : template.template_url ? (
-                  <img
-                    src={template.template_url}
-                    alt={template.name}
-                    className="absolute inset-0 w-full h-full object-cover"
-                  />
-                ) : (
-                  <div className="absolute inset-0 flex items-center justify-center bg-pb-elevated">
-                    <ImageIcon size={32} className="text-pb-faint" />
-                  </div>
-                )}
+        <h2 className="text-pb-text text-sm font-semibold mb-3 flex items-center gap-2">
+          <Layers size={16} className="text-pb-text-secondary" />
+          Pilih Template
+          <span className="text-pb-text-muted font-normal">
+            {templatesQuery.isLoading ? '' : templates.length}
+          </span>
+        </h2>
+        {templatesQuery.isLoading ? (
+          <div className="flex items-center justify-center py-16 bg-pb-surface border border-pb-border rounded-2xl">
+            <Spinner size="lg" className="text-pb-text" />
+          </div>
+        ) : templates.length === 0 ? (
+          <div className="bg-pb-surface border border-pb-border rounded-2xl p-8 text-center">
+            <ImageIcon size={40} className="text-pb-faint mx-auto mb-3" />
+            <p className="text-pb-text font-medium mb-1">Belum ada template</p>
+            <p className="text-pb-text-muted text-sm mb-5">
+              Unggah template desain di menu Kelola Template terlebih dahulu.
+            </p>
+            <Button variant="outline" size="md" onClick={() => navigate('/templates')}>
+              Kelola Template
+            </Button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+            {templates.map((template) => {
+              const isStarting = startingTemplateId === template.id
+              return (
+                <motion.button
+                  key={template.id}
+                  type="button"
+                  initial={{ opacity: 0, scale: 0.97 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  whileHover={startingTemplateId ? {} : { y: -5, scale: 1.02 }}
+                  whileTap={startingTemplateId ? {} : { scale: 0.98 }}
+                  transition={{ type: "spring", stiffness: 350, damping: 25 }}
+                  onClick={() => handleSelectTemplate(template)}
+                  disabled={!!startingTemplateId}
+                  className="relative aspect-[3/4] bg-pb-surface border border-pb-border hover:border-pb-border-strong rounded-xl overflow-hidden text-left shadow-xs hover:shadow-xl transition-colors duration-200 group disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
+                >
+                  {template.preview_url ? (
+                    <img
+                      src={template.preview_url}
+                      alt={template.name}
+                      className="absolute inset-0 w-full h-full object-cover"
+                    />
+                  ) : template.template_url ? (
+                    <img
+                      src={template.template_url}
+                      alt={template.name}
+                      className="absolute inset-0 w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="absolute inset-0 flex items-center justify-center bg-pb-elevated">
+                      <ImageIcon size={32} className="text-pb-faint" />
+                    </div>
+                  )}
 
-                {/* Badge jumlah frame */}
-                <span className="absolute top-2 right-2 px-2 py-0.5 rounded-md bg-black/60 backdrop-blur-sm
-                  text-white text-xs font-medium">
-                  {template.frame_count} frame
-                </span>
+                  {/* Loading Overlay jika card sedang diklik */}
+                  {isStarting && (
+                    <div className="absolute inset-0 bg-black/60 backdrop-blur-xs flex flex-col items-center justify-center gap-2 z-10">
+                      <Spinner size="md" className="text-white" />
+                      <span className="text-white text-xs font-medium">Memuat Sesi...</span>
+                    </div>
+                  )}
 
-                {/* Indikator terpilih */}
-                {isSelected && (
-                  <span className="absolute top-2 left-2 w-6 h-6 rounded-md bg-white flex items-center justify-center">
-                    <Check size={14} className="text-black" />
+                  {/* Badge jumlah frame */}
+                  <span className="absolute top-2 right-2 px-2 py-0.5 rounded-md bg-black/60 backdrop-blur-sm
+                    text-white text-xs font-medium">
+                    {template.frame_count} frame
                   </span>
-                )}
 
-                {/* Info bawah */}
-                <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/90 to-transparent">
-                  <p className="text-white text-sm font-medium truncate">{template.name}</p>
-                  <p className="text-white/70 text-xs">
-                    {template.canvas_width} x {template.canvas_height}
-                  </p>
-                </div>
-              </motion.button>
-            )
-          })}
-        </div>
-      )}
+                  {/* Info bawah */}
+                  <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/90 to-transparent">
+                    <p className="text-white text-sm font-medium truncate">{template.name}</p>
+                    <p className="text-white/70 text-xs">
+                      {template.canvas_width} x {template.canvas_height}
+                    </p>
+                  </div>
+                </motion.button>
+              )
+            })}
+          </div>
+        )}
       </div>
     </div>
   )

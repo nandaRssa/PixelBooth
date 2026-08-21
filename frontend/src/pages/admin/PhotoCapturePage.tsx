@@ -227,6 +227,29 @@ const PhotoCapturePage: React.FC = () => {
     }, 1000)
   }
 
+  // ===== Remote Bluetooth Shutter Listener =====
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (
+        (e.code === 'Space' ||
+          e.code === 'Enter' ||
+          e.code === 'AudioVolumeUp' ||
+          e.code === 'PageDown') &&
+        phase === 'idle' &&
+        cameraActive &&
+        !allDone
+      ) {
+        if (e.code === 'Space' || e.code === 'PageDown') {
+          e.preventDefault()
+        }
+        startCountdown()
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [phase, cameraActive, allDone])
+
   // Saat countdown mencapai 0, ambil foto TEPAT SATU KALI.
   // Pemicu capture tidak boleh berada di dalam updater setState —
   // StrictMode menjalankan updater dua kali dan memicu double-capture.

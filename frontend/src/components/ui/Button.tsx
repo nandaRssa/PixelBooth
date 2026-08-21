@@ -25,9 +25,9 @@ interface ButtonProps {
 }
 
 const variantStyles: Record<ButtonVariant, string> = {
-  primary: 'bg-pb-accent text-pb-on-accent hover:opacity-85 active:opacity-75',
-  secondary: 'bg-pb-elevated text-pb-text border border-pb-border hover:bg-pb-elevated hover:border-pb-border-light',
-  danger: 'bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 hover:border-red-500/30',
+  primary: 'bg-gradient-to-r from-[#FF5A36] via-[#FF7836] to-[#FF9836] text-white shadow-md shadow-orange-500/20 hover:shadow-lg hover:shadow-orange-500/35 hover:brightness-105 active:scale-[0.98]',
+  secondary: 'bg-pb-elevated text-pb-text border border-pb-border hover:bg-pb-surface hover:border-pb-border-strong',
+  danger: 'bg-red-500/10 text-red-500 border border-red-500/20 hover:bg-red-500/20 hover:border-red-500/30',
   ghost: 'text-pb-text-secondary hover:text-pb-text hover:bg-pb-elevated',
   outline: 'border border-pb-border-strong text-pb-text hover:bg-pb-elevated hover:border-pb-text-muted',
 }
@@ -58,7 +58,9 @@ export const Button: React.FC<ButtonProps> = ({
 
   return (
     <motion.button
+      whileHover={isDisabled ? {} : { y: -2, scale: 1.02 }}
       whileTap={isDisabled ? {} : { scale: 0.97 }}
+      transition={{ type: 'spring', stiffness: 400, damping: 25 }}
       type={type}
       id={id}
       form={form}
