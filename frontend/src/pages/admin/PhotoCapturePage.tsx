@@ -111,7 +111,13 @@ const PhotoCapturePage: React.FC = () => {
     if (!tpl || !tpl.template_url || previewSlots.length === 0) return
 
     let cancelled = false
-    buildTemplateOverlay(tpl.template_url, previewSlots, tpl.canvas_width, tpl.canvas_height)
+    buildTemplateOverlay(
+      tpl.template_url,
+      previewSlots,
+      tpl.canvas_width,
+      tpl.canvas_height,
+      tpl.detection_method
+    )
       .then((url) => {
         if (!cancelled) setOverlay({ url, token: overlayToken })
       })

@@ -21,6 +21,7 @@ return new class extends Migration
             $table->integer('canvas_height')->default(1920);
             $table->integer('frame_count')->default(1);
             $table->jsonb('frame_configuration')->nullable(); // array konfigurasi frame
+            $table->string('detection_method')->default('transparent'); // 'transparent' atau 'white-detection'
             $table->enum('status', ['active', 'inactive'])->default('active');
             $table->timestamps();
 

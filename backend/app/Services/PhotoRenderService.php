@@ -56,25 +56,28 @@ class PhotoRenderService
         imagecopy($templateWithHoles, $templateImg, 0, 0, 0, 0, $w, $h);
         imagedestroy($templateImg);
 
-        // Buat lubang transparan (alpha = 127) pada salinan template mengikuti mask tiap frame
-        $transparent = imagecolorallocatealpha($templateWithHoles, 0, 0, 0, 127);
-        foreach ($slots as $slot) {
-            $points = $slot['mask'] ?? null;
-            if (is_array($points) && count($points) >= 3) {
-                $flat = [];
-                foreach ($points as $p) {
-                    $px = (int) round($p[0] * $w / $canvasW);
-                    $py = (int) round($p[1] * $h / $canvasH);
-                    $flat[] = $px;
-                    $flat[] = $py;
+        // Hanya buat lubang transparan (alpha = 127) jika menggunakan deteksi warna putih
+        // Jika menggunakan mode transparan, biarkan overlay PNG apa adanya untuk menjaga desain/ornamen di atas foto
+        if (($template->detection_method ?? 'transparent') === 'white-detection') {
+            $transparent = imagecolorallocatealpha($templateWithHoles, 0, 0, 0, 127);
+            foreach ($slots as $slot) {
+                $points = $slot['mask'] ?? null;
+                if (is_array($points) && count($points) >= 3) {
+                    $flat = [];
+                    foreach ($points as $p) {
+                        $px = (int) round($p[0] * $w / $canvasW);
+                        $py = (int) round($p[1] * $h / $canvasH);
+                        $flat[] = $px;
+                        $flat[] = $py;
+                    }
+                    imagefilledpolygon($templateWithHoles, $flat, count($flat) / 2, $transparent);
+                } else {
+                    $x = (int) round($slot['x'] * $w / $canvasW);
+                    $y = (int) round($slot['y'] * $h / $canvasH);
+                    $sw = (int) round($slot['width'] * $w / $canvasW);
+                    $sh = (int) round($slot['height'] * $h / $canvasH);
+                    imagefilledrectangle($templateWithHoles, $x, $y, $x + $sw - 1, $y + $sh - 1, $transparent);
                 }
-                imagefilledpolygon($templateWithHoles, $flat, count($flat) / 2, $transparent);
-            } else {
-                $x = (int) round($slot['x'] * $w / $canvasW);
-                $y = (int) round($slot['y'] * $h / $canvasH);
-                $sw = (int) round($slot['width'] * $w / $canvasW);
-                $sh = (int) round($slot['height'] * $h / $canvasH);
-                imagefilledrectangle($templateWithHoles, $x, $y, $x + $sw - 1, $y + $sh - 1, $transparent);
             }
         }
 

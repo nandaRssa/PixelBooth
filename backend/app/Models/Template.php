@@ -19,6 +19,7 @@ class Template extends Model
         'canvas_height',
         'frame_count',
         'frame_configuration',
+        'detection_method',
         'status',
     ];
 

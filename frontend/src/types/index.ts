@@ -24,6 +24,7 @@ export interface Template {
   canvas_height: number
   frame_count: number
   frame_configuration: FrameConfig[] | null
+  detection_method?: 'transparent' | 'white-detection'
   status: 'active' | 'inactive'
   template_url: string | null
   preview_url: string | null

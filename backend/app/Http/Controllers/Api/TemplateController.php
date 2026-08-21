@@ -82,6 +82,7 @@ class TemplateController extends Controller
             'canvas_height' => $request->canvas_height,
             'frame_count' => $detected['frame_count'] ?? $request->frame_count,
             'frame_configuration' => $detected['frames'] ?? $frameConfig,
+            'detection_method' => $detected['detection_method'] ?? 'transparent',
             'status' => 'active',
         ]);
 
@@ -177,10 +178,11 @@ class TemplateController extends Controller
             'name' => ['sometimes', 'string', 'max:255'],
             'frame_configuration' => ['sometimes'],
             'frame_count' => ['sometimes', 'integer', 'min:1', 'max:50'],
+            'detection_method' => ['sometimes', 'string', 'in:transparent,white-detection'],
             'status' => ['sometimes', 'in:active,inactive'],
         ]);
 
-        $data = $request->only(['name', 'frame_count', 'status']);
+        $data = $request->only(['name', 'frame_count', 'detection_method', 'status']);
 
         // frame_configuration bisa dikirim sebagai array atau JSON string
         if ($request->has('frame_configuration')) {

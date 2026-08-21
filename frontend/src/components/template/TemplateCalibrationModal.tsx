@@ -41,6 +41,7 @@ export const TemplateCalibrationModal: React.FC<TemplateCalibrationModalProps> =
   // Drag states (Resize)
   const [isResizing, setIsResizing] = useState(false)
   const [resizeStartSize, setResizeStartSize] = useState({ w: 0, h: 0 })
+  const [detectionMethod, setDetectionMethod] = useState<'transparent' | 'white-detection'>('transparent')
 
   const canvasWidth = template?.canvas_width ?? 1080
   const canvasHeight = template?.canvas_height ?? 1920
@@ -48,6 +49,7 @@ export const TemplateCalibrationModal: React.FC<TemplateCalibrationModalProps> =
   // Load existing configuration
   useEffect(() => {
     if (isOpen && template) {
+      setDetectionMethod(template.detection_method ?? 'transparent')
       const config = template.frame_configuration
       if (Array.isArray(config)) {
         setFrames(
@@ -275,6 +277,9 @@ export const TemplateCalibrationModal: React.FC<TemplateCalibrationModalProps> =
       const response = await apiClient.post(`/templates/${template.id}/detect-frames`)
       const detected = response.data.data
       if (detected && Array.isArray(detected.frames)) {
+        if (detected.detection_method) {
+          setDetectionMethod(detected.detection_method)
+        }
         setFrames(
           detected.frames.map((f: any, idx: number) => ({
             id: idx + 1,
@@ -311,6 +316,7 @@ export const TemplateCalibrationModal: React.FC<TemplateCalibrationModalProps> =
       await apiClient.put(`/templates/${template.id}`, {
         frame_configuration: finalConfig,
         frame_count: finalConfig.length,
+        detection_method: detectionMethod,
       })
       toast.success('Kalibrasi template berhasil disimpan.')
       onSaveSuccess()
@@ -483,6 +489,21 @@ export const TemplateCalibrationModal: React.FC<TemplateCalibrationModalProps> =
                         Scan Ulang
                       </Button>
                     </div>
+                  </div>
+
+                  {/* Mode Deteksi */}
+                  <div className="space-y-2">
+                    <label className="block text-white text-xs font-semibold uppercase tracking-wider text-[#606060]">
+                      Mode Template
+                    </label>
+                    <select
+                      value={detectionMethod}
+                      onChange={(e) => setDetectionMethod(e.target.value as 'transparent' | 'white-detection')}
+                      className="w-full bg-[#0A0A0A] border border-[#2A2A2A] rounded-lg px-3 py-2 text-white text-xs focus:outline-none"
+                    >
+                      <option value="transparent">Transparency First (PNG Overlay)</option>
+                      <option value="white-detection">White Color Detection (Fallback)</option>
+                    </select>
                   </div>
 
                   {/* Frame List */}

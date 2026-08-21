@@ -57,21 +57,111 @@ class TemplateAnalyzerService
         $targetW = $canvasWidth ?? $info[0];
         $targetH = $canvasHeight ?? $info[1];
 
-        // 1) Alpha/Transparency detection (PNG & WEBP dapat memiliki alpha)
+        // 1) Cek apakah template memiliki transparency / alpha channel
+        $hasAlpha = false;
         if (in_array($info[2], [IMAGETYPE_PNG, IMAGETYPE_WEBP], true)) {
-            $alpha = $this->detectAlphaFrames($filePath, $targetW, $targetH);
-            if ($alpha !== null) {
-                return $this->finalize($alpha);
-            }
+            $hasAlpha = $this->hasTransparency($filePath);
         }
 
-        // 4) Color/Contrast detection sebagai fallback
+        if ($hasAlpha) {
+            // Gunakan deteksi alpha, JANGAN JALANKAN deteksi warna putih
+            $alpha = $this->detectAlphaFrames($filePath, $targetW, $targetH);
+            if ($alpha !== null) {
+                $alpha['detection_method'] = 'transparent';
+                return $this->finalize($alpha);
+            }
+
+            // Fallback: Jika ada transparansi tetapi disaring (terlalu kecil/dekoratif),
+            // buat satu slot default transparan penuh seukuran canvas agar tetap bernilai 'transparent'.
+            $fallback = [
+                'frame_count' => 1,
+                'method' => 'alpha',
+                'frames' => [
+                    [
+                        'id' => 1,
+                        'order' => 0,
+                        'shape' => 'rectangle',
+                        'x' => 0,
+                        'y' => 0,
+                        'width' => $targetW,
+                        'height' => $targetH,
+                        'position' => ['x' => 0, 'y' => 0],
+                        'size' => ['width' => $targetW, 'height' => $targetH],
+                        'mask' => [
+                            [0, 0],
+                            [$targetW, 0],
+                            [$targetW, $targetH],
+                            [0, $targetH],
+                        ],
+                        'corner_radius' => null,
+                        'radius' => null,
+                        'radius_y' => null,
+                        'fill_ratio' => 1.0,
+                        'source' => 'alpha',
+                    ]
+                ],
+                'detection_method' => 'transparent',
+            ];
+            return $this->finalize($fallback);
+        }
+
+        // 2) Gunakan deteksi warna putih hanya jika template tidak memiliki area transparan
         $color = $this->detectColorFrames($filePath, $targetW, $targetH);
         if ($color !== null) {
+            $color['detection_method'] = 'white-detection';
             return $this->finalize($color);
         }
 
         return null;
+    }
+
+    /**
+     * Cek apakah gambar memiliki alpha channel / pixel transparan (alpha < 127).
+     */
+    private function hasTransparency(string $filePath): bool
+    {
+        $info = @getimagesize($filePath);
+        if (! $info || ! in_array($info[2], [IMAGETYPE_PNG, IMAGETYPE_WEBP], true)) {
+            return false;
+        }
+
+        $src = match ($info[2]) {
+            IMAGETYPE_PNG => @imagecreatefrompng($filePath),
+            IMAGETYPE_WEBP => @imagecreatefromwebp($filePath),
+            default => null,
+        };
+
+        if (! $src) {
+            return false;
+        }
+
+        $w = imagesx($src);
+        $h = imagesy($src);
+
+        // Downscale untuk memangkas waktu scanning pixel
+        $scale = min(1.0, 300 / max($w, $h));
+        $sw = max(1, (int) round($w * $scale));
+        $sh = max(1, (int) round($h * $scale));
+
+        $img = imagecreatetruecolor($sw, $sh);
+        imagealphablending($img, false);
+        imagesavealpha($img, true);
+        imagecopyresampled($img, $src, 0, 0, 0, 0, $sw, $sh, $w, $h);
+        imagedestroy($src);
+
+        $hasAlpha = false;
+        for ($y = 0; $y < $sh; $y++) {
+            for ($x = 0; $x < $sw; $x++) {
+                $rgba = imagecolorat($img, $x, $y);
+                $alpha = ($rgba >> 24) & 0x7F; // 0 = opaque, 127 = fully transparent
+                if ($alpha > 10) {
+                    $hasAlpha = true;
+                    break 2;
+                }
+            }
+        }
+        imagedestroy($img);
+        return $hasAlpha;
     }
 
     /**
@@ -84,7 +174,7 @@ class TemplateAnalyzerService
      */
     private function detectAlphaFrames(string $filePath, int $targetW, int $targetH): ?array
     {
-        $src = @imagecreatefrompng($filePath);
+        $src = $this->loadImage($filePath);
         if (! $src) {
             return null;
         }
