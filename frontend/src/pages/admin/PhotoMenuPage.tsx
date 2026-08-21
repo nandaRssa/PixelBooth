@@ -108,10 +108,8 @@ const PhotoMenuPage: React.FC = () => {
         />
       </div>
 
-      {/* ===== Konten (scroll area) ===== */}
-      <div className="flex-1 min-h-0 overflow-y-auto pb-6">
       {/* ===== Status Sumber Kamera ===== */}
-      <div className="bg-pb-surface border border-pb-border rounded-xl p-4 mb-6">
+      <div className="bg-pb-surface border border-pb-border rounded-xl p-4 mb-6 shrink-0">
         <div className="flex items-center justify-between">
           <div>
             <p className="text-pb-text text-sm font-medium flex items-center gap-2">
@@ -155,7 +153,7 @@ const PhotoMenuPage: React.FC = () => {
       </div>
 
       {/* ===== Info Singkat ===== */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 shrink-0">
         {[
           { label: 'Format yang Didukung', value: 'PNG, JPG, WEBP' },
           { label: 'Ukuran Canvas', value: 'Bebas (pixel based)' },
@@ -169,7 +167,7 @@ const PhotoMenuPage: React.FC = () => {
       </div>
 
       {/* ===== Aksi Mulai Sesi ===== */}
-      <div className="mb-6 bg-pb-surface border border-pb-border rounded-2xl p-5">
+      <div className="mb-6 bg-pb-surface border border-pb-border rounded-2xl p-5 shrink-0">
         <div className="flex flex-col lg:flex-row lg:items-center gap-4">
           <div className="flex-1 min-w-0">
             {selectedTemplate ? (
@@ -246,6 +244,8 @@ const PhotoMenuPage: React.FC = () => {
         </div>
       </div>
 
+      {/* ===== Daftar Template (scroll area) ===== */}
+      <div className="flex-1 min-h-0 overflow-y-auto pb-6">
       {/* ===== Pilih Template ===== */}
       <h2 className="text-pb-text text-sm font-semibold mb-3 flex items-center gap-2">
         <Layers size={16} className="text-pb-text-secondary" />
