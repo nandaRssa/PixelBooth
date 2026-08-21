@@ -40,7 +40,7 @@ export function useMovePhoto() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: ({ id, folderId }: { id: number; folderId: number }) =>
+    mutationFn: ({ id, folderId }: { id: number; folderId: number | null }) =>
       photoApi.move(id, folderId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['photos'] })
@@ -65,7 +65,7 @@ export function useBulkMovePhotos() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: ({ photoIds, folderId }: { photoIds: number[]; folderId: number }) =>
+    mutationFn: ({ photoIds, folderId }: { photoIds: number[]; folderId: number | null }) =>
       photoApi.bulkMove(photoIds, folderId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['photos'] })

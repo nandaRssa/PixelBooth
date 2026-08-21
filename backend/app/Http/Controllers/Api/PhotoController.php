@@ -56,7 +56,7 @@ class PhotoController extends Controller
     public function move(Request $request, Photo $photo): JsonResponse
     {
         $request->validate([
-            'folder_id' => ['required', 'exists:folders,id'],
+            'folder_id' => ['nullable', 'integer', 'exists:folders,id'],
         ]);
 
         $photo->update(['folder_id' => $request->folder_id]);
@@ -101,7 +101,7 @@ class PhotoController extends Controller
         $request->validate([
             'photo_ids' => ['required', 'array'],
             'photo_ids.*' => ['integer', 'exists:photos,id'],
-            'folder_id' => ['required', 'exists:folders,id'],
+            'folder_id' => ['nullable', 'integer', 'exists:folders,id'],
         ]);
 
         Photo::whereIn('id', $request->photo_ids)->update([

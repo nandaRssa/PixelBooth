@@ -455,7 +455,9 @@ const PhotoCapturePage: React.FC = () => {
             <Button
               variant="secondary"
               size="md"
-              onClick={() => navigate('/gallery')}
+              onClick={() =>
+                navigate(folderId ? `/gallery?folder_id=${folderId}` : '/gallery')
+              }
               leftIcon={<ExternalLink size={16} />}
             >
               Buka Galeri

@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Folder as FolderIcon, Search } from 'lucide-react'
+import { Folder as FolderIcon, ImageIcon, Search } from 'lucide-react'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { Spinner } from '@/components/ui/StatusBadge'
@@ -7,12 +7,13 @@ import type { Folder } from '@/types'
 
 // ==========================================
 // Move Photo Modal — pilih folder tujuan
+// Termasuk opsi "Tanpa Folder" (galeri utama)
 // ==========================================
 
 interface MovePhotoModalProps {
   isOpen: boolean
   onClose: () => void
-  onConfirm: (folderId: number) => void
+  onConfirm: (folderId: number | null) => void
   folders: Folder[]
   isLoadingFolders: boolean
   isMoving: boolean
@@ -72,29 +73,48 @@ const MovePhotoModal: React.FC<MovePhotoModalProps> = ({
           <div className="flex justify-center py-8">
             <Spinner size="md" className="text-white" />
           </div>
-        ) : filtered.length === 0 ? (
-          <p className="text-[#606060] text-sm text-center py-8">
-            {query ? 'Folder tidak ditemukan.' : 'Belum ada folder.'}
-          </p>
         ) : (
-          filtered.map(({ folder, depth }) => (
-            <button
-              key={folder.id}
-              type="button"
-              onClick={() => onConfirm(folder.id)}
-              disabled={isMoving}
-              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg
-                text-left text-sm text-[#A0A0A0] hover:text-white hover:bg-white/5
-                transition-colors disabled:opacity-50"
-              style={{ paddingLeft: `${12 + depth * 20}px` }}
-            >
-              <FolderIcon size={16} className="text-[#606060]" />
-              <span className="flex-1 truncate">{folder.name}</span>
-              <span className="text-xs text-[#606060]">
-                {folder.photo_count ?? 0} foto
-              </span>
-            </button>
-          ))
+          <>
+            {/* Opsi tanpa folder — galeri utama */}
+            {!query || 'tanpa folder galeri utama'.includes(query.toLowerCase()) ? (
+              <button
+                type="button"
+                onClick={() => onConfirm(null)}
+                disabled={isMoving}
+                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg
+                  text-left text-sm text-[#A0A0A0] hover:text-white hover:bg-white/5
+                  transition-colors disabled:opacity-50"
+              >
+                <ImageIcon size={16} className="text-[#606060]" />
+                <span className="flex-1">Tanpa Folder (Galeri Utama)</span>
+              </button>
+            ) : null}
+
+            {filtered.length === 0 && query ? (
+              <p className="text-[#606060] text-sm text-center py-8">
+                Folder tidak ditemukan.
+              </p>
+            ) : (
+              filtered.map(({ folder, depth }) => (
+                <button
+                  key={folder.id}
+                  type="button"
+                  onClick={() => onConfirm(folder.id)}
+                  disabled={isMoving}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg
+                    text-left text-sm text-[#A0A0A0] hover:text-white hover:bg-white/5
+                    transition-colors disabled:opacity-50"
+                  style={{ paddingLeft: `${12 + depth * 20}px` }}
+                >
+                  <FolderIcon size={16} className="text-[#606060]" />
+                  <span className="flex-1 truncate">{folder.name}</span>
+                  <span className="text-xs text-[#606060]">
+                    {folder.photo_count ?? 0} foto
+                  </span>
+                </button>
+              ))
+            )}
+          </>
         )}
       </div>
 

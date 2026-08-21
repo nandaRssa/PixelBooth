@@ -185,7 +185,7 @@ const GalleryPage: React.FC = () => {
     }
   }
 
-  const handleMovePhoto = async (folderId: number) => {
+  const handleMovePhoto = async (folderId: number | null) => {
     if (!moveTarget) return
     try {
       await movePhoto.mutateAsync({ id: moveTarget.id, folderId })
@@ -226,7 +226,7 @@ const GalleryPage: React.FC = () => {
     }
   }
 
-  const handleBulkMove = async (folderId: number) => {
+  const handleBulkMove = async (folderId: number | null) => {
     if (selectedIds.size === 0) return
     try {
       await bulkMovePhotos.mutateAsync({ photoIds: [...selectedIds], folderId })

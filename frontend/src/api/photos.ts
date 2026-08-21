@@ -25,14 +25,15 @@ export const photoApi = {
     await apiClient.post('/photos/bulk-delete', { photo_ids: photoIds })
   },
 
-  move: async (id: number, folderId: number): Promise<Photo> => {
+  // folderId null = pindah ke galeri utama (tanpa folder)
+  move: async (id: number, folderId: number | null): Promise<Photo> => {
     const response = await apiClient.post<ApiResponse<Photo>>(`/photos/${id}/move`, {
       folder_id: folderId,
     })
     return response.data.data
   },
 
-  bulkMove: async (photoIds: number[], folderId: number): Promise<void> => {
+  bulkMove: async (photoIds: number[], folderId: number | null): Promise<void> => {
     await apiClient.post('/photos/bulk-move', { photo_ids: photoIds, folder_id: folderId })
   },
 }
