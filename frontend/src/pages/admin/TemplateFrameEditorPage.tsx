@@ -1088,12 +1088,18 @@ ctx.restore()
             Kembali
           </Button>
           <div className="min-w-0">
-            <h1 className="text-pb-text text-xl font-bold leading-tight">Frame Editor</h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-pb-text text-xl font-bold leading-tight">Frame Editor</h1>
+              <span
+                className="px-2 py-0.5 rounded-md bg-amber-500/15 border border-amber-500/30
+                  text-amber-400 text-[11px] font-medium shrink-0"
+                title="Confirm template agar bisa dipakai sesi"
+              >
+                Draft
+              </span>
+            </div>
             <p className="text-pb-text-muted text-xs mt-0.5 truncate">{template.name}</p>
           </div>
-          <span className="ml-2 px-2 py-0.5 rounded-md bg-amber-500/15 border border-amber-500/30 text-amber-400 text-xs font-medium">
-            Draft — belum siap dipakai
-          </span>
         </div>
 
         {/* ===== Mode Manual / Auto Render ===== */}
