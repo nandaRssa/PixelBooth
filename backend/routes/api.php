@@ -56,6 +56,7 @@ Route::middleware('throttle:120,1')->group(function () {
     Route::get('/templates/{template}', [TemplateController::class, 'show'])->name('templates.show');
     Route::post('/templates', [TemplateController::class, 'store'])->name('templates.store');
     Route::put('/templates/{template}', [TemplateController::class, 'update'])->name('templates.update');
+    Route::post('/templates/{template}/detect-frames', [TemplateController::class, 'detectFrames'])->name('templates.detectFrames');
     Route::delete('/templates/{template}', [TemplateController::class, 'destroy'])->name('templates.destroy');
 
     // Folders

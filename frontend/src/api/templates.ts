@@ -3,8 +3,8 @@ import type { Template, ApiResponse, CameraFrame } from '@/types'
 
 // ==========================================
 // PIXELBOOTH — Templates API
-// Frame sepenuhnya manual via Frame Editor.
-// Tidak ada endpoint deteksi otomatis.
+// Frame bisa manual (Frame Editor) atau hasil
+// auto detection (mode Auto Render).
 // ==========================================
 
 export interface TemplatePayload {
@@ -65,5 +65,13 @@ export const templateApi = {
 
   remove: async (id: number): Promise<void> => {
     await apiClient.delete(`/templates/${id}`)
+  },
+
+  /** Auto detection (mode Auto Render) — hasil TIDAK tersimpan otomatis. */
+  detectFrames: async (id: number): Promise<CameraFrame[]> => {
+    const response = await apiClient.post<ApiResponse<{ frame_count: number; frames: CameraFrame[] }>>(
+      `/templates/${id}/detect-frames`
+    )
+    return response.data.data.frames
   },
 }

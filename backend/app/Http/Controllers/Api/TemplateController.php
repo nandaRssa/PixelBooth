@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Template;
 use App\Services\FrameMaskService;
+use App\Services\TemplateFrameDetector;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -115,6 +116,43 @@ class TemplateController extends Controller
         return response()->json([
             'message' => 'Template berhasil diperbarui.',
             'data' => $template->fresh(),
+        ]);
+    }
+
+    /**
+     * Deteksi otomatis area foto pada template (mode Auto Render).
+     * Mengembalikan frame hasil deteksi TANPA menyimpan — user masih bisa
+     * menilai hasilnya di Frame Editor (bandingkan dengan mode Manual),
+     * lalu menyimpan lewat Confirm Template.
+     */
+    public function detectFrames(Template $template): JsonResponse
+    {
+        if (! $template->template_file || ! Storage::disk('public')->exists($template->template_file)) {
+            return response()->json(['message' => 'File template tidak ditemukan.'], 404);
+        }
+
+        $result = (new TemplateFrameDetector())->detect(
+            Storage::disk('public')->path($template->template_file),
+            $template->canvas_width,
+            $template->canvas_height
+        );
+
+        $frames = [];
+        foreach (($result['frame_configuration'] ?? []) as $i => $slot) {
+            $norm = $this->maskService->normalizeFrame($slot);
+            $norm['id'] = $i + 1;
+            $norm['order'] = $i;
+            $frames[] = $norm;
+        }
+
+        return response()->json([
+            'message' => count($frames) > 0
+                ? 'Frames Detected: ' . count($frames) . ' bingkai.'
+                : 'Tidak ada area foto yang terdeteksi pada template ini.',
+            'data' => [
+                'frame_count' => count($frames),
+                'frames' => $frames,
+            ],
         ]);
     }
 

@@ -7,6 +7,7 @@ import {
   FlipHorizontal,
   FlipVertical,
   Layers,
+  Lock,
   Plus,
   Shield,
   Eraser,
@@ -15,11 +16,12 @@ import {
   Video,
   VideoOff,
   Eye,
+  Wand2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Spinner } from '@/components/ui/StatusBadge'
 import { toast } from '@/components/ui/Toast'
-import { useTemplate, useUpdateTemplate } from '@/hooks/useTemplates'
+import { templateApi, useTemplate, useUpdateTemplate } from '@/hooks/useTemplates'
 import { normalizeFrame, computeHoleMask, downscaleTemplate, type WorkTemplate } from '@/utils/frameMask'
 import { loadImage } from '@/utils/templateOverlay'
 import type { CameraFrame, ClearArea, Template } from '@/types'
@@ -82,6 +84,10 @@ const TemplateFrameEditorPage: React.FC = () => {
   const [cameraError, setCameraError] = useState<string | null>(null)
   const [initialized, setInitialized] = useState(false)
   const [drawingRect, setDrawingRect] = useState<{ x1: number; y1: number; x2: number; y2: number } | null>(null)
+  // Dual mode penentuan Camera Frame: manual (editor) / auto (deteksi sistem)
+  const [frameMode, setFrameMode] = useState<'manual' | 'auto'>('manual')
+  const [detecting, setDetecting] = useState(false)
+  const manualBackupRef = useRef<CameraFrame[] | null>(null)
 
   const containerRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -291,8 +297,8 @@ const TemplateFrameEditorPage: React.FC = () => {
           ctx.strokeRect(a.x - f.width / 2, a.y - f.height / 2, a.w, a.h)
           ctx.setLineDash([])
         }
-        ctx.restore()
-      }
+ctx.restore()
+    }
 
       // Label Frame N
       ctx.font = `${13 / S}px system-ui, sans-serif`
@@ -467,6 +473,7 @@ const TemplateFrameEditorPage: React.FC = () => {
 
   const hitHandle = (f: CameraFrame, p: { x: number; y: number }): DragType | null => {
     const tol = HANDLE_TOL_PX / viewRef.current.scale
+    const cornerTol = Math.max(tol, 10 / viewRef.current.scale) // sudut sedikit lebih besar dari handle
     const [lx, ly] = localPoint(f, p)
     const hw = f.width / 2
     const hh = f.height / 2
@@ -478,9 +485,20 @@ const TemplateFrameEditorPage: React.FC = () => {
     // Harus berada di sekitar border frame (± toleransi)
     if (Math.abs(lx) > hw + tol || Math.abs(ly) > hh + tol) return null
 
-    // Zona PITA di sepanjang tiap tepi (ala software grafis):
-    // pegang di mana pun sepanjang tepi kiri = resize-w, tepi atas = resize-n.
-    // Sudut hanya di area persegi sudut tempat kedua pita bertemu.
+    // Prioritas: sudut (persegi kecil di pojok) → tepi (pita tanpa sudut)
+    const atCorner =
+      (lx <= -hw + cornerTol && ly <= -hh + cornerTol) || // NW
+      (lx >= hw - cornerTol && ly <= -hh + cornerTol) ||  // NE
+      (lx <= -hw + cornerTol && ly >= hh - cornerTol) ||  // SW
+      (lx >= hw - cornerTol && ly >= hh - cornerTol)      // SE
+
+    if (atCorner) {
+      const ns = ly < 0 ? 'n' : 's'
+      const ew = lx < 0 ? 'w' : 'e'
+      return `resize-${ns}${ew}` as DragType
+    }
+
+    // Tepi: pita sepanjang sisi TANPA area sudut
     const nearX = hw - Math.abs(lx) <= tol
     const nearY = hh - Math.abs(ly) <= tol
     if (!nearX && !nearY) return null // interior -> bukan handle
@@ -502,6 +520,12 @@ const TemplateFrameEditorPage: React.FC = () => {
   // ===== Pointer events =====
   const onPointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (!template) return
+    // Mode Auto Render: semua interaksi manual dikunci
+    if (frameMode === 'auto') return
+    // Abaikan pointer tambahan (multi-touch) saat satu gesture sedang berjalan —
+    // pointer kedua bisa mengganti jenis drag di tengah jalan dan membuat
+    // frame melompat seperti "terbalik".
+    if (dragRef.current) return
     const p = toCanvas(e.clientX, e.clientY)
     ;(e.target as HTMLCanvasElement).setPointerCapture(e.pointerId)
 
@@ -581,6 +605,10 @@ const TemplateFrameEditorPage: React.FC = () => {
   const updateCursor = (p: { x: number; y: number }) => {
     const cv = canvasRef.current
     if (!cv) return
+    if (frameMode === 'auto') {
+      cv.style.cursor = 'not-allowed'
+      return
+    }
     if (mode !== 'select') {
       cv.style.cursor = 'crosshair'
       return
@@ -708,11 +736,12 @@ const TemplateFrameEditorPage: React.FC = () => {
 
   // ===== Frame ops =====
   const updateFrame = (fid: number, patch: Partial<CameraFrame>) => {
+    if (frameMode === 'auto') return
     setFrames((prev) => prev.map((f) => (f.id === fid ? { ...f, ...patch } : f)))
   }
 
   const addFrame = () => {
-    if (!template) return
+    if (!template || frameMode === 'auto') return
     const newId = Math.max(0, ...frames.map((f) => f.id)) + 1
     const w = template.canvas_width * 0.45
     const h = template.canvas_height * 0.28
@@ -733,7 +762,7 @@ const TemplateFrameEditorPage: React.FC = () => {
   }
 
   const duplicateFrame = () => {
-    if (!selected) return
+    if (!selected || frameMode === 'auto') return
     const newId = Math.max(0, ...frames.map((f) => f.id)) + 1
     const copy = normalizeFrame({
       ...selected,
@@ -749,9 +778,48 @@ const TemplateFrameEditorPage: React.FC = () => {
   }
 
   const deleteFrame = () => {
-    if (!selected) return
+    if (!selected || frameMode === 'auto') return
     setFrames((prev) => prev.filter((f) => f.id !== selected.id))
     setSelectedId(null)
+  }
+
+  // ===== Dual Mode: Manual / Auto Render =====
+  const runAutoDetect = async () => {
+    if (!template || detecting) return
+    setDetecting(true)
+    try {
+      const detected = await templateApi.detectFrames(template.id)
+      setFrames(detected)
+      setSelectedId(null)
+      if (detected.length === 0) {
+        toast.error('Tidak ada area foto yang terdeteksi pada template ini.')
+      } else {
+        toast.success(`Frames Detected — ${detected.length} bingkai ditemukan.`)
+      }
+    } catch {
+      toast.error('Gagal menjalankan auto detection.')
+      setFrameMode('manual')
+    } finally {
+      setDetecting(false)
+    }
+  }
+
+  const switchFrameMode = (m: 'manual' | 'auto') => {
+    if (m === frameMode || detecting) return
+    if (m === 'auto') {
+      // Simpan hasil kerja manual agar bisa dipulihkan saat kembali
+      manualBackupRef.current = frames
+      setFrameMode('auto')
+      // Langsung proses deteksi tanpa tombol tambahan
+      void runAutoDetect()
+    } else {
+      setFrameMode('manual')
+      // Kembalikan susunan manual terakhir (perbandingan non-destruktif)
+      if (manualBackupRef.current) {
+        setFrames(manualBackupRef.current)
+        setSelectedId(null)
+      }
+    }
   }
 
   // ===== Confirm Template =====
@@ -833,6 +901,38 @@ const TemplateFrameEditorPage: React.FC = () => {
             Draft — belum siap dipakai
           </span>
         </div>
+
+        {/* ===== Mode Manual / Auto Render ===== */}
+        <div className="flex rounded-xl border border-[#2A2A2A] overflow-hidden bg-[#0A0A0A] shrink-0">
+          <button
+            type="button"
+            onClick={() => switchFrameMode('manual')}
+            disabled={detecting}
+            className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50 ${
+              frameMode === 'manual'
+                ? 'bg-cyan-500/20 text-cyan-300'
+                : 'text-[#A0A0A0] hover:text-white'
+            }`}
+          >
+            <MousePointer2 size={15} />
+            Manual
+          </button>
+          <div className="w-px bg-[#2A2A2A]" />
+          <button
+            type="button"
+            onClick={() => switchFrameMode('auto')}
+            disabled={detecting}
+            className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50 ${
+              frameMode === 'auto'
+                ? 'bg-violet-500/20 text-violet-300'
+                : 'text-[#A0A0A0] hover:text-white'
+            }`}
+          >
+            <Wand2 size={15} />
+            Auto Render
+          </button>
+        </div>
+
         <div className="flex items-center gap-2">
           <Button
             variant={testCamera ? 'primary' : 'secondary'}
@@ -873,7 +973,19 @@ const TemplateFrameEditorPage: React.FC = () => {
             onPointerUp={onPointerUp}
             onPointerCancel={onPointerUp}
           />
-          {frames.length === 0 && (
+          {detecting && (
+            <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-black/60">
+              <Spinner size="lg" className="text-cyan-400" />
+              <p className="text-white text-sm font-medium">Detecting Frames...</p>
+            </div>
+          )}
+          {frameMode === 'auto' && !detecting && (
+            <div className="absolute top-3 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1.5 rounded-full bg-violet-500/15 border border-violet-500/40 px-3 py-1.5 text-violet-300 text-xs font-medium">
+              <Lock size={13} />
+              Auto Render aktif — frame dikontrol sistem
+            </div>
+          )}
+          {frames.length === 0 && !detecting && frameMode === 'manual' && (
             <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
               <Layers size={40} className="text-[#333] mb-3" />
               <p className="text-[#A0A0A0] text-sm mb-4">Belum ada camera frame.</p>
@@ -884,6 +996,10 @@ const TemplateFrameEditorPage: React.FC = () => {
               </div>
             </div>
           )}
+          {/* Penanda versi build — untuk memastikan bundle terbaru yang dimuat */}
+          <div className="absolute bottom-2 right-3 text-[10px] text-[#555] select-none pointer-events-none">
+            editor-v6 · dual-mode
+          </div>
         </div>
 
         {/* ===== Sidebar ===== */}
@@ -892,7 +1008,13 @@ const TemplateFrameEditorPage: React.FC = () => {
           <section className="bg-[#141414] border border-[#2A2A2A] rounded-xl p-4">
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-white text-sm font-semibold">Camera Frames ({frames.length})</h3>
-              <Button variant="outline" size="sm" onClick={addFrame} leftIcon={<Plus size={14} />}>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={addFrame}
+                disabled={frameMode === 'auto'}
+                leftIcon={<Plus size={14} />}
+              >
                 Add
               </Button>
             </div>
@@ -923,10 +1045,22 @@ const TemplateFrameEditorPage: React.FC = () => {
             </div>
             {selected && (
               <div className="grid grid-cols-2 gap-2 mt-3">
-                <Button variant="secondary" size="sm" onClick={duplicateFrame} leftIcon={<Copy size={14} />}>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={duplicateFrame}
+                  disabled={frameMode === 'auto'}
+                  leftIcon={<Copy size={14} />}
+                >
                   Duplicate
                 </Button>
-                <Button variant="danger" size="sm" onClick={deleteFrame} leftIcon={<Trash2 size={14} />}>
+                <Button
+                  variant="danger"
+                  size="sm"
+                  onClick={deleteFrame}
+                  disabled={frameMode === 'auto'}
+                  leftIcon={<Trash2 size={14} />}
+                >
                   Delete
                 </Button>
               </div>
@@ -935,7 +1069,7 @@ const TemplateFrameEditorPage: React.FC = () => {
 
           {/* Transform */}
           {selected && (
-            <section className="bg-[#141414] border border-[#2A2A2A] rounded-xl p-4">
+            <section className={`bg-[#141414] border border-[#2A2A2A] rounded-xl p-4 ${frameMode === 'auto' ? 'opacity-50 pointer-events-none' : ''}`}>
               <h3 className="text-white text-sm font-semibold mb-3">Transformasi Frame</h3>
               <div className="grid grid-cols-4 gap-2 mb-3">
                 {numInput('X', selected.x, (v) => updateFrame(selected.id, { x: v }))}
@@ -1013,7 +1147,7 @@ const TemplateFrameEditorPage: React.FC = () => {
 
           {/* Fine Tune Remove */}
           {selected && (
-            <section className="bg-[#141414] border border-[#2A2A2A] rounded-xl p-4 space-y-3">
+            <section className={`bg-[#141414] border border-[#2A2A2A] rounded-xl p-4 space-y-3 ${frameMode === 'auto' ? 'opacity-50 pointer-events-none' : ''}`}>
               <h3 className="text-white text-sm font-semibold">Fine Tune Remove</h3>
               {slider('Center Clear Priority', 'clear_zone', 5, 100, 1, '%')}
               {slider('Clear Expansion', 'clear_expansion', 0, 200, 5, '%')}
@@ -1026,7 +1160,7 @@ const TemplateFrameEditorPage: React.FC = () => {
 
           {/* Manual Protect / Remove */}
           {selected && (
-            <section className="bg-[#141414] border border-[#2A2A2A] rounded-xl p-4">
+            <section className={`bg-[#141414] border border-[#2A2A2A] rounded-xl p-4 ${frameMode === 'auto' ? 'opacity-50 pointer-events-none' : ''}`}>
               <h3 className="text-white text-sm font-semibold mb-3">Manual Area</h3>
               <div className="grid grid-cols-3 gap-1.5 mb-3">
                 <button
