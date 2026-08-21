@@ -313,4 +313,97 @@ class TemplateFrameDetectorTest extends TestCase
 
         $this->assertNull($result, 'Ornamen kecil tidak boleh dianggap frame');
     }
+
+    public function test_area_terhalang_di_tengah_bukan_slot_foto(): void
+    {
+        // Slot putih dengan objek warna berbeda MENGHALANGI di tengahnya:
+        // bukan slot foto -> hasil deteksi harus kosong.
+        $w = 800;
+        $h = 1000;
+        $img = $this->darkCanvas($w, $h);
+        imagefilledrectangle($img, 150, 250, 650, 750, imagecolorallocate($img, 242, 242, 242));
+        // Objek penghalang di tengah slot
+        imagefilledrectangle($img, 320, 420, 480, 580, imagecolorallocate($img, 200, 40, 40));
+        $tmp = $this->saveTemp($img);
+
+        $result = (new TemplateFrameDetector())->detect($tmp);
+        @unlink($tmp);
+
+        $this->assertNull($result, 'Area dengan penghalang di tengah bukan slot foto');
+    }
+
+    public function test_kotak_miring_40_derajat_akurat(): void
+    {
+        // Kotak (mendekati persegi) miring 40°: rotasi HARUS ~40° dan ukuran
+        // frame mengikuti bentuk yang dirender — bukan 30° atau 0°.
+        $w = 800;
+        $h = 800;
+        $img = $this->darkCanvas($w, $h);
+
+        $angle = deg2rad(40);
+        $cx = 400.0;
+        $cy = 400.0;
+        $hw = 165.0; // 330 lebar
+        $hh = 175.0; // 350 tinggi (mendekati persegi)
+        $cos = cos($angle);
+        $sin = sin($angle);
+        $pts = [];
+        foreach ([[-1, -1], [1, -1], [1, 1], [-1, 1]] as [$sx, $sy]) {
+            $pts[] = $cx + $sx * $hw * $cos - $sy * $hh * $sin;
+            $pts[] = $cy + $sx * $hw * $sin + $sy * $hh * $cos;
+        }
+        imagefilledpolygon($img, $pts, imagecolorallocate($img, 248, 248, 248));
+        $tmp = $this->saveTemp($img);
+
+        $result = (new TemplateFrameDetector())->detect($tmp);
+        @unlink($tmp);
+
+        $this->assertNotNull($result, 'Kotak miring harus terdeteksi');
+        $this->assertSame(1, $result['frame_count']);
+        $slot = $result['frame_configuration'][0];
+
+        $this->assertGreaterThanOrEqual(36.0, abs($slot['rotation']), 'Rotasi 40° tidak boleh terbaca jauh lebih kecil');
+        $this->assertLessThanOrEqual(44.0, abs($slot['rotation']));
+        // Ukuran mengikuti bentuk yang dirender — full wrap sampai boundary
+        // warna nyata (toleransi ketat ±7%)
+        $this->assertGreaterThan(330 * 0.93, (float) $slot['width'], 'Lebar frame harus seukuran kotak yang dirender');
+        $this->assertLessThan(330 * 1.07, (float) $slot['width']);
+        $this->assertGreaterThan(350 * 0.93, (float) $slot['height'], 'Tinggi frame harus seukuran kotak yang dirender');
+        $this->assertLessThan(350 * 1.07, (float) $slot['height']);
+    }
+
+    public function test_rotasi_negatif_25_derajat_akurat(): void
+    {
+        // Rect landscape miring -25°: arah dan besaran rotasi harus akurat.
+        $w = 900;
+        $h = 700;
+        $img = $this->darkCanvas($w, $h);
+
+        $angle = deg2rad(-25);
+        $cx = 450.0;
+        $cy = 350.0;
+        $hw = 210.0; // 420 lebar
+        $hh = 130.0; // 260 tinggi
+        $cos = cos($angle);
+        $sin = sin($angle);
+        $pts = [];
+        foreach ([[-1, -1], [1, -1], [1, 1], [-1, 1]] as [$sx, $sy]) {
+            $pts[] = $cx + $sx * $hw * $cos - $sy * $hh * $sin;
+            $pts[] = $cy + $sx * $hw * $sin + $sy * $hh * $cos;
+        }
+        imagefilledpolygon($img, $pts, imagecolorallocate($img, 244, 244, 244));
+        $tmp = $this->saveTemp($img);
+
+        $result = (new TemplateFrameDetector())->detect($tmp);
+        @unlink($tmp);
+
+        $this->assertNotNull($result);
+        $this->assertSame(1, $result['frame_count']);
+        $slot = $result['frame_configuration'][0];
+
+        $this->assertGreaterThanOrEqual(-29.0, $slot['rotation'], 'Rotasi -25° harus akurat');
+        $this->assertLessThanOrEqual(-21.0, $slot['rotation']);
+        $this->assertGreaterThan(420 * 0.93, (float) $slot['width'], 'Full wrap: lebar sesuai bentuk dirender');
+        $this->assertGreaterThan(260 * 0.93, (float) $slot['height'], 'Full wrap: tinggi sesuai bentuk dirender');
+    }
 }

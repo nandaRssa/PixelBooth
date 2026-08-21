@@ -7,7 +7,6 @@ import {
   FlipHorizontal,
   FlipVertical,
   Layers,
-  Lock,
   Plus,
   Shield,
   Eraser,
@@ -384,7 +383,7 @@ ctx.restore()
 
     // Lingkaran kursor kuas (ukuran = kemudahan menjangkau seed, BUKAN
     // batas region — region mengikuti connected-region detection)
-    if (mode !== 'select' && frameMode === 'manual' && cursorRef.current) {
+    if (mode !== 'select' && cursorRef.current) {
       const cur = cursorRef.current
       const color =
         mode === 'remove' ? '#EF4444' : mode === 'protect' ? '#FACC15' : '#22C55E'
@@ -546,8 +545,6 @@ ctx.restore()
   // ===== Pointer events =====
   const onPointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (!template) return
-    // Mode Auto Render: semua interaksi manual dikunci
-    if (frameMode === 'auto') return
     // Abaikan pointer tambahan (multi-touch) saat satu gesture sedang berjalan —
     // pointer kedua bisa mengganti jenis drag di tengah jalan dan membuat
     // frame melompat seperti "terbalik".
@@ -648,12 +645,6 @@ ctx.restore()
   const updateCursor = (p: { x: number; y: number }) => {
     const cv = canvasRef.current
     if (!cv) return
-    if (frameMode === 'auto') {
-      cursorRef.current = null
-      cv.style.cursor = 'not-allowed'
-      scheduleRender()
-      return
-    }
     if (mode !== 'select') {
       // Lingkaran kuas menggantikan kursor sistem
       cursorRef.current = p
@@ -775,7 +766,6 @@ ctx.restore()
   }
 
   const addSeed = (key: BrushKey, f: CameraFrame, p: { x: number; y: number }) => {
-    if (frameMode === 'auto') return
     const [lx, ly] = toContentLocal(f, p)
     if (lx < 0 || ly < 0 || lx > f.width || ly > f.height) return
     updateFrame(f.id, {
@@ -784,7 +774,6 @@ ctx.restore()
   }
 
   const eraseSeeds = (f: CameraFrame, key: BrushKey, p: { x: number; y: number }) => {
-    if (frameMode === 'auto') return
     const radius = brushSize / 2 / viewRef.current.scale
     const inRadius = (s: { x: number; y: number }) => {
       const c = toCanvasPoint(f, s.x, s.y)
@@ -811,12 +800,11 @@ ctx.restore()
 
   // ===== Frame ops =====
   const updateFrame = (fid: number, patch: Partial<CameraFrame>) => {
-    if (frameMode === 'auto') return
     setFrames((prev) => prev.map((f) => (f.id === fid ? { ...f, ...patch } : f)))
   }
 
   const addFrame = () => {
-    if (!template || frameMode === 'auto') return
+    if (!template) return
     const newId = Math.max(0, ...frames.map((f) => f.id)) + 1
     const w = template.canvas_width * 0.45
     const h = template.canvas_height * 0.28
@@ -837,7 +825,7 @@ ctx.restore()
   }
 
   const duplicateFrame = () => {
-    if (!selected || frameMode === 'auto') return
+    if (!selected) return
     const newId = Math.max(0, ...frames.map((f) => f.id)) + 1
     const copy = normalizeFrame({
       ...selected,
@@ -856,7 +844,7 @@ ctx.restore()
   }
 
   const deleteFrame = () => {
-    if (!selected || frameMode === 'auto') return
+    if (!selected) return
     setFrames((prev) => prev.filter((f) => f.id !== selected.id))
     setSelectedId(null)
   }
@@ -1066,11 +1054,11 @@ ctx.restore()
           )}
           {frameMode === 'auto' && !detecting && (
             <div className="absolute top-3 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1.5 rounded-full bg-violet-500/15 border border-violet-500/40 px-3 py-1.5 text-violet-300 text-xs font-medium">
-              <Lock size={13} />
-              Auto Render aktif — frame dikontrol sistem
+              <Wand2 size={13} />
+              Auto Render aktif — semua setting tetap bisa diedit
             </div>
           )}
-          {frames.length === 0 && !detecting && frameMode === 'manual' && (
+          {frames.length === 0 && !detecting && (
             <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
               <Layers size={40} className="text-[#333] mb-3" />
               <p className="text-[#A0A0A0] text-sm mb-4">Belum ada camera frame.</p>
@@ -1083,7 +1071,7 @@ ctx.restore()
           )}
           {/* Penanda versi build — untuk memastikan bundle terbaru yang dimuat */}
           <div className="absolute bottom-2 right-3 text-[10px] text-[#555] select-none pointer-events-none">
-            editor-v17 · brush-tint
+            editor-v18 · auto-editable
           </div>
         </div>
 
@@ -1097,7 +1085,6 @@ ctx.restore()
                 variant="outline"
                 size="sm"
                 onClick={addFrame}
-                disabled={frameMode === 'auto'}
                 leftIcon={<Plus size={14} />}
               >
                 Add
@@ -1134,7 +1121,6 @@ ctx.restore()
                   variant="secondary"
                   size="sm"
                   onClick={duplicateFrame}
-                  disabled={frameMode === 'auto'}
                   leftIcon={<Copy size={14} />}
                 >
                   Duplicate
@@ -1143,7 +1129,6 @@ ctx.restore()
                   variant="danger"
                   size="sm"
                   onClick={deleteFrame}
-                  disabled={frameMode === 'auto'}
                   leftIcon={<Trash2 size={14} />}
                 >
                   Delete
@@ -1154,7 +1139,7 @@ ctx.restore()
 
           {/* Transform */}
           {selected && (
-            <section className={`bg-[#141414] border border-[#2A2A2A] rounded-xl p-4 ${frameMode === 'auto' ? 'opacity-50 pointer-events-none' : ''}`}>
+            <section className="bg-[#141414] border border-[#2A2A2A] rounded-xl p-4">
               <h3 className="text-white text-sm font-semibold mb-3">Transformasi Frame</h3>
               <div className="grid grid-cols-4 gap-2 mb-3">
                 {numInput('X', selected.x, (v) => updateFrame(selected.id, { x: v }))}
@@ -1232,7 +1217,7 @@ ctx.restore()
 
           {/* Fine Tune Remove */}
           {selected && (
-            <section className={`bg-[#141414] border border-[#2A2A2A] rounded-xl p-4 space-y-3 ${frameMode === 'auto' ? 'opacity-50 pointer-events-none' : ''}`}>
+            <section className="bg-[#141414] border border-[#2A2A2A] rounded-xl p-4 space-y-3">
               <h3 className="text-white text-sm font-semibold">Fine Tune Remove</h3>
               <label className="flex items-center justify-between cursor-pointer">
                 <span className="text-[#A0A0A0] text-xs font-medium flex items-center gap-1.5">
@@ -1260,7 +1245,7 @@ ctx.restore()
 
           {/* Manual Protect / Remove / Restore — Brush Region */}
           {selected && (
-            <section className={`bg-[#141414] border border-[#2A2A2A] rounded-xl p-4 ${frameMode === 'auto' ? 'opacity-50 pointer-events-none' : ''}`}>
+            <section className="bg-[#141414] border border-[#2A2A2A] rounded-xl p-4">
               <h3 className="text-white text-sm font-semibold mb-3">Brush Area</h3>
               <div className="grid grid-cols-4 gap-1.5 mb-3">
                 <button

@@ -40,6 +40,16 @@ class TemplateFrameDetector
     /** Confidence minimum agar region dijadikan frame (0..1). */
     private const MIN_CONFIDENCE = 0.55;
 
+    /** Reclaim tepi: langkah & jarak maksimum jalan keluar (px kerja). */
+    private const RECLAIM_STEP = 0.5;
+    private const RECLAIM_MAX = 8.0;
+
+    /** Berhenti bila menemui warna DATAR yang beda >90 dari warna tepi. */
+    private const RECLAIM_STOP_T = 90.0;
+
+    /** Dua sampel berjarak 1px saling mirip <=24 = warna datar (bukan pita AA). */
+    private const RECLAIM_FLAT_T = 24.0;
+
     /**
      * Deteksi slot foto pada file template.
      *
@@ -308,9 +318,13 @@ class TemplateFrameDetector
     /**
      * Hitung statistik + confidence tiap region.
      * Confidence = kombinasi Size + Color Consistency + Boundary + Shape +
-     * Position (+ Similarity terhadap region referensi). Region yang
-     * menempel >=3 sisi canvas dianggap background/bingkai dekoratif dan
-     * langsung ditolak.
+     * Position (+ Similarity terhadap region referensi).
+     *
+     * Penolakan diberi alasan (tetap masuk daftar untuk analisis konteks):
+     *  - 'background': menempel >=3 sisi canvas / membentang hampir penuh.
+     *  - 'obstructed': ADA SESUATU MENGHALANGI DI TENGAH (warna berbeda
+     *    menutupi zona tengah bbox) -> bukan slot foto. Isi yang berada di
+     *    dalamnya juga ditolak (lihat selectFrames).
      *
      * @param array<int, array{id:int,pixels:array<int,int>,w:int,h:int}> $regions
      * @return array<int, array<string, mixed>>
@@ -321,25 +335,47 @@ class TemplateFrameDetector
         foreach ($regions as $region) {
             $stats = $this->regionStats($region, $w, $h);
             if ($stats === null) {
-                continue;
+                continue; // terlalu kecil = detail dekorasi
             }
+
+            $reject = null;
 
             // Background / bingkai penuh: menempel >= 3 sisi canvas.
             if ($stats['edgesTouched'] >= 3) {
-                continue;
+                $reject = 'background';
             }
 
             $relArea = $stats['area'] / $canvasArea;
-            if ($relArea > 0.88) {
-                continue; // hampir seluruh canvas = background
+            if ($reject === null && $relArea > 0.88) {
+                $reject = 'background'; // hampir seluruh canvas = background
             }
 
             // Region yang membentang hampir penuh canvas adalah background,
             // bukan slot foto (slot foto punya margin desain).
-            $fracW = $stats['bw'] / $w;
-            $fracH = $stats['bh'] / $h;
-            if (($fracW >= 0.96 && $fracH >= 0.9) || ($fracH >= 0.96 && $fracW >= 0.9)) {
-                continue;
+            if ($reject === null) {
+                $fracW = $stats['bw'] / $w;
+                $fracH = $stats['bh'] / $h;
+                if (($fracW >= 0.96 && $fracH >= 0.9) || ($fracH >= 0.96 && $fracW >= 0.9)) {
+                    $reject = 'background';
+                }
+            }
+
+            // ATURAN TERHALANG TENGAH: jika zona tengah bbox tidak didominasi
+            // region ini sendiri, ada objek/warna lain di tengahnya -> itu
+            // struktur cincin/surround, bukan slot foto.
+            if ($reject === null) {
+                $coverage = $this->centerCoverage(
+                    $stats['set'],
+                    $stats['bx'],
+                    $stats['by'],
+                    $stats['bw'],
+                    $stats['bh'],
+                    $w,
+                    $h
+                );
+                if ($coverage < 0.6) {
+                    $reject = 'obstructed';
+                }
             }
 
             // Ukuran relatif: indikator terkuat slot foto vs ornamen.
@@ -377,6 +413,7 @@ class TemplateFrameDetector
                 'region' => $region,
                 'stats' => $stats,
                 'confidence' => $confidence,
+                'reject' => $reject,
             ];
         }
 
@@ -384,11 +421,23 @@ class TemplateFrameDetector
             return [];
         }
 
-        // Reference signature: kandidat terkuat menjadi acuan kemiripan.
+        // Reference signature: kandidat NON-tertolak terkuat jadi acuan.
         usort($candidates, fn ($a, $b) => $b['confidence'] <=> $a['confidence']);
-        $ref = $candidates[0]['stats'];
+        $ref = null;
+        foreach ($candidates as $cand) {
+            if ($cand['reject'] === null) {
+                $ref = $cand['stats'];
+                break;
+            }
+        }
+        if ($ref === null) {
+            return $candidates;
+        }
 
         foreach ($candidates as $i => &$cand) {
+            if ($cand['reject'] !== null) {
+                continue; // yang ditolak tidak perlu boost
+            }
             $st = $cand['stats'];
             $dColor = $this->colorDist($st['avg'], $ref['avg']);
             $simColor = max(0.0, 1.0 - $dColor / 160);
@@ -419,7 +468,9 @@ class TemplateFrameDetector
     {
         $pixels = $region['pixels'];
         $area = count($pixels);
-        if ($area < max(40, (int) round(0.0015 * $w * $h))) {
+        // Floor kandidat 3% canvas: slot foto selalu relatif besar; elemen
+        // di bawah ini adalah ornamen/objek penghalang, bukan kandidat.
+        if ($area < max(40, (int) round(0.03 * $w * $h))) {
             return null; // detail dekorasi, bukan kandidat
         }
 
@@ -505,7 +556,37 @@ class TemplateFrameDetector
             'std' => $std,
             'edgesTouched' => $edgesTouched,
             'perimGrad' => $gradN > 0 ? $gradSum / $gradN : 0.0,
+            'set' => $memberSet,
         ];
+    }
+
+    /**
+     * Fraksi sampel grid 7x7 di ZONA TENGAH bbox (36% x 36% terpusat) yang
+     * merupakan anggota region. Rendah = ada warna lain menghalangi tengah.
+     */
+    private function centerCoverage(array $set, int $bx, int $by, int $bw, int $bh, int $w, int $h): float
+    {
+        $zx0 = $bx + (int) floor($bw * 0.32);
+        $zy0 = $by + (int) floor($bh * 0.32);
+        $zx1 = $bx + (int) ceil($bw * 0.68);
+        $zy1 = $by + (int) ceil($bh * 0.68);
+        $zw = max(1, $zx1 - $zx0);
+        $zh = max(1, $zy1 - $zy0);
+
+        $hits = 0;
+        $total = 0;
+        for ($gy = 0; $gy < 7; $gy++) {
+            for ($gx = 0; $gx < 7; $gx++) {
+                $px = min($w - 1, $zx0 + (int) round(($gx / 6) * ($zw - 1)));
+                $py = min($h - 1, $zy0 + (int) round(($gy / 6) * ($zh - 1)));
+                $total++;
+                if (isset($set[$py * $w + $px])) {
+                    $hits++;
+                }
+            }
+        }
+
+        return $total > 0 ? $hits / $total : 0.0;
     }
 
     /** Gradien maksimum ke tetangga di luar region (kekuatan boundary). */
@@ -543,12 +624,44 @@ class TemplateFrameDetector
     {
         usort($candidates, fn ($a, $b) => $b['confidence'] <=> $a['confidence']);
 
+        // Warisan penolakan: kandidat yang berada DI DALAM surround yang
+        // 'obstructed' (ada penghalang di tengahnya) adalah objek penghalang
+        // itu sendiri -> ikut ditolak. Surround bertipe 'background' tidak
+        // mewariskan apa pun (slot foto memang hidup di atas background).
+        foreach ($candidates as $a) {
+            if ($a['reject'] !== 'obstructed') {
+                continue;
+            }
+            $sa = $a['stats'];
+            foreach ($candidates as $ib => $b) {
+                if ($b['reject'] !== null) {
+                    continue;
+                }
+                $sb = $b['stats'];
+                if ($sa['area'] < 2 * $sb['area']) {
+                    continue;
+                }
+                $slack = 2;
+                $contains = $sb['bx'] >= $sa['bx'] - $slack
+                    && $sb['by'] >= $sa['by'] - $slack
+                    && $sb['bx'] + $sb['bw'] <= $sa['bx'] + $sa['bw'] + $slack
+                    && $sb['by'] + $sb['bh'] <= $sa['by'] + $sa['bh'] + $slack;
+                if ($contains) {
+                    $candidates[$ib]['reject'] = 'obstruction-content';
+                }
+            }
+        }
+
         // Buang kandidat "surround" (background/bingkai dekoratif): bbox-nya
         // memuat bbox kandidat lain yang jauh lebih kecil, dan dirinya
         // berbentuk cincin/melukit (fill rendah) atau menempel >= 2 sisi
         // canvas. Area foto sejati ada di DALAM struktur tersebut.
         $rejected = [];
         foreach ($candidates as $ia => $a) {
+            if ($a['reject'] !== null) {
+                $rejected[$ia] = true;
+                continue;
+            }
             $sa = $a['stats'];
             $fillA = $sa['area'] / max(1, $sa['bw'] * $sa['bh']);
             if ($fillA >= 0.55 && $sa['edgesTouched'] < 2) {
@@ -607,10 +720,12 @@ class TemplateFrameDetector
     // ------------------------------------------------------------------
 
     /**
-     * Fit region menjadi frame: pusat + extent di sepanjang sumbu utama
-     * (PCA via image moments). Kemiringan asli DIPERTAHANKAN — tidak ada
-     * auto-straighten. Rotasi dinormalisasi ke (-45, 45] dan di-snap ke 0
-     * bila |θ| < 1.5° (sekadar meredam noise, bukan memaksa tegak).
+     * Fit region menjadi frame: cari orientasi dengan PROJECTION
+     * CONCENTRATION — sudut di mana proyeksi piksel ke kedua sumbu lokal
+     * paling terkonsentrasi adalah orientasi kotak/rect aslinya. Metode ini
+     * akurat untuk SEMUA rasio termasuk persegi (image moments gagal/stabil
+     * buruk untuk bentuk mendekati persegi — 40° bisa terbaca 30°).
+     * Kemiringan asli DIPERTAHANKAN; tidak ada auto-straighten.
      *
      * @param array<string, mixed> $cand
      * @param array<int, int> $pixels
@@ -619,89 +734,153 @@ class TemplateFrameDetector
     private function fitRegion(array $cand, array $pixels): ?array
     {
         $w = $cand['region']['w'];
-        $h = $cand['region']['h'];
         $n = count($pixels);
         if ($n < 4) {
             return null;
         }
 
-        $step = max(1, (int) floor(sqrt($n / 20000)));
-        $m20 = $m02 = $m11 = 0.0;
+        // Centroid dari SELURUH piksel (tanpa sampling agar tidak bias).
         $cx = 0.0;
         $cy = 0.0;
-        $cnt = 0;
-        $sampled = [];
-        for ($i = 0; $i < $n; $i += $step) {
-            $idx = $pixels[$i];
-            $x = $idx % $w;
-            $y = intdiv($idx, $w);
-            $sampled[] = [$x, $y];
-            $cx += $x;
-            $cy += $y;
-            $cnt++;
+        foreach ($pixels as $idx) {
+            $cx += $idx % $w;
+            $cy += intdiv($idx, $w);
         }
-        if ($cnt < 4) {
-            return null;
-        }
-        $cx /= $cnt;
-        $cy /= $cnt;
+        $cx /= $n;
+        $cy /= $n;
 
-        foreach ($sampled as [$x, $y]) {
-            $dx = $x - $cx;
-            $dy = $y - $cy;
-            $m20 += $dx * $dx;
-            $m02 += $dy * $dy;
-            $m11 += $dx * $dy;
-        }
-        $m20 /= $cnt;
-        $m02 /= $cnt;
-        $m11 /= $cnt;
+        // Sampel deterministik (hash multiplikatif Knuth) — menghindari bias
+        // urutan BFS pada daftar piksel; urutan flood bukan urutan spasial.
+        $coarsePts = $this->samplePoints($pixels, $w, 3500);
+        $finePts = $this->samplePoints($pixels, $w, 9000);
 
-        // Anisotropi rendah (blob mendekati bulat/persegi) -> anggap tegak.
-        $trace = $m20 + $m02;
-        $anisotropy = sqrt(max(0.0, ($m20 - $m02) * ($m20 - $m02) + 4 * $m11 * $m11));
-        if ($trace <= 0 || $anisotropy < 0.15 * $trace) {
-            $theta = 0.0;
-        } else {
-            $theta = 0.5 * atan2(2 * $m11, $m20 - $m02);
+        $projScore = function (array $pts, float $deg) use ($cx, $cy): float {
+            $rad = deg2rad($deg);
+            $cos = cos($rad);
+            $sin = sin($rad);
+            $cu = [];
+            $cv = [];
+            foreach ($pts as [$x, $y]) {
+                $dx = $x - $cx;
+                $dy = $y - $cy;
+                $u = $dx * $cos + $dy * $sin;
+                $v = -$dx * $sin + $dy * $cos;
+                $iu = (int) floor($u / 2);
+                $iv = (int) floor($v / 2);
+                $cu[$iu] = ($cu[$iu] ?? 0) + 1;
+                $cv[$iv] = ($cv[$iv] ?? 0) + 1;
+            }
+            $s = 0.0;
+            foreach ($cu as $c) {
+                $s += $c * $c;
+            }
+            foreach ($cv as $c) {
+                $s += $c * $c;
+            }
+
+            return $s;
+        };
+
+        // Sweep kasur -46..46 (langkah 2°), lalu perbaikan halus ±2.5°
+        // (langkah 0.25°). Rentang (-45,45] cukup karena rotasi rect punya
+        // simetri 90°.
+        $bestDeg = 0.0;
+        $bestScore = -1.0;
+        for ($deg = -46.0; $deg <= 46.0; $deg += 2.0) {
+            $sc = $projScore($coarsePts, $deg);
+            if ($sc > $bestScore) {
+                $bestScore = $sc;
+                $bestDeg = $deg;
+            }
+        }
+        for ($deg = $bestDeg - 2.5; $deg <= $bestDeg + 2.5; $deg += 0.25) {
+            $sc = $projScore($finePts, $deg);
+            if ($sc > $bestScore) {
+                $bestScore = $sc;
+                $bestDeg = $deg;
+            }
         }
 
-        // Normalisasi ke (-45, 45]: arah sumbu-x frame, bukan paksaan simetri.
-        $deg = rad2deg($theta);
+        // Blob isotropis (lingkaran/dll): skor datar di segala sudut ->
+        // ketajaman puncak rendah -> anggap tegak.
+        $sideAvg = ($projScore($finePts, $bestDeg - 8) + $projScore($finePts, $bestDeg + 8)) / 2;
+        if ($bestScore <= 0 || ($bestScore - $sideAvg) / $bestScore < 0.015) {
+            $bestDeg = 0.0;
+        }
+
+        // Normalisasi ke (-45, 45] + snap noise kecil (bukan paksaan tegak).
+        $deg = $bestDeg;
         while ($deg > 45) {
             $deg -= 90;
         }
         while ($deg <= -45) {
             $deg += 90;
         }
-        if (abs($deg) < 1.5) {
+        if (abs($deg) < 0.8) {
             $deg = 0.0;
         }
         $rad = deg2rad($deg);
         $cos = cos($rad);
         $sin = sin($rad);
 
-        // Proyeksi piksel ke sumbu utama -> width/height sesuai bentuk asli.
+        // Extent di sepanjang sumbu final dari SELURUH piksel -> ukuran
+        // frame persis sebesar bentuk yang dirender.
         $uMin = $vMin = INF;
         $uMax = $vMax = -INF;
-        foreach ($sampled as [$x, $y]) {
-            $dx = $x - $cx;
-            $dy = $y - $cy;
+        $vAtUMin = $vAtUMax = $uAtVMin = $uAtVMax = 0.0;
+        foreach ($pixels as $idx) {
+            $dx = ($idx % $w) - $cx;
+            $dy = intdiv($idx, $w) - $cy;
             $u = $dx * $cos + $dy * $sin;
             $v = -$dx * $sin + $dy * $cos;
             if ($u < $uMin) {
                 $uMin = $u;
+                $vAtUMin = $v;
             }
             if ($u > $uMax) {
                 $uMax = $u;
+                $vAtUMax = $v;
             }
             if ($v < $vMin) {
                 $vMin = $v;
+                $uAtVMin = $u;
             }
             if ($v > $vMax) {
                 $vMax = $v;
+                $uAtVMax = $u;
             }
         }
+
+        // FULL WRAP: segmentasi mengikis tepi region (blur + ambang gradien +
+        // dilasi boundary ~2-3px kerja per sisi) sehingga frame lebih kecil
+        // dari slot aslinya. Dari tiap titik ekstrem, jalan KELUAR selama
+        // warna masih menyambung — pita anti-alias dilewati, dan berhenti
+        // tepat saat menemui warna datar yang berbeda (boundary nyata).
+        // Aturan: senada warna & tak dibatasi beda warna = ikut ter-wrap.
+        $uMin -= $this->reclaimWalk(
+            $cx + $uMin * $cos - $vAtUMin * $sin,
+            $cy + $uMin * $sin + $vAtUMin * $cos,
+            -$cos,
+            -$sin
+        );
+        $uMax += $this->reclaimWalk(
+            $cx + $uMax * $cos - $vAtUMax * $sin,
+            $cy + $uMax * $sin + $vAtUMax * $cos,
+            $cos,
+            $sin
+        );
+        $vMin -= $this->reclaimWalk(
+            $cx + $uAtVMin * $cos - $vMin * $sin,
+            $cy + $uAtVMin * $sin + $vMin * $cos,
+            $sin,
+            -$cos
+        );
+        $vMax += $this->reclaimWalk(
+            $cx + $uAtVMax * $cos - $vMax * $sin,
+            $cy + $uAtVMax * $sin + $vMax * $cos,
+            -$sin,
+            $cos
+        );
 
         $fw = max(1.0, $uMax - $uMin);
         $fh = max(1.0, $vMax - $vMin);
@@ -718,6 +897,81 @@ class TemplateFrameDetector
             'rotation' => round($deg, 1),
             'confidence' => round($cand['confidence'] * 100, 1),
         ];
+    }
+
+    /**
+     * Sampel titik deterministik dari daftar piksel (maks $cap titik).
+     * Acak seragam ber-seed tetap — tidak bias terhadap urutan array yang
+     * tersusun BFS (spatially coherent), berbeda dari stride biasa.
+     *
+     * @param array<int, int> $pixels
+     * @return array<int, array{0:float,1:float}>
+     */
+    private function samplePoints(array $pixels, int $w, int $cap): array
+    {
+        $n = count($pixels);
+        $out = [];
+        if ($n <= $cap) {
+            foreach ($pixels as $idx) {
+                $out[] = [(float) ($idx % $w), (float) intdiv($idx, $w)];
+            }
+
+            return $out;
+        }
+        mt_srand(0x504F544F); // seed tetap -> hasil deterministik
+        for ($i = 0; $i < $cap; $i++) {
+            $idx = $pixels[mt_rand(0, $n - 1)];
+            $out[] = [(float) ($idx % $w), (float) intdiv($idx, $w)];
+        }
+
+        return $out;
+    }
+
+    /**
+     * Jalan keluar dari titik tepi region ke arah (dx, dy): selama warna
+     * masih menyambung dengan warna awal tepi, terus maju — pita transisi
+     * anti-alias dilewati. Berhenti saat menemui warna DATAR yang berbeda
+     * (dua sampel berjarak 1px saling mirip tapi jauh dari warna awal) =
+     * boundary nyata milik elemen lain. Return jarak yang aman ditambahkan
+     * ke extent (px kerja).
+     */
+    private function reclaimWalk(float $sx, float $sy, float $dx, float $dy): float
+    {
+        $start = $this->sampleWorkColor($sx, $sy);
+        if ($start === null) {
+            return 0.0;
+        }
+        $lastGood = 0.0;
+        for ($t = self::RECLAIM_STEP; $t <= self::RECLAIM_MAX; $t += self::RECLAIM_STEP) {
+            $c = $this->sampleWorkColor($sx + $dx * $t, $sy + $dy * $t);
+            if ($c === null) {
+                break;
+            }
+            $next = $this->sampleWorkColor($sx + $dx * ($t + 1.0), $sy + $dy * ($t + 1.0));
+            $flatOther = $this->colorDist($c, $start) > self::RECLAIM_STOP_T
+                && ($next === null || $this->colorDist($c, $next) <= self::RECLAIM_FLAT_T);
+            if ($flatOther) {
+                break;
+            }
+            $lastGood = $t;
+        }
+
+        return $lastGood;
+    }
+
+    /** Warna piksel kerja di koordinat fraksional (nearest), null di luar. */
+    private function sampleWorkColor(float $x, float $y): ?array
+    {
+        $ix = (int) round($x);
+        $iy = (int) round($y);
+        if ($iy < 0 || $iy >= count($this->workPx)) {
+            return null;
+        }
+        if ($ix < 0 || $ix >= count($this->workPx[$iy])) {
+            return null;
+        }
+
+        return $this->workPx[$iy][$ix];
     }
 
     /**
