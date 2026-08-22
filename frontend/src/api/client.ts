@@ -29,6 +29,9 @@ export function getStorageUrl(path?: string | null): string {
     .replace(/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?\/?/i, '')
     .replace(/^http:\/\//i, 'https://')
 
+  // Convert raw /storage/ to /api/storage/ so CORS headers are always sent by Laravel
+  cleanPath = cleanPath.replace(/(^|\/)storage\//i, '$1api/storage/')
+
   if (cleanPath.startsWith('https://')) {
     return cleanPath
   }

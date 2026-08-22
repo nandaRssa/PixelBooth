@@ -43,7 +43,7 @@ class Template extends Model
         if (str_starts_with($this->template_file, 'http://') || str_starts_with($this->template_file, 'https://')) {
             return $this->template_file;
         }
-        return url('storage/' . ltrim($this->template_file, '/'));
+        return url('api/storage/' . ltrim($this->template_file, '/'));
     }
 
     public function getPreviewUrlAttribute(): ?string
@@ -54,7 +54,7 @@ class Template extends Model
         if (str_starts_with($this->preview_file, 'http://') || str_starts_with($this->preview_file, 'https://')) {
             return $this->preview_file;
         }
-        return url('storage/' . ltrim($this->preview_file, '/'));
+        return url('api/storage/' . ltrim($this->preview_file, '/'));
     }
 
     /**

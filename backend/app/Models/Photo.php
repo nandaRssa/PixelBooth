@@ -53,7 +53,7 @@ class Photo extends Model
         if (str_starts_with((string) $this->storage_path, 'http://') || str_starts_with((string) $this->storage_path, 'https://')) {
             return $this->storage_path;
         }
-        return url('storage/' . ltrim((string) $this->storage_path, '/'));
+        return url('api/storage/' . ltrim((string) $this->storage_path, '/'));
     }
 
     public function getThumbnailUrlAttribute(): ?string
@@ -64,7 +64,7 @@ class Photo extends Model
         if (str_starts_with($this->thumbnail_path, 'http://') || str_starts_with($this->thumbnail_path, 'https://')) {
             return $this->thumbnail_path;
         }
-        return url('storage/' . ltrim($this->thumbnail_path, '/'));
+        return url('api/storage/' . ltrim($this->thumbnail_path, '/'));
     }
 
     public function getQrUrlAttribute(): ?string
@@ -75,7 +75,7 @@ class Photo extends Model
         if (str_starts_with($this->qr_path, 'http://') || str_starts_with($this->qr_path, 'https://')) {
             return $this->qr_path;
         }
-        return url('storage/' . ltrim($this->qr_path, '/'));
+        return url('api/storage/' . ltrim($this->qr_path, '/'));
     }
 
     /**

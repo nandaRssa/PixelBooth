@@ -29,7 +29,7 @@ class SessionCapture extends Model
         if (str_starts_with((string) $this->photo_path, 'http://') || str_starts_with((string) $this->photo_path, 'https://')) {
             return $this->photo_path;
         }
-        return url('storage/' . ltrim((string) $this->photo_path, '/'));
+        return url('api/storage/' . ltrim((string) $this->photo_path, '/'));
     }
 
     /**
