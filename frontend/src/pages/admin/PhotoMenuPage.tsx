@@ -89,7 +89,7 @@ const PhotoMenuPage: React.FC = () => {
       toast.success(`Sesi dimulai dengan template "${template.name}".`)
 
       const mode = getSessionDisplayMode()
-      if (mode === 'fullscreen') {
+      if (mode === 'fullscreen' || window.innerWidth < 1024) {
         navigate(`/photo/session-fs/${session.id}`)
       } else {
         navigate(`/photo/session/${session.id}`)

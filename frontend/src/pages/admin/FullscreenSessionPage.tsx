@@ -523,20 +523,22 @@ const FullscreenSessionPage: React.FC = () => {
             <div className="absolute inset-4 border-2 border-white/20 rounded-xl pointer-events-none" />
           )}
 
-          {/* Countdown besar di tengah */}
+          {/* Countdown besar di tengah (z-30 agar selalu tampil di atas layer desain) */}
           {phase === 'countdown' && countdown !== null && countdown > 0 && (
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-              <span
-                className="text-white font-bold leading-none drop-shadow-[0_4px_24px_rgba(0,0,0,0.6)]"
-                style={{ fontSize: 'min(24vw, 9rem)' }}
-              >
-                {countdown}
-              </span>
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-30">
+              <div className="w-28 h-28 sm:w-36 sm:h-36 rounded-full bg-black/65 backdrop-blur-sm border-2 border-white/60 flex items-center justify-center shadow-[0_0_40px_rgba(0,0,0,0.8)]">
+                <span
+                  className="text-white font-black leading-none drop-shadow-[0_4px_24px_rgba(0,0,0,0.9)]"
+                  style={{ fontSize: 'min(20vw, 5.5rem)' }}
+                >
+                  {countdown}
+                </span>
+              </div>
             </div>
           )}
 
           {/* Flash putih saat capture */}
-          {isCapturing && <div className="absolute inset-0 bg-white animate-pulse" />}
+          {isCapturing && <div className="absolute inset-0 bg-white animate-pulse z-40" />}
 
           {/* Kamera tidak aktif */}
           {!cameraActive && !allDone && (

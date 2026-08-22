@@ -141,6 +141,13 @@ const PhotoCapturePage: React.FC = () => {
   // Hanya tampilkan overlay yang dibangun untuk template & slot saat ini
   const overlayUrl = overlay && overlay.token === overlayToken ? overlay.url : null
 
+  // ===== Auto Redirect on Mobile to Fullscreen =====
+  useEffect(() => {
+    if (window.innerWidth < 1024 && id) {
+      navigate(`/photo/session-fs/${id}`, { replace: true })
+    }
+  }, [id, navigate])
+
   // ===== Muat sesi =====
   useEffect(() => {
     let cancelled = false
@@ -800,14 +807,14 @@ const PhotoCapturePage: React.FC = () => {
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
-                  className="absolute z-20 flex items-center justify-center pointer-events-none"
+                  className="absolute z-30 flex items-center justify-center pointer-events-none"
                   style={slotPosition(activeSlot)}
                 >
                   <motion.div
                     key={countdown}
                     initial={{ scale: 1.6, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
-                    className="w-24 h-24 sm:w-28 sm:h-28 rounded-full bg-black/60 border border-white/40 flex items-center justify-center shadow-2xl"
+                    className="w-24 h-24 sm:w-28 sm:h-28 rounded-full bg-black/65 border border-white/60 flex items-center justify-center shadow-2xl"
                   >
                     <span className="text-pb-text text-5xl sm:text-6xl font-bold">{countdown}</span>
                   </motion.div>
