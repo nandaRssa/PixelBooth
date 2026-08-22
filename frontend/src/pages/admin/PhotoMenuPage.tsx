@@ -193,9 +193,9 @@ const PhotoMenuPage: React.FC = () => {
         </div>
       </div>
 
-      {/* ===== Daftar Template (scroll area diperluas) ===== */}
-      <div className="flex-1 min-h-0 overflow-y-auto pb-10">
-        <h2 className="text-pb-text text-xs sm:text-sm font-semibold mb-2.5 flex items-center gap-2 sticky top-0 bg-pb-bg/90 backdrop-blur-xs py-1 z-10">
+      {/* ===== Daftar Template (dibatasi sekitar 3 baris x 3 kolom di HP) ===== */}
+      <div className="flex-1 min-h-0 max-h-[360px] sm:max-h-none overflow-y-auto pb-4 pr-0.5">
+        <h2 className="text-pb-text text-xs sm:text-sm font-semibold mb-2 flex items-center gap-2 sticky top-0 bg-pb-bg/95 backdrop-blur-xs py-1 z-10">
           <Layers size={15} className="text-[#FF5A36]" />
           <span>Pilih Template</span>
           <span className="text-pb-text-muted font-normal text-xs">
@@ -203,17 +203,17 @@ const PhotoMenuPage: React.FC = () => {
           </span>
         </h2>
         {templatesQuery.isLoading ? (
-          <div className="flex items-center justify-center py-16 bg-pb-surface border border-pb-border rounded-2xl">
+          <div className="flex items-center justify-center py-12 bg-pb-surface border border-pb-border rounded-2xl">
             <Spinner size="lg" className="text-pb-text" />
           </div>
         ) : templates.length === 0 ? (
-          <div className="bg-pb-surface border border-pb-border rounded-2xl p-8 text-center">
-            <ImageIcon size={40} className="text-pb-faint mx-auto mb-3" />
-            <p className="text-pb-text font-medium mb-1">Belum ada template</p>
-            <p className="text-pb-text-muted text-sm mb-5">
+          <div className="bg-pb-surface border border-pb-border rounded-2xl p-6 text-center">
+            <ImageIcon size={36} className="text-pb-faint mx-auto mb-2" />
+            <p className="text-pb-text font-medium text-sm mb-1">Belum ada template</p>
+            <p className="text-pb-text-muted text-xs mb-4">
               Unggah template desain di menu Kelola Template terlebih dahulu.
             </p>
-            <Button variant="outline" size="md" onClick={() => navigate('/templates')}>
+            <Button variant="outline" size="sm" onClick={() => navigate('/templates')}>
               Kelola Template
             </Button>
           </div>
