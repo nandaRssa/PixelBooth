@@ -169,10 +169,12 @@ const TemplateFrameEditorPage: React.FC = () => {
   }, [template, initialized]);
 
   // ===== Muat gambar template + data kerja =====
+  const templateUrl = template?.template_url || template?.preview_url || template?.template_file;
+
   useEffect(() => {
-    if (!template?.template_url) return;
+    if (!templateUrl || !template) return;
     let cancelled = false;
-    loadImage(getStorageUrl(template.template_url))
+    loadImage(templateUrl)
       .then((img) => {
         if (cancelled) return;
         templateImgRef.current = img;
@@ -184,12 +186,16 @@ const TemplateFrameEditorPage: React.FC = () => {
         rebuildHoles();
         scheduleRender();
       })
-      .catch(() => toast.error("Gagal memuat gambar template."));
+      .catch(() => {
+        if (!cancelled) {
+          toast.error("Gagal memuat gambar template.");
+        }
+      });
     return () => {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [template?.template_url]);
+  }, [templateUrl, template?.canvas_width, template?.canvas_height]);
 
   // ===== Rebuild layer desain berlubang saat frame berubah =====
   const rebuildHoles = useCallback(() => {
@@ -312,10 +318,13 @@ const TemplateFrameEditorPage: React.FC = () => {
         }
         ctx.drawImage(video, -dw / 2, -dh / 2, dw, dh);
       } else if (previewMask) {
-        ctx.fillStyle = "#16202B";
+        // Lapisan visual frame kamera (jelas, kontras, dan rapi)
+        ctx.fillStyle = "rgba(15, 23, 42, 0.85)";
         ctx.fillRect(-f.width / 2, -f.height / 2, f.width, f.height);
-        ctx.strokeStyle = "rgba(120,160,200,0.25)";
-        ctx.lineWidth = 2 / S;
+        
+        // Kisi-kisi garis diagonal viewfinder
+        ctx.strokeStyle = "rgba(56, 189, 248, 0.25)";
+        ctx.lineWidth = 1.5 / S;
         const step = Math.max(f.width, f.height) / 8;
         for (
           let d = -Math.max(f.width, f.height);
@@ -327,6 +336,13 @@ const TemplateFrameEditorPage: React.FC = () => {
           ctx.lineTo(-f.width / 2 + d + f.height, f.height / 2);
           ctx.stroke();
         }
+
+        // Teks penanda "Area Kamera Frame N" di tengah
+        ctx.fillStyle = "rgba(56, 189, 248, 0.85)";
+        ctx.font = `bold ${Math.max(12 / S, Math.round(f.width / 16))}px system-ui, sans-serif`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(`Area Kamera Frame ${frames.indexOf(f) + 1}`, 0, 0);
       }
       ctx.restore();
     }
@@ -334,6 +350,8 @@ const TemplateFrameEditorPage: React.FC = () => {
     // --- Layer desain dengan lubang mask (DI ATAS kamera) ---
     if (holesRef.current) {
       ctx.drawImage(holesRef.current, 0, 0);
+    } else if (templateImgRef.current) {
+      ctx.drawImage(templateImgRef.current, 0, 0, tpl.canvas_width, tpl.canvas_height);
     }
 
     // --- Tint region brush (remove merah / protect kuning / keep hijau) ---
@@ -469,36 +487,62 @@ const TemplateFrameEditorPage: React.FC = () => {
   useEffect(() => {
     if (!testCamera) return;
     let cancelled = false;
-    navigator.mediaDevices
-      .getUserMedia({
-        video: {
-          facingMode: "user",
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-        },
-        audio: false,
-      })
-      .then((stream) => {
+
+    const startCamera = async () => {
+      try {
+        let stream: MediaStream;
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: {
+              facingMode: "user",
+              width: { ideal: 1280 },
+              height: { ideal: 720 },
+            },
+            audio: false,
+          });
+        } catch {
+          // Fallback ke kamera default apa pun jika facingMode/resolusi spesifik gagal
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: true,
+            audio: false,
+          });
+        }
+
         if (cancelled) {
           stream.getTracks().forEach((t) => t.stop());
           return;
         }
+
         streamRef.current = stream;
         const video = document.createElement("video");
         video.srcObject = stream;
         video.muted = true;
         video.playsInline = true;
-        video.play().catch(() => {});
+        video.setAttribute("playsinline", "");
+        video.setAttribute("muted", "");
+        video.onloadedmetadata = () => {
+          video.play().catch(() => {});
+          scheduleRender();
+        };
+        video.onplaying = () => {
+          scheduleRender();
+        };
+        await video.play().catch(() => {});
         videoRef.current = video;
         setCameraError(null);
         scheduleRender();
-      })
-      .catch(() => {
+      } catch {
+        if (cancelled) return;
         setTestCamera(false);
         setCameraError(
-          "Tidak dapat mengakses kamera. Izinkan akses kamera di browser.",
+          "Tidak dapat mengakses kamera. Pastikan izin kamera telah diberikan di browser.",
         );
-      });
+        toast.error("Tidak dapat mengakses kamera.");
+      }
+    };
+
+    startCamera();
+
     return () => {
       cancelled = true;
       streamRef.current?.getTracks().forEach((t) => t.stop());

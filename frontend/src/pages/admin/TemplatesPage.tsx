@@ -15,6 +15,7 @@ import {
   CheckSquare,
   Square,
   Check,
+  Pencil,
 } from "lucide-react";
 import { Modal, ConfirmModal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
@@ -23,6 +24,7 @@ import { toast } from "@/components/ui/Toast";
 import {
   useTemplates,
   useCreateTemplate,
+  useUpdateTemplate,
   useDeleteTemplate,
   templateApi,
 } from "@/hooks/useTemplates";
@@ -52,6 +54,7 @@ const TemplatesPage: React.FC = () => {
   const queryClient = useQueryClient();
   const templatesQuery = useTemplates();
   const createTemplate = useCreateTemplate();
+  const updateTemplate = useUpdateTemplate();
   const deleteTemplate = useDeleteTemplate();
 
   const [isUploadOpen, setIsUploadOpen] = useState(false);
@@ -59,6 +62,8 @@ const TemplatesPage: React.FC = () => {
   const [templateFile, setTemplateFile] = useState<File | null>(null);
   const [previewFile, setPreviewFile] = useState<File | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Template | null>(null);
+  const [renameTarget, setRenameTarget] = useState<Template | null>(null);
+  const [renameName, setRenameName] = useState("");
 
   // ===== Seleksi Massal =====
   const [selectionMode, setSelectionMode] = useState(false);
@@ -355,7 +360,7 @@ const TemplatesPage: React.FC = () => {
                       </div>
                     </div>
                   ) : (
-                    /* Tombol Edit & Hapus: SELALU TAMPIL */
+                    /* Tombol Edit Frame, Ubah Nama, & Hapus: SELALU TAMPIL */
                     <div className="absolute top-1.5 left-1.5 z-10 flex flex-col gap-1">
                       <button
                         type="button"
@@ -368,6 +373,19 @@ const TemplatesPage: React.FC = () => {
                         aria-label="Buka Frame Editor"
                       >
                         <SlidersHorizontal size={13} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setRenameTarget(template);
+                          setRenameName(template.name);
+                        }}
+                        className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-black/80 backdrop-blur-md text-amber-300 hover:text-amber-200 border border-white/20 shadow-md active:scale-95 transition-all flex items-center justify-center"
+                        title="Ubah Nama Template"
+                        aria-label="Ubah Nama Template"
+                      >
+                        <Pencil size={13} />
                       </button>
                       <button
                         type="button"
@@ -639,6 +657,69 @@ const TemplatesPage: React.FC = () => {
         loading={isBulkDeleting}
         danger
       />
+
+      {/* ===== Modal Ubah Nama Template ===== */}
+      <Modal
+        isOpen={Boolean(renameTarget)}
+        onClose={() => setRenameTarget(null)}
+        title="Ubah Nama Template"
+        size="sm"
+      >
+        <form
+          onSubmit={async (e) => {
+            e.preventDefault();
+            if (!renameTarget || !renameName.trim()) return;
+            try {
+              await updateTemplate.mutateAsync({
+                id: renameTarget.id,
+                payload: { name: renameName.trim() },
+              });
+              toast.success("Nama template berhasil diperbarui.");
+              setRenameTarget(null);
+            } catch {
+              toast.error("Gagal memperbarui nama template.");
+            }
+          }}
+        >
+          <div className="mb-4">
+            <label className="block text-pb-text text-sm font-medium mb-1.5">
+              Nama Template
+            </label>
+            <input
+              type="text"
+              value={renameName}
+              onChange={(e) => setRenameName(e.target.value)}
+              placeholder="Masukkan nama template..."
+              required
+              autoFocus
+              className="w-full bg-pb-bg border border-pb-border rounded-xl px-3.5 py-2.5
+                text-pb-text text-sm placeholder:text-pb-faint
+                focus:outline-none focus:ring-1 focus:border-[#FF5A36] transition-colors"
+            />
+          </div>
+
+          <div className="flex justify-end gap-2 pt-3 border-t border-pb-border">
+            <Button
+              type="button"
+              variant="secondary"
+              size="md"
+              onClick={() => setRenameTarget(null)}
+              disabled={updateTemplate.isPending}
+            >
+              Batal
+            </Button>
+            <Button
+              type="submit"
+              variant="primary"
+              size="md"
+              disabled={updateTemplate.isPending || !renameName.trim()}
+              loading={updateTemplate.isPending}
+            >
+              Simpan
+            </Button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 };
