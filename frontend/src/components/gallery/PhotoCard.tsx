@@ -28,6 +28,20 @@ const PhotoCard: React.FC<PhotoCardProps> = ({
   isSelected = false,
   onToggleSelect,
 }) => {
+  const [imgSrc, setImgSrc] = React.useState<string>(() =>
+    getStorageUrl(photo.thumbnail_url || photo.url)
+  )
+
+  React.useEffect(() => {
+    setImgSrc(getStorageUrl(photo.thumbnail_url || photo.url))
+  }, [photo.thumbnail_url, photo.url])
+
+  const handleImgError = () => {
+    if (photo.url && imgSrc !== getStorageUrl(photo.url)) {
+      setImgSrc(getStorageUrl(photo.url))
+    }
+  }
+
   const handleClick = () => {
     if (selectionMode) {
       onToggleSelect?.(photo)
@@ -55,11 +69,12 @@ const PhotoCard: React.FC<PhotoCardProps> = ({
       `}
       onClick={handleClick}
     >
-      {(photo.thumbnail_url || photo.url) ? (
+      {imgSrc ? (
         <img
-          src={getStorageUrl(photo.thumbnail_url ?? photo.url)}
+          src={imgSrc}
           alt={photo.filename}
           loading="lazy"
+          onError={handleImgError}
           className={`absolute inset-0 w-full h-full object-cover transition-all duration-200 ${
             selectionMode && !isSelected ? 'opacity-60' : 'group-hover:scale-105'
           }`}
