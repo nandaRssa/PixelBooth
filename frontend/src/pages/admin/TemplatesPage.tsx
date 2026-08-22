@@ -397,27 +397,28 @@ const TemplatesPage: React.FC = () => {
                   )}
 
                   {/* Overlay Bawah */}
-                  <div className="absolute bottom-0 left-0 right-0 p-2.5 sm:p-3 bg-gradient-to-t from-black/95 via-black/70 to-transparent">
-                    <p className="text-white text-xs sm:text-sm font-semibold truncate">
-                      {template.name}
-                    </p>
-                    <p className="text-white/80 text-[11px] mt-0.5">
-                      {template.canvas_width} x {template.canvas_height}
-                    </p>
+                  <div className="absolute bottom-0 left-0 right-0 p-2.5 sm:p-3 bg-gradient-to-t from-black/95 via-black/70 to-transparent flex items-end justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-white text-xs sm:text-sm font-semibold truncate">
+                        {template.name}
+                      </p>
+                      <p className="text-white/80 text-[11px] mt-0.5">
+                        {template.canvas_width} x {template.canvas_height}
+                      </p>
+                    </div>
                     {template.status === "draft" && !selectionMode && (
-                      <Button
-                        variant="primary"
-                        size="sm"
-                        fullWidth
-                        className="mt-1.5 text-[11px] py-1 h-auto font-semibold"
+                      <button
+                        type="button"
                         onClick={(e) => {
                           e.stopPropagation();
                           navigate(`/templates/${template.id}/editor`);
                         }}
-                        leftIcon={<SlidersHorizontal size={11} />}
+                        className="w-7 h-7 rounded-lg bg-[#FF5A36] text-white hover:bg-[#ff7354] active:scale-95 shadow-md flex items-center justify-center transition-all shrink-0"
+                        title="Konfigurasi Frame"
+                        aria-label="Konfigurasi Frame"
                       >
-                        Konfigurasi Frame
-                      </Button>
+                        <SlidersHorizontal size={13} />
+                      </button>
                     )}
                   </div>
                 </motion.div>
@@ -592,6 +593,7 @@ const TemplatesPage: React.FC = () => {
             fullWidth
             onClick={() => setIsUploadOpen(false)}
             disabled={createTemplate.isPending}
+            className="text-xs sm:text-sm font-medium"
           >
             Batal
           </Button>
@@ -601,7 +603,7 @@ const TemplatesPage: React.FC = () => {
             fullWidth
             onClick={handleUpload}
             loading={createTemplate.isPending}
-            leftIcon={<Upload size={15} />}
+            className="text-xs sm:text-sm font-semibold"
           >
             {createTemplate.isPending
               ? "Mengunggah..."
