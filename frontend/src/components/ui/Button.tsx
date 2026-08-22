@@ -58,9 +58,9 @@ export const Button: React.FC<ButtonProps> = ({
 
   return (
     <motion.button
-      whileHover={isDisabled ? {} : { y: -2, scale: 1.02 }}
-      whileTap={isDisabled ? {} : { scale: 0.97 }}
-      transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+      whileHover={isDisabled ? undefined : { y: -1, scale: 1.01 }}
+      whileTap={isDisabled ? undefined : { scale: 0.98 }}
+      transition={{ duration: 0.12 }}
       type={type}
       id={id}
       form={form}
@@ -68,8 +68,8 @@ export const Button: React.FC<ButtonProps> = ({
       disabled={isDisabled}
       className={`
         inline-flex items-center justify-center gap-2 rounded-lg font-medium
-        transition-all duration-150 cursor-pointer select-none
-        disabled:opacity-40 disabled:cursor-not-allowed
+        transition-colors duration-150 cursor-pointer select-none
+        disabled:opacity-50 disabled:cursor-not-allowed
         focus:outline-none focus:ring-2 focus:ring-white/20 focus:ring-offset-2 focus:ring-offset-black
         ${variantStyles[variant]}
         ${sizeStyles[size]}
