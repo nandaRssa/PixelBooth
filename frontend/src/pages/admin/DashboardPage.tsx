@@ -1,7 +1,11 @@
 import React from 'react'
 import { motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
-import { LayoutGrid, Camera, Layers, ArrowRight } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
+import { LayoutGrid, Camera, Layers, ArrowRight, Folder, Image, Sparkles } from 'lucide-react'
+import { photoApi } from '@/api/photos'
+import { useFolders } from '@/hooks/useFolders'
+import { useTemplates } from '@/hooks/useTemplates'
 
 // ==========================================
 // Dashboard / Home Page
@@ -34,19 +38,61 @@ const DashboardPage: React.FC = () => {
   const hour = new Date().getHours()
   const greeting = hour < 12 ? 'Selamat Pagi' : hour < 17 ? 'Selamat Siang' : 'Selamat Malam'
 
+  // Sinkronisasi data real-time dari backend
+  const { data: photosData, isLoading: photosLoading } = useQuery({
+    queryKey: ['photos', 'total-count'],
+    queryFn: () => photoApi.list({ page: 1 }),
+    staleTime: 1000 * 30,
+  })
+  const { data: folders = [], isLoading: foldersLoading } = useFolders()
+  const { data: templates = [], isLoading: templatesLoading } = useTemplates()
+
+  const totalPhotos = photosLoading ? '...' : (photosData?.total ?? 0)
+  const totalFolders = foldersLoading ? '...' : folders.length
+  const totalTemplates = templatesLoading
+    ? '...'
+    : templates.filter((t) => t.status === 'active' || !t.status).length
+
+  const stats = [
+    {
+      label: 'Total Foto',
+      value: totalPhotos,
+      icon: Image,
+      to: '/gallery',
+      subtext: 'Foto tersimpan di galeri',
+      color: 'text-orange-400',
+    },
+    {
+      label: 'Total Folder',
+      value: totalFolders,
+      icon: Folder,
+      to: '/gallery',
+      subtext: 'Folder album galeri',
+      color: 'text-cyan-400',
+    },
+    {
+      label: 'Template Aktif',
+      value: totalTemplates,
+      icon: Sparkles,
+      to: '/templates',
+      subtext: 'Template siap pakai',
+      color: 'text-emerald-400',
+    },
+  ]
+
   return (
-    <div className="max-w-4xl">
+    <div className="max-w-4xl mx-auto pb-8">
       {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
-        className="mb-12"
+        className="mb-8 sm:mb-10"
       >
-        <p className="text-pb-text-muted text-sm mb-1">{greeting},</p>
-        <h1 className="text-pb-text text-3xl font-bold tracking-tight">
-          PixelBooth
+        <p className="text-pb-text-muted text-xs sm:text-sm mb-1">{greeting},</p>
+        <h1 className="text-pb-text text-2xl sm:text-3xl font-bold tracking-tight">
+          Pixel<span className="text-[#FF5A36]">Booth</span>
         </h1>
-        <p className="text-pb-text-secondary text-base mt-2">
+        <p className="text-pb-text-secondary text-sm sm:text-base mt-1.5">
           Apa yang ingin Anda kelola hari ini?
         </p>
       </motion.div>
@@ -89,26 +135,37 @@ const DashboardPage: React.FC = () => {
         })}
       </div>
 
-      {/* Quick Stats placeholder */}
+      {/* Synchronized Quick Stats Cards */}
       <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.4 }}
-        className="mt-8 grid grid-cols-1 sm:grid-cols-3 gap-4"
+        initial={{ opacity: 0, y: 15 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.3 }}
+        className="mt-6 sm:mt-8 grid grid-cols-1 sm:grid-cols-3 gap-3.5 sm:gap-4"
       >
-        {[
-          { label: 'Total Foto', value: '—' },
-          { label: 'Total Folder', value: '—' },
-          { label: 'Template Aktif', value: '—' },
-        ].map((stat) => (
-          <div
-            key={stat.label}
-            className="bg-pb-surface border border-pb-border rounded-xl px-4 py-4"
-          >
-            <p className="text-pb-text-muted text-xs mb-1">{stat.label}</p>
-            <p className="text-pb-text text-2xl font-bold">{stat.value}</p>
-          </div>
-        ))}
+        {stats.map((stat) => {
+          const StatIcon = stat.icon
+          return (
+            <button
+              key={stat.label}
+              type="button"
+              onClick={() => navigate(stat.to)}
+              className="text-left bg-pb-surface border border-pb-border hover:border-pb-border-strong rounded-2xl p-4 sm:p-5 shadow-xs hover:shadow-md transition-all duration-150 cursor-pointer group"
+            >
+              <div className="flex items-center justify-between mb-2.5">
+                <p className="text-pb-text-muted text-xs font-medium">{stat.label}</p>
+                <div className={`p-1.5 rounded-lg bg-pb-elevated group-hover:bg-pb-border/50 transition-colors ${stat.color}`}>
+                  <StatIcon size={16} />
+                </div>
+              </div>
+              <p className="text-pb-text text-2xl sm:text-3xl font-bold tracking-tight mb-1">
+                {stat.value}
+              </p>
+              <p className="text-pb-text-muted text-[11px] sm:text-xs truncate">
+                {stat.subtext}
+              </p>
+            </button>
+          )
+        })}
       </motion.div>
     </div>
   )
