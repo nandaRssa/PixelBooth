@@ -153,54 +153,27 @@ const TemplateFrameEditorPage: React.FC = () => {
   const rafRef = useRef<number | null>(null);
   const viewRef = useRef({ scale: 1, ox: 0, oy: 0 });
 
+  const framesRef = useRef<CameraFrame[]>(frames);
+  const templateRef = useRef<Template | null>(template);
+
+  useEffect(() => {
+    framesRef.current = frames;
+  }, [frames]);
+
+  useEffect(() => {
+    templateRef.current = template;
+  }, [template]);
+
   const selected = useMemo(
     () => frames.find((f) => f.id === selectedId) ?? null,
     [frames, selectedId],
   );
 
-  // ===== Init frames dari template =====
-  useEffect(() => {
-    if (!template || initialized) return;
-    const cfg = Array.isArray(template.frame_configuration)
-      ? template.frame_configuration
-      : [];
-    setFrames(cfg.map(normalizeFrame));
-    setInitialized(true);
-  }, [template, initialized]);
-
-  // ===== Muat gambar template + data kerja =====
-  const templateUrl = template?.template_url || template?.preview_url || template?.template_file;
-
-  useEffect(() => {
-    if (!templateUrl || !template) return;
-    let cancelled = false;
-    loadImage(templateUrl)
-      .then((img) => {
-        if (cancelled) return;
-        templateImgRef.current = img;
-        workRef.current = downscaleTemplate(
-          img,
-          template.canvas_width,
-          template.canvas_height,
-        );
-        rebuildHoles();
-        scheduleRender();
-      })
-      .catch(() => {
-        if (!cancelled) {
-          toast.error("Gagal memuat gambar template.");
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [templateUrl, template?.canvas_width, template?.canvas_height]);
-
   // ===== Rebuild layer desain berlubang saat frame berubah =====
   const rebuildHoles = useCallback(() => {
     const img = templateImgRef.current;
-    const tpl = template;
+    const tpl = templateRef.current;
+    const currentFrames = framesRef.current;
     if (!img || !tpl) return;
     try {
       const canvas = document.createElement("canvas");
@@ -230,7 +203,7 @@ const TemplateFrameEditorPage: React.FC = () => {
       const regionCtx = region.getContext("2d");
 
       ctx.globalCompositeOperation = "destination-out";
-      for (const f of frames) {
+      for (const f of currentFrames) {
         let mask = null;
         if (wt) {
           try {
@@ -266,14 +239,7 @@ const TemplateFrameEditorPage: React.FC = () => {
     } catch {
       // abaikan kegagalan rebuild sementara
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [frames, template]);
-
-  useEffect(() => {
-    rebuildHoles();
-    scheduleRender();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [frames]);
+  }, []);
 
   // ===== Render utama =====
   const render = useCallback(() => {
@@ -310,7 +276,7 @@ const TemplateFrameEditorPage: React.FC = () => {
 
     // --- Layer kamera / placeholder (DI BAWAH desain) ---
     const video = testCamera ? videoRef.current : null;
-    const videoReady = video && video.readyState >= 2 && video.videoWidth > 0;
+    const videoReady = video && (video.videoWidth > 0 || video.readyState >= 1) && !video.paused;
 
     for (const f of frames) {
       const rad = (f.rotation * Math.PI) / 180;
@@ -319,8 +285,6 @@ const TemplateFrameEditorPage: React.FC = () => {
       ctx.save();
       ctx.translate(cx, cy);
       ctx.rotate(rad);
-      // Konten frame (video/placeholder) dicerminkan sesuai flip —
-      // transform identik dengan render final (rotasi lalu flip lokal)
       ctx.scale(f.flip_h ? -1 : 1, f.flip_v ? -1 : 1);
       ctx.beginPath();
       ctx.rect(-f.width / 2, -f.height / 2, f.width, f.height);
@@ -422,7 +386,6 @@ const TemplateFrameEditorPage: React.FC = () => {
     }
 
     // --- Tint region brush (remove merah / protect kuning / keep hijau) ---
-    // Hanya tampil saat kuas aktif; di mode select frame tampil bersih.
     if (regionRef.current && mode !== "select") {
       ctx.drawImage(regionRef.current, 0, 0);
     }
@@ -442,21 +405,21 @@ const TemplateFrameEditorPage: React.FC = () => {
       if (!testCamera) {
         if (isSel) {
           if (mode === "remove") {
-            ctx.fillStyle = "rgba(239, 68, 68, 0.40)"; // Merah Terang (Remove Mode)
+            ctx.fillStyle = "rgba(239, 68, 68, 0.40)";
           } else if (mode === "protect") {
-            ctx.fillStyle = "rgba(245, 158, 11, 0.40)"; // Kuning Emas (Protect Mode)
+            ctx.fillStyle = "rgba(245, 158, 11, 0.40)";
           } else if (mode === "restore") {
-            ctx.fillStyle = "rgba(16, 185, 129, 0.40)"; // Hijau Emerald (Restore Mode)
+            ctx.fillStyle = "rgba(16, 185, 129, 0.40)";
           } else {
-            ctx.fillStyle = "rgba(255, 90, 54, 0.35)"; // Oranye Neon (Select Mode Aktif)
+            ctx.fillStyle = "rgba(255, 90, 54, 0.35)";
           }
         } else {
-          ctx.fillStyle = "rgba(16, 185, 129, 0.22)"; // Hijau Emerald Neon (Frame Tidak Aktif)
+          ctx.fillStyle = "rgba(16, 185, 129, 0.22)";
         }
         ctx.fillRect(-f.width / 2, -f.height / 2, f.width, f.height);
       }
 
-      // 2. Border frame: Oranye Terang untuk terpilih, Hijau Neon untuk tidak terpilih
+      // 2. Border frame
       ctx.lineWidth = (isSel ? 3.5 : 2.5) / S;
       ctx.setLineDash(isSel ? [] : [8 / S, 5 / S]);
       ctx.strokeStyle = isSel ? "#FF5A36" : "#10B981";
@@ -467,32 +430,28 @@ const TemplateFrameEditorPage: React.FC = () => {
       const cornerLen = Math.min(22 / S, f.width / 4, f.height / 4);
       ctx.strokeStyle = isSel ? "#FFFFFF" : "#10B981";
       ctx.lineWidth = (isSel ? 3.5 : 2.5) / S;
-      // Top-left
       ctx.beginPath();
       ctx.moveTo(-f.width / 2, -f.height / 2 + cornerLen);
       ctx.lineTo(-f.width / 2, -f.height / 2);
       ctx.lineTo(-f.width / 2 + cornerLen, -f.height / 2);
       ctx.stroke();
-      // Top-right
       ctx.beginPath();
       ctx.moveTo(f.width / 2 - cornerLen, -f.height / 2);
       ctx.lineTo(f.width / 2, -f.height / 2);
       ctx.lineTo(f.width / 2, -f.height / 2 + cornerLen);
       ctx.stroke();
-      // Bottom-left
       ctx.beginPath();
       ctx.moveTo(-f.width / 2, f.height / 2 - cornerLen);
       ctx.lineTo(-f.width / 2, f.height / 2);
       ctx.lineTo(-f.width / 2 + cornerLen, f.height / 2);
       ctx.stroke();
-      // Bottom-right
       ctx.beginPath();
       ctx.moveTo(f.width / 2 - cornerLen, f.height / 2);
       ctx.lineTo(f.width / 2, f.height / 2);
       ctx.lineTo(f.width / 2, f.height / 2 - cornerLen);
       ctx.stroke();
 
-      // Area protect/remove frame terpilih (konten → ikut flip)
+      // Area protect/remove frame terpilih
       if (isSel) {
         ctx.save();
         ctx.scale(f.flip_h ? -1 : 1, f.flip_v ? -1 : 1);
@@ -517,7 +476,7 @@ const TemplateFrameEditorPage: React.FC = () => {
         ctx.restore();
       }
 
-      // Label Badge Frame N (Pill Kontras Tinggi di sudut atas)
+      // Label Badge Frame N
       ctx.font = `bold ${12 / S}px system-ui, sans-serif`;
       ctx.textAlign = "left";
       ctx.textBaseline = "bottom";
@@ -525,7 +484,6 @@ const TemplateFrameEditorPage: React.FC = () => {
       const pad = 5 / S;
       const tw = ctx.measureText(label).width;
       
-      // Badge background
       ctx.fillStyle = isSel ? "#FF5A36" : "rgba(16, 185, 129, 0.95)";
       ctx.beginPath();
       ctx.roundRect(-f.width / 2, -f.height / 2 - pad * 3 - 2 / S, tw + pad * 2, 18 / S, 4 / S);
@@ -534,7 +492,6 @@ const TemplateFrameEditorPage: React.FC = () => {
       ctx.lineWidth = 1.5 / S;
       ctx.stroke();
 
-      // Badge text
       ctx.fillStyle = "#FFFFFF";
       ctx.fillText(label, -f.width / 2 + pad, -f.height / 2 - pad);
 
@@ -568,8 +525,6 @@ const TemplateFrameEditorPage: React.FC = () => {
       ctx.restore();
     }
 
-    // Lingkaran kursor kuas (ukuran = kemudahan menjangkau seed, BUKAN
-    // batas region — region mengikuti connected-region detection)
     if (mode !== "select" && cursorRef.current) {
       const cur = cursorRef.current;
       const color =
@@ -595,7 +550,6 @@ const TemplateFrameEditorPage: React.FC = () => {
     mode,
     previewMask,
     testCamera,
-    selected,
     brushSize,
   ]);
 
@@ -606,6 +560,57 @@ const TemplateFrameEditorPage: React.FC = () => {
       render();
     });
   }, [render]);
+
+  // ===== Init frames dari template =====
+  useEffect(() => {
+    if (!template || initialized) return;
+    const cfg = Array.isArray(template.frame_configuration)
+      ? template.frame_configuration
+      : [];
+    const normalized = cfg.map(normalizeFrame);
+    framesRef.current = normalized;
+    setFrames(normalized);
+    setInitialized(true);
+    rebuildHoles();
+    scheduleRender();
+  }, [template, initialized, rebuildHoles, scheduleRender]);
+
+  // ===== Muat gambar template + data kerja =====
+  const templateUrl = template?.template_url || template?.preview_url || template?.template_file;
+
+  useEffect(() => {
+    if (!templateUrl || !template) return;
+    let cancelled = false;
+    loadImage(templateUrl)
+      .then((img) => {
+        if (cancelled) return;
+        templateImgRef.current = img;
+        try {
+          workRef.current = downscaleTemplate(
+            img,
+            template.canvas_width,
+            template.canvas_height,
+          );
+        } catch {
+          workRef.current = null;
+        }
+        rebuildHoles();
+        scheduleRender();
+      })
+      .catch(() => {
+        if (!cancelled) {
+          toast.error("Gagal memuat gambar template.");
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [templateUrl, template?.canvas_width, template?.canvas_height, rebuildHoles, scheduleRender]);
+
+  useEffect(() => {
+    rebuildHoles();
+    scheduleRender();
+  }, [frames, rebuildHoles, scheduleRender]);
 
   useEffect(() => {
     scheduleRender();
