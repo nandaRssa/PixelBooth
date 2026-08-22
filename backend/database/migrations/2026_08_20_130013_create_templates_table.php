@@ -22,7 +22,7 @@ return new class extends Migration
             $table->integer('frame_count')->default(1);
             $table->jsonb('frame_configuration')->nullable(); // array konfigurasi frame
             $table->string('detection_method')->default('transparent'); // 'transparent' atau 'white-detection'
-            $table->enum('status', ['active', 'inactive'])->default('active');
+            $table->enum('status', ['draft', 'active', 'inactive'])->default('draft');
             $table->timestamps();
 
             $table->index('status');

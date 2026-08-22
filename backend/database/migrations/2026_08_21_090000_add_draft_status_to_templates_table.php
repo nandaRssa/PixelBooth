@@ -12,15 +12,19 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('templates', function (Blueprint $table) {
-            $table->enum('status', ['draft', 'active', 'inactive'])->default('draft')->change();
-        });
+        if (\Illuminate\Support\Facades\DB::getDriverName() !== 'pgsql') {
+            Schema::table('templates', function (Blueprint $table) {
+                $table->enum('status', ['draft', 'active', 'inactive'])->default('draft')->change();
+            });
+        }
     }
 
     public function down(): void
     {
-        Schema::table('templates', function (Blueprint $table) {
-            $table->enum('status', ['active', 'inactive'])->default('active')->change();
-        });
+        if (\Illuminate\Support\Facades\DB::getDriverName() !== 'pgsql') {
+            Schema::table('templates', function (Blueprint $table) {
+                $table->enum('status', ['active', 'inactive'])->default('active')->change();
+            });
+        }
     }
 };

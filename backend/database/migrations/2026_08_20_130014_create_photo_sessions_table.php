@@ -24,7 +24,6 @@ return new class extends Migration
             $table->timestamps();
 
             $table->index('status');
-            $table->index('session_token');
         });
     }
 

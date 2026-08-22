@@ -29,8 +29,6 @@ return new class extends Migration
             $table->string('mime_type')->default('image/jpeg');
             $table->timestamps();
 
-            $table->index('unique_token');
-            $table->index('folder_id');
             $table->index('is_final');
             $table->index('is_temporary');
         });

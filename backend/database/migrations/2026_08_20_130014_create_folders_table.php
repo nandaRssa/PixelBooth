@@ -20,9 +20,6 @@ return new class extends Migration
             $table->string('qr_path')->nullable();    // path file QR code image
             $table->string('google_drive_id')->nullable(); // Google Drive folder ID
             $table->timestamps();
-
-            $table->index('unique_token');
-            $table->index('parent_folder_id');
         });
     }
 
