@@ -373,30 +373,6 @@ const TemplateFrameEditorPage: React.FC = () => {
           ctx.lineTo(f.width / 2, f.height / 2 - cornerLen);
           ctx.stroke();
         }
-
-        // Badge Penanda "Area Kamera Frame N" di tengah (High-Contrast Pill)
-        const shapeName = f.shape === "ellipse" ? "Elips" : f.shape === "polygon" ? "Fleksibel" : "";
-        const badgeText = `📷 FRAME ${frames.indexOf(f) + 1}${shapeName ? ` (${shapeName})` : ""}`;
-        const fontSize = Math.max(12 / S, Math.round(f.width / 16));
-        ctx.font = `bold ${fontSize}px system-ui, sans-serif`;
-        const tw = ctx.measureText(badgeText).width;
-        const bw = tw + 20 / S;
-        const bh = fontSize + 14 / S;
-
-        // Pill background
-        ctx.fillStyle = "rgba(15, 23, 42, 0.95)";
-        ctx.beginPath();
-        ctx.roundRect(-bw / 2, -bh / 2, bw, bh, 8 / S);
-        ctx.fill();
-        ctx.strokeStyle = "#FF5A36";
-        ctx.lineWidth = 2 / S;
-        ctx.stroke();
-
-        // Pill text
-        ctx.fillStyle = "#FFFFFF";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.fillText(badgeText, 0, 0);
       }
       ctx.restore();
     }
