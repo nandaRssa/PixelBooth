@@ -81,20 +81,21 @@ const PhotoCard: React.FC<PhotoCardProps> = ({
       {/* Overlay aksi (hanya di mode normal) */}
       {!selectionMode && (
         <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/40 to-transparent opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-200 flex flex-col justify-end p-2 sm:p-2.5">
-          <div className="flex items-center gap-1 sm:gap-1.5 w-full">
+          <div className="flex items-center justify-between gap-1 sm:gap-1.5 w-full">
             <button
               type="button"
               onClick={(e) => {
                 e.stopPropagation()
                 onPreview(photo)
               }}
-              className="flex-1 min-w-0 flex items-center justify-center gap-1 px-1.5 sm:px-2 py-1.5 rounded-lg
+              className="flex-1 min-w-0 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg
                 bg-black/80 backdrop-blur-md text-white border border-white/20
-                text-[11px] sm:text-xs font-semibold hover:bg-black hover:text-cyan-300 active:scale-95 transition-all shadow-md truncate"
+                text-xs font-semibold hover:bg-black hover:text-cyan-300 active:scale-95 transition-all shadow-md"
               title="Lihat Foto"
+              aria-label="Lihat Foto"
             >
-              <Eye size={13} className="text-cyan-300 shrink-0" />
-              <span className="truncate">Lihat</span>
+              <Eye size={15} className="text-cyan-300 shrink-0" />
+              <span className="hidden sm:inline truncate">Lihat</span>
             </button>
             <button
               type="button"
@@ -102,13 +103,14 @@ const PhotoCard: React.FC<PhotoCardProps> = ({
                 e.stopPropagation()
                 onMove(photo)
               }}
-              className="flex-1 min-w-0 flex items-center justify-center gap-1 px-1.5 sm:px-2 py-1.5 rounded-lg
+              className="flex-1 min-w-0 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg
                 bg-black/80 backdrop-blur-md text-white border border-white/20
-                text-[11px] sm:text-xs font-semibold hover:bg-black hover:text-amber-300 active:scale-95 transition-all shadow-md truncate"
+                text-xs font-semibold hover:bg-black hover:text-amber-300 active:scale-95 transition-all shadow-md"
               title="Pindahkan Foto"
+              aria-label="Pindahkan Foto"
             >
-              <FolderInput size={13} className="text-amber-300 shrink-0" />
-              <span className="truncate">Pindah</span>
+              <FolderInput size={15} className="text-amber-300 shrink-0" />
+              <span className="hidden sm:inline truncate">Pindah</span>
             </button>
             <button
               type="button"
@@ -116,12 +118,12 @@ const PhotoCard: React.FC<PhotoCardProps> = ({
                 e.stopPropagation()
                 onDelete(photo)
               }}
-              className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-black/80 backdrop-blur-md text-red-400 border border-white/20
+              className="w-8 h-8 rounded-lg bg-black/80 backdrop-blur-md text-red-400 border border-white/20
                 hover:bg-red-600 hover:text-white active:scale-95 transition-all shadow-md flex items-center justify-center shrink-0"
               title="Hapus Foto"
               aria-label="Hapus Foto"
             >
-              <Trash2 size={13} />
+              <Trash2 size={15} />
             </button>
           </div>
         </div>
