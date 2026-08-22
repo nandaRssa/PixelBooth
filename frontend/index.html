@@ -36,9 +36,24 @@
     <!-- Preconnect Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+
+    <!-- Early Theme Execution — Mencegah Flicker/Mismatch Warna Saat Awal Akses -->
+    <script>
+      (function () {
+        try {
+          var t = localStorage.getItem('pb-theme');
+          if (t === 'light') {
+            document.documentElement.classList.add('light');
+          } else {
+            document.documentElement.classList.remove('light');
+          }
+        } catch (e) {}
+      })();
+    </script>
   </head>
-  <body>
+  <body class="bg-pb-bg text-pb-text">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
+
