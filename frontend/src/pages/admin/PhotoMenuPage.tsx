@@ -101,12 +101,12 @@ const PhotoMenuPage: React.FC = () => {
   }
 
   return (
-    <div className="flex flex-col h-[calc(100vh-4rem)]">
+    <div className="flex flex-col min-h-[calc(100vh-6rem)] sm:h-[calc(100vh-4rem)]">
       {/* ===== Header ===== */}
-      <div className="flex items-center justify-between mb-6 shrink-0">
+      <div className="flex items-center justify-between mb-3 sm:mb-6 shrink-0">
         <div>
-          <h1 className="text-pb-text text-2xl font-bold">Photo</h1>
-          <p className="text-pb-text-muted text-sm mt-1">Pilih template untuk langsung memulai sesi pemotretan</p>
+          <h1 className="text-pb-text text-xl sm:text-2xl font-bold">Photo</h1>
+          <p className="text-pb-text-muted text-xs sm:text-sm mt-0.5 sm:mt-1">Pilih template untuk langsung memulai sesi pemotretan</p>
         </div>
         <CameraStatusBadge
           status={
@@ -115,73 +115,62 @@ const PhotoMenuPage: React.FC = () => {
         />
       </div>
 
-      {/* ===== Status Sumber Kamera ===== */}
-      <div className="bg-pb-surface border border-pb-border rounded-xl p-4 mb-6 shrink-0">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-pb-text text-sm font-medium flex items-center gap-2">
+      {/* ===== Status Sumber Kamera (Compact di HP) ===== */}
+      <div className="bg-pb-surface border border-pb-border rounded-xl p-3 sm:p-4 mb-3 sm:mb-4 shrink-0">
+        <div className="flex items-center justify-between gap-2">
+          <div className="min-w-0">
+            <p className="text-pb-text text-xs sm:text-sm font-medium flex items-center gap-1.5 truncate">
               {webcamAvailable === false ? (
-                <VideoOff size={16} className="text-amber-400" />
+                <VideoOff size={15} className="text-amber-400 shrink-0" />
               ) : (
-                <Video size={16} className="text-green-400" />
+                <Video size={15} className="text-green-400 shrink-0" />
               )}
-              Webcam Device (Utama)
+              <span>Webcam Device (Utama)</span>
             </p>
-            <p className="text-pb-text-muted text-xs mt-1">
+            <p className="text-pb-text-muted text-[11px] sm:text-xs mt-0.5 truncate sm:whitespace-normal">
               {webcamAvailable === null
                 ? 'Memeriksa kamera device...'
                 : webcamAvailable
-                  ? 'Kamera device terdeteksi. Capture berjalan langsung di browser.'
-                  : 'Tidak ada kamera device terdeteksi. Periksa izin akses kamera.'}
+                  ? 'Kamera terdeteksi · Capture via browser.'
+                  : 'Tidak ada kamera terdeteksi.'}
             </p>
           </div>
-          <span className="text-xs text-pb-text-muted">Sumber default</span>
+          <span className="text-[10px] sm:text-xs text-pb-text-muted shrink-0 bg-pb-elevated px-2 py-0.5 rounded-md border border-pb-border/50">
+            Default
+          </span>
         </div>
 
         {/* DSLR opsional */}
-        {hardwareQuery.isLoading ? (
-          <div className="flex items-center gap-3 mt-3 pt-3 border-t border-pb-border">
-            <Spinner size="sm" className="text-pb-text" />
-            <p className="text-pb-text-secondary text-xs">Memeriksa hardware bridge (DSLR)...</p>
-          </div>
-        ) : hardware?.bridge_online ? (
-          <div className="flex items-center justify-between mt-3 pt-3 border-t border-pb-border">
-            <p className="text-green-400 text-xs flex items-center gap-2">
-              <Wifi size={14} />
+        {hardware?.bridge_online && (
+          <div className="flex items-center justify-between mt-2 pt-2 border-t border-pb-border">
+            <p className="text-green-400 text-[11px] sm:text-xs flex items-center gap-1.5">
+              <Wifi size={13} />
               {dslrConnected
-                ? `DSLR terhubung via bridge: ${hardware.camera_model ?? 'kamera'}${
-                    typeof hardware.battery_level === 'number' ? ` · baterai ${hardware.battery_level}%` : ''
-                  }`
-                : 'Bridge online, kamera DSLR belum siap'}
+                ? `DSLR: ${hardware.camera_model ?? 'kamera'}`
+                : 'Bridge online'}
             </p>
-            <span className="text-xs text-pb-text-muted">Opsional</span>
+            <span className="text-[10px] text-pb-text-muted">DSLR</span>
           </div>
-        ) : null}
+        )}
       </div>
 
-      {/* ===== Pilihan Folder Tujuan ===== */}
-      <div className="mb-6 bg-pb-surface border border-pb-border rounded-2xl p-5 shrink-0 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <p className="text-pb-text font-medium text-sm">Target Penyimpanan</p>
-          <p className="text-pb-text-muted text-xs mt-0.5">Pilih folder galeri tujuan sebelum memilih template foto.</p>
-
-          {webcamAvailable === false && (
-            <p className="flex items-center gap-1.5 text-amber-400 text-xs mt-1.5">
-              <AlertTriangle size={12} />
-              Webcam tidak terdeteksi — izinkan akses kamera di browser.
-            </p>
-          )}
+      {/* ===== Pilihan Folder Tujuan (Compact di HP) ===== */}
+      <div className="mb-3 sm:mb-5 bg-pb-surface border border-pb-border rounded-xl p-3 sm:p-4 shrink-0 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-4">
+        <div className="min-w-0">
+          <p className="text-pb-text font-semibold text-xs sm:text-sm flex items-center gap-1.5">
+            <FolderPlus size={14} className="text-[#FF5A36]" />
+            Target Folder Galeri
+          </p>
+          <p className="text-pb-text-muted text-[11px] sm:text-xs mt-0.5">
+            Pilih folder tujuan sebelum memilih template.
+          </p>
         </div>
 
-        <div className="w-full sm:w-72">
-          <label className="block text-pb-text-secondary text-xs font-medium mb-1.5 flex items-center gap-1.5">
-            <FolderPlus size={13} />
-            Simpan Hasil ke Folder
-          </label>
+        <div className="w-full sm:w-64 shrink-0">
           {foldersQuery.isLoading ? (
-            <div className="flex items-center gap-2 bg-pb-bg border border-pb-border rounded-lg px-4 py-2.5">
+            <div className="flex items-center gap-2 bg-pb-bg border border-pb-border rounded-lg px-3 py-1.5">
               <Spinner size="sm" className="text-pb-text" />
-              <span className="text-pb-text-muted text-sm">Memuat folder...</span>
+              <span className="text-pb-text-muted text-xs">Memuat...</span>
             </div>
           ) : (
             <select
@@ -189,8 +178,8 @@ const PhotoMenuPage: React.FC = () => {
               onChange={(e) =>
                 setSelectedFolderId(e.target.value === '' ? null : Number(e.target.value))
               }
-              className="w-full bg-pb-bg border border-pb-border rounded-lg px-3 py-2.5
-                text-pb-text text-sm focus:outline-none focus:ring-1 focus:border-pb-border-strong focus:ring-white/10
+              className="w-full bg-pb-bg border border-pb-border rounded-lg px-3 py-2
+                text-pb-text text-xs sm:text-sm focus:outline-none focus:ring-1 focus:border-[#FF5A36]
                 [&>option]:bg-pb-bg"
             >
               <option value="">Galeri (Tanpa Folder)</option>
@@ -204,13 +193,13 @@ const PhotoMenuPage: React.FC = () => {
         </div>
       </div>
 
-      {/* ===== Daftar Template (scroll area) ===== */}
-      <div className="flex-1 min-h-0 overflow-y-auto pb-6">
-        <h2 className="text-pb-text text-sm font-semibold mb-3 flex items-center gap-2">
-          <Layers size={16} className="text-pb-text-secondary" />
-          Pilih Template
-          <span className="text-pb-text-muted font-normal">
-            {templatesQuery.isLoading ? '' : templates.length}
+      {/* ===== Daftar Template (scroll area diperluas) ===== */}
+      <div className="flex-1 min-h-0 overflow-y-auto pb-10">
+        <h2 className="text-pb-text text-xs sm:text-sm font-semibold mb-2.5 flex items-center gap-2 sticky top-0 bg-pb-bg/90 backdrop-blur-xs py-1 z-10">
+          <Layers size={15} className="text-[#FF5A36]" />
+          <span>Pilih Template</span>
+          <span className="text-pb-text-muted font-normal text-xs">
+            ({templatesQuery.isLoading ? '...' : templates.length})
           </span>
         </h2>
         {templatesQuery.isLoading ? (
