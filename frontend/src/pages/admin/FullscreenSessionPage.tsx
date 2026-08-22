@@ -464,19 +464,9 @@ const FullscreenSessionPage: React.FC = () => {
             }}
           />
 
-          {/* Template mentah (fallback di bawah kamera) */}
-          {!overlayUrl && template?.template_url && (
-            <img
-              src={getStorageUrl(template.template_url)}
-              alt={template.name}
-              draggable={false}
-              className="absolute inset-0 w-full h-full object-fill pointer-events-none"
-            />
-          )}
-
-          {/* Lapisan slot: live camera / foto jadi / hitam */}
+          {/* Lapisan slot kamera: DI BELAKANG DESAIN (z-0) */}
           {previewSlots.length > 0 && (
-            <div className="absolute inset-0 pointer-events-none">
+            <div className="absolute inset-0 pointer-events-none z-0">
               {previewSlots.map((slot, i) => (
                 <div key={i} className="absolute overflow-hidden" style={slotPosition(slot)}>
                   {i === activeFrameIndex && cameraActive && !allDone ? (
@@ -508,13 +498,13 @@ const FullscreenSessionPage: React.FC = () => {
             </div>
           )}
 
-          {/* Overlay terproses di atas kamera */}
-          {overlayUrl && (
+          {/* Template Desain: DI DEPAN KAMERA (z-10) — Kamera otomatis berada DI BELAKANG DESAIN */}
+          {template && template.template_url && (
             <img
-              src={overlayUrl}
-              alt=""
+              src={overlayUrl || getStorageUrl(template.template_url)}
+              alt={template.name}
               draggable={false}
-              className="absolute inset-0 w-full h-full object-fill pointer-events-none"
+              className="absolute inset-0 w-full h-full object-fill pointer-events-none z-10"
             />
           )}
 

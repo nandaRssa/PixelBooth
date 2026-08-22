@@ -710,19 +710,9 @@ const PhotoCapturePage: React.FC = () => {
               }}
             />
 
-            {/* Template mentah (fallback): ditaruh di BAWAH kamera slot */}
-            {!overlayUrl && template && template.template_url && (
-              <img
-                src={getStorageUrl(template.template_url)}
-                alt={template.name}
-                draggable={false}
-                className="absolute inset-0 w-full h-full object-fill pointer-events-none select-none"
-              />
-            )}
-
-            {/* Lapisan slot: kamera live (frame aktif) / foto (selesai) / hitam (pending) */}
+            {/* Lapisan slot kamera: DI BELAKANG DESAIN (z-0) */}
             {previewSlots.length > 0 && template && (
-              <div className="absolute inset-0 pointer-events-none">
+              <div className="absolute inset-0 pointer-events-none z-0">
                 {previewSlots.map((slot, i) => (
                   <div key={i} className="absolute overflow-hidden" style={slotPosition(slot)}>
                     {i === activeFrameIndex && cameraActive && !allDone ? (
@@ -754,13 +744,13 @@ const PhotoCapturePage: React.FC = () => {
               </div>
             )}
 
-            {/* Overlay terproses: desain template DI ATAS kamera (lubang foto transparan) */}
-            {overlayUrl && (
+            {/* Template Desain: DI DEPAN KAMERA (z-10) — Kamera otomatis berada DI BELAKANG DESAIN */}
+            {template && template.template_url && (
               <img
-                src={overlayUrl}
+                src={overlayUrl || getStorageUrl(template.template_url)}
                 alt={template?.name ?? 'Template'}
                 draggable={false}
-                className="absolute inset-0 w-full h-full object-fill pointer-events-none select-none"
+                className="absolute inset-0 w-full h-full object-fill pointer-events-none select-none z-10"
               />
             )}
 
