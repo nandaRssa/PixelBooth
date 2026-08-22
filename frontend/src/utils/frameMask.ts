@@ -14,7 +14,7 @@
 
 import type { CameraFrame, BrushPoint, ClearArea } from '@/types'
 
-export const WORK_MAX = 480
+export const WORK_MAX = 1200
 
 /** Normalisasi frame parsial menjadi konfigurasi lengkap ber-default. */
 export function normalizeFrame(frame: Partial<CameraFrame>): CameraFrame {

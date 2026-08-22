@@ -21,8 +21,11 @@ namespace App\Services;
  */
 class FrameMaskService
 {
-    /** Resolusi kerja maksimal (sisi terpanjang grid analisis). */
-    public const WORK_MAX = 480;
+    /**
+     * Resolusi kerja analisis warna (HD): semakin tinggi resolusinya,
+     * semakin presisi dan halus penghapusan piksel tanpa ada gerigi/serbuk kasar.
+     */
+    public const WORK_MAX = 1200;
 
     /**
      * Normalisasi satu frame dari input API/user menjadi struktur lengkap ber-default.
