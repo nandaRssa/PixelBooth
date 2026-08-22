@@ -15,28 +15,30 @@ const apiClient = axios.create({
 })
 
 /**
- * Resolves any relative storage path or relative URL to the full backend storage origin.
+ * Resolves any relative storage path or relative URL to the full backend storage origin,
+ * ensuring all assets use HTTPS to prevent Mixed Content blocking on Vercel.
  */
 export function getStorageUrl(path?: string | null): string {
   if (!path) return ''
+  // Upgrade insecure HTTP to HTTPS for cloudflare tunnel & public origins
+  let cleanPath = path.replace(/^http:\/\//i, 'https://')
   if (
-    path.startsWith('http://') ||
-    path.startsWith('https://') ||
-    path.startsWith('data:') ||
-    path.startsWith('blob:')
+    cleanPath.startsWith('https://') ||
+    cleanPath.startsWith('data:') ||
+    cleanPath.startsWith('blob:')
   ) {
-    return path
+    return cleanPath
   }
   const apiBase = import.meta.env.VITE_API_URL || ''
   if (apiBase.startsWith('http://') || apiBase.startsWith('https://')) {
     try {
-      const origin = new URL(apiBase).origin
-      return `${origin}/${path.replace(/^\/+/, '')}`
+      const origin = new URL(apiBase).origin.replace(/^http:\/\//i, 'https://')
+      return `${origin}/${cleanPath.replace(/^\/+/, '')}`
     } catch {
-      return path
+      return cleanPath
     }
   }
-  return path
+  return cleanPath
 }
 
 export default apiClient
