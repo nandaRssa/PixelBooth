@@ -177,18 +177,18 @@ const TemplatesPage: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-4rem)]">
+    <div className="flex flex-col min-h-[calc(100vh-5rem)]">
       {/* ===== Header ===== */}
-      <div className="flex items-center justify-between flex-wrap gap-3 mb-6 shrink-0">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 shrink-0">
         <div>
-          <h1 className="text-pb-text text-2xl font-bold">Kelola Template</h1>
-          <p className="text-pb-text-muted text-sm mt-1">
+          <h1 className="text-pb-text text-xl sm:text-2xl font-bold">Kelola Template</h1>
+          <p className="text-pb-text-muted text-xs sm:text-sm mt-1">
             Upload → Frame Editor → Test Camera → Confirm → Siap dipakai
           </p>
         </div>
 
         {/* Action Buttons & Bulk Select */}
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-2 shrink-0 flex-wrap">
           {selectionMode ? (
             <>
               <Button
@@ -198,7 +198,7 @@ const TemplatesPage: React.FC = () => {
                 leftIcon={<CheckSquare size={16} />}
               >
                 {selectedIds.size === templates.length && templates.length > 0
-                  ? "Batal Pilih Semua"
+                  ? "Batal Semua"
                   : "Pilih Semua"}
               </Button>
               {selectedIds.size > 0 && (
@@ -219,7 +219,7 @@ const TemplatesPage: React.FC = () => {
                   setSelectedIds(new Set());
                 }}
               >
-                Batalkan
+                Batal
               </Button>
             </>
           ) : (
@@ -248,9 +248,9 @@ const TemplatesPage: React.FC = () => {
       </div>
 
       {/* ===== Konten (scroll area) ===== */}
-      <div className="flex-1 min-h-0 overflow-y-auto pb-6">
-        {/* ===== Info ===== */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+      <div className="flex-1 min-h-0 pb-6">
+        {/* ===== Info Cards ===== */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
           {[
             { label: "Format yang Didukung", value: "PNG, JPG, WEBP" },
             { label: "Ukuran Canvas", value: "Bebas (pixel based)" },
@@ -258,10 +258,10 @@ const TemplatesPage: React.FC = () => {
           ].map((info) => (
             <div
               key={info.label}
-              className="bg-pb-surface border border-pb-border rounded-xl px-4 py-4"
+              className="bg-pb-surface border border-pb-border rounded-xl p-3 sm:p-4 shadow-xs"
             >
-              <p className="text-pb-text-muted text-xs mb-1">{info.label}</p>
-              <p className="text-pb-text text-sm font-medium">{info.value}</p>
+              <p className="text-pb-text-muted text-[11px] sm:text-xs mb-0.5">{info.label}</p>
+              <p className="text-pb-text text-xs sm:text-sm font-semibold">{info.value}</p>
             </div>
           ))}
         </div>

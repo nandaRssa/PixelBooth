@@ -1271,9 +1271,9 @@ const TemplateFrameEditorPage: React.FC = () => {
     );
 
   return (
-    <div className="flex flex-col h-[calc(100vh-4rem)]">
+    <div className="flex flex-col min-h-[calc(100vh-5rem)] lg:h-[calc(100vh-4rem)]">
       {/* ===== Header ===== */}
-      <div className="flex items-center justify-between flex-wrap gap-y-2 mb-4 shrink-0">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4 shrink-0">
         <div className="flex items-center gap-3 min-w-0">
           <Button
             variant="ghost"
@@ -1285,7 +1285,7 @@ const TemplateFrameEditorPage: React.FC = () => {
           </Button>
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <h1 className="text-pb-text text-xl font-bold leading-tight">
+              <h1 className="text-pb-text text-lg sm:text-xl font-bold leading-tight truncate">
                 Frame Editor
               </h1>
               <span
@@ -1302,54 +1302,55 @@ const TemplateFrameEditorPage: React.FC = () => {
           </div>
         </div>
 
-        {/* ===== Mode Manual / Auto Render ===== */}
-        <div className="flex rounded-xl border border-pb-border overflow-hidden bg-pb-bg shrink-0 p-1 gap-1">
-          <button
-            type="button"
-            onClick={() => switchFrameMode("manual")}
-            disabled={detecting}
-            className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-all disabled:opacity-50 ${
-              frameMode === "manual"
-                ? "bg-cyan-100 text-cyan-900 border border-cyan-300/70 dark:bg-cyan-950/80 dark:text-cyan-200 dark:border-cyan-500/30 shadow-xs"
-                : "text-pb-text-secondary hover:text-pb-text hover:bg-pb-surface"
-            }`}
-          >
-            <MousePointer2 size={15} />
-            Manual
-          </button>
-          <button
-            type="button"
-            onClick={() => switchFrameMode("auto")}
-            disabled={detecting}
-            className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-all disabled:opacity-50 ${
-              frameMode === "auto"
-                ? "bg-violet-100 text-violet-950 border border-violet-300/70 dark:bg-violet-950/80 dark:text-violet-200 dark:border-violet-500/30 shadow-xs"
-                : "text-pb-text-secondary hover:text-pb-text hover:bg-pb-surface"
-            }`}
-          >
-            <Wand2 size={15} />
-            Auto Render
-          </button>
-        </div>
+        {/* ===== Actions Bar ===== */}
+        <div className="flex items-center gap-2 shrink-0 flex-wrap">
+          {/* Mode Manual / Auto Render */}
+          <div className="flex rounded-xl border border-pb-border overflow-hidden bg-pb-bg p-0.5 gap-0.5">
+            <button
+              type="button"
+              onClick={() => switchFrameMode("manual")}
+              disabled={detecting}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all disabled:opacity-50 ${
+                frameMode === "manual"
+                  ? "bg-cyan-100 text-cyan-900 border border-cyan-300/70 dark:bg-cyan-950/80 dark:text-cyan-200 dark:border-cyan-500/30 shadow-xs"
+                  : "text-pb-text-secondary hover:text-pb-text hover:bg-pb-surface"
+              }`}
+            >
+              <MousePointer2 size={14} />
+              Manual
+            </button>
+            <button
+              type="button"
+              onClick={() => switchFrameMode("auto")}
+              disabled={detecting}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all disabled:opacity-50 ${
+                frameMode === "auto"
+                  ? "bg-violet-100 text-violet-950 border border-violet-300/70 dark:bg-violet-950/80 dark:text-violet-200 dark:border-violet-500/30 shadow-xs"
+                  : "text-pb-text-secondary hover:text-pb-text hover:bg-pb-surface"
+              }`}
+            >
+              <Wand2 size={14} />
+              Auto Render
+            </button>
+          </div>
 
-        <div className="flex items-center gap-2 shrink-0">
           <Button
             variant={testCamera ? "primary" : "secondary"}
-            size="md"
+            size="sm"
             onClick={() => setTestCamera((v) => !v)}
-            leftIcon={testCamera ? <VideoOff size={16} /> : <Video size={16} />}
+            leftIcon={testCamera ? <VideoOff size={15} /> : <Video size={15} />}
           >
-            {testCamera ? "Stop Kamera" : "Test Camera"}
+            {testCamera ? "Stop" : "Test Camera"}
           </Button>
           <Button
             variant="primary"
-            size="md"
+            size="sm"
             onClick={handleConfirm}
             loading={updateTemplate.isPending}
             disabled={frames.length === 0}
-            leftIcon={<Check size={16} />}
+            leftIcon={<Check size={15} />}
           >
-            Confirm Template
+            Confirm
           </Button>
         </div>
       </div>
@@ -1360,11 +1361,11 @@ const TemplateFrameEditorPage: React.FC = () => {
         </div>
       )}
 
-      <div className="flex gap-4 flex-1 min-h-0">
+      <div className="flex flex-col lg:flex-row gap-4 flex-1 min-h-0">
         {/* ===== Canvas ===== */}
         <div
           ref={containerRef}
-          className="relative flex-1 bg-pb-bg border border-pb-border rounded-2xl overflow-hidden min-h-0"
+          className="relative w-full h-[52vh] sm:h-[60vh] lg:h-auto lg:flex-1 bg-pb-bg border border-pb-border rounded-2xl overflow-hidden shrink-0 lg:shrink min-h-[300px]"
         >
           <canvas
             ref={canvasRef}
@@ -1416,12 +1417,12 @@ const TemplateFrameEditorPage: React.FC = () => {
           )}
           {/* Penanda versi build — untuk memastikan bundle terbaru yang dimuat */}
           <div className="absolute bottom-2 right-3 text-[10px] text-pb-text-muted select-none pointer-events-none">
-            editor-v19 · keyboard-undo
+            editor-v20 · responsive
           </div>
         </div>
 
         {/* ===== Sidebar ===== */}
-        <div className="w-80 shrink-0 overflow-y-auto pr-1 space-y-4">
+        <div className="w-full lg:w-80 shrink-0 overflow-y-visible lg:overflow-y-auto pr-0 lg:pr-1 space-y-4 pb-8 lg:pb-0">
           {/* Frames */}
           <section className="bg-pb-surface border border-pb-border rounded-xl p-4">
             <h3 className="text-pb-text text-sm font-semibold mb-2">

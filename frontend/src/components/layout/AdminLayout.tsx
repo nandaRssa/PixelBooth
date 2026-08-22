@@ -37,54 +37,61 @@ export const AdminLayout: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-pb-bg flex">
-      {/* Sidebar — rail ikon di layar sempit (iPad portrait), penuh di desktop */}
-      <aside className="w-16 lg:w-64 bg-pb-bg border-r border-pb-border flex flex-col fixed h-full z-10 transition-[width] duration-200">
+    <div className="min-h-screen bg-pb-bg flex flex-col lg:flex-row">
+      {/* ===== Mobile Top Header (< lg) ===== */}
+      <header className="lg:hidden fixed top-0 left-0 right-0 h-14 bg-pb-bg/90 backdrop-blur-md border-b border-pb-border flex items-center justify-between px-4 z-30">
+        <div className="flex items-center gap-2">
+          <span className="w-8 h-8 rounded-lg bg-gradient-to-tr from-[#FF5A36] to-[#FF8836] flex items-center justify-center text-white font-bold text-xs shadow-sm shadow-orange-500/30">
+            PB
+          </span>
+          <h1 className="text-pb-text font-bold text-base tracking-tight">
+            Pixel<span className="text-[#FF5A36]">Booth</span>
+          </h1>
+        </div>
+        <button
+          type="button"
+          onClick={toggleTheme}
+          aria-label={theme === 'dark' ? 'Mode siang' : 'Mode malam'}
+          title={theme === 'dark' ? 'Mode siang' : 'Mode malam'}
+          className="flex items-center justify-center w-9 h-9 rounded-xl bg-pb-surface border border-pb-border text-pb-text-secondary hover:text-pb-text transition-colors"
+        >
+          {theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
+        </button>
+      </header>
+
+      {/* ===== Desktop Sidebar (lg+) ===== */}
+      <aside className="hidden lg:flex w-64 bg-pb-bg border-r border-pb-border flex-col fixed h-full z-20">
         {/* Logo */}
-        <div className="px-3 lg:px-6 py-6 border-b border-pb-border">
-          <div className="flex items-center justify-center lg:justify-between gap-2">
+        <div className="px-6 py-6 border-b border-pb-border">
+          <div className="flex items-center justify-between gap-2">
             <button
               type="button"
               onClick={toggleTheme}
               aria-label={theme === 'dark' ? 'Mode siang' : 'Mode malam'}
               title={theme === 'dark' ? 'Mode siang' : 'Mode malam'}
-              className="hidden lg:flex items-center justify-center w-8 h-8 rounded-lg shrink-0
+              className="flex items-center justify-center w-8 h-8 rounded-lg shrink-0
                 text-pb-text-secondary hover:text-pb-text hover:bg-white/5 transition-colors"
             >
               {theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
             </button>
-            <div className="hidden lg:block min-w-0">
+            <div className="min-w-0 flex-1 ml-2">
               <h1 className="text-pb-text font-bold text-lg tracking-tight">
-                Pixel<span className="text-pb-text-secondary">Booth</span>
+                Pixel<span className="text-[#FF5A36]">Booth</span>
               </h1>
               <p className="text-pb-text-muted text-xs mt-0.5">Sistem Photobooth Profesional</p>
             </div>
-            {/* Mode rail: ikon logo + toggle */}
-            <span className="lg:hidden text-pb-text font-bold text-lg">PB</span>
-          </div>
-          {/* Toggle untuk rail mode */}
-          <div className="flex justify-center mt-3 lg:hidden">
-            <button
-              type="button"
-              onClick={toggleTheme}
-              aria-label={theme === 'dark' ? 'Mode siang' : 'Mode malam'}
-              className="flex items-center justify-center w-9 h-9 rounded-lg
-                text-pb-text-secondary hover:text-pb-text hover:bg-white/5 transition-colors"
-            >
-              {theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
-            </button>
           </div>
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 px-2 lg:px-3 py-4 space-y-1">
+        <nav className="flex-1 px-3 py-4 space-y-1">
           {navItems.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
               title={item.label}
               className={({ isActive }) => `
-                flex items-center justify-center lg:justify-start gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold
+                flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold
                 transition-all duration-200 group hover:translate-x-1.5
                 ${isActive
                   ? 'bg-gradient-to-r from-[#FF5A36] to-[#FF8836] text-white shadow-md shadow-orange-500/25'
@@ -93,39 +100,84 @@ export const AdminLayout: React.FC = () => {
               `}
             >
               {item.icon}
-              <span className="hidden lg:inline">{item.label}</span>
+              <span>{item.label}</span>
             </NavLink>
           ))}
         </nav>
 
         {/* Footer */}
-        <div className="px-2 lg:px-3 py-4 border-t border-pb-border">
+        <div className="px-3 py-4 border-t border-pb-border">
           <NavLink
             to="/settings"
             title="Pengaturan"
             className={({ isActive }) => `
-              flex items-center justify-center lg:justify-start gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold
+              flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold
               transition-all duration-200 hover:translate-x-1.5
               ${isActive ? 'bg-gradient-to-r from-[#FF5A36] to-[#FF8836] text-white shadow-md shadow-orange-500/25' : 'text-pb-text-secondary hover:text-pb-text hover:bg-pb-elevated'}
             `}
           >
             <Settings size={20} />
-            <span className="hidden lg:inline">Pengaturan</span>
+            <span>Pengaturan</span>
           </NavLink>
         </div>
       </aside>
 
-      {/* Main Content */}
-      <main className="flex-1 ml-16 lg:ml-64 min-h-screen">
+      {/* ===== Main Content Area ===== */}
+      <main className="flex-1 w-full lg:ml-64 min-h-screen pt-16 lg:pt-0 pb-20 lg:pb-0">
         <motion.div
           initial={{ opacity: 0, y: 4 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.2 }}
-          className="p-8"
+          className="p-4 sm:p-6 lg:p-8"
         >
           <Outlet />
         </motion.div>
       </main>
+
+      {/* ===== Mobile Bottom Navigation Bar (< lg) ===== */}
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 h-16 bg-pb-surface/95 backdrop-blur-lg border-t border-pb-border flex items-center justify-around px-2 z-30 shadow-lg">
+        {navItems.map((item) => (
+          <NavLink
+            key={item.to}
+            to={item.to}
+            className={({ isActive }) => `
+              flex flex-col items-center justify-center flex-1 py-1 px-1 rounded-xl transition-all
+              ${isActive
+                ? 'text-[#FF5A36] font-semibold'
+                : 'text-pb-text-muted hover:text-pb-text'
+              }
+            `}
+          >
+            {({ isActive }) => (
+              <>
+                <div className={`p-1 rounded-lg transition-colors ${isActive ? 'bg-orange-500/10' : ''}`}>
+                  {item.icon}
+                </div>
+                <span className="text-[10px] mt-0.5 leading-none">{item.label}</span>
+              </>
+            )}
+          </NavLink>
+        ))}
+        <NavLink
+          to="/settings"
+          className={({ isActive }) => `
+            flex flex-col items-center justify-center flex-1 py-1 px-1 rounded-xl transition-all
+            ${isActive
+              ? 'text-[#FF5A36] font-semibold'
+              : 'text-pb-text-muted hover:text-pb-text'
+            }
+          `}
+        >
+          {({ isActive }) => (
+            <>
+              <div className={`p-1 rounded-lg transition-colors ${isActive ? 'bg-orange-500/10' : ''}`}>
+                <Settings size={20} />
+              </div>
+              <span className="text-[10px] mt-0.5 leading-none">Pengaturan</span>
+            </>
+          )}
+        </NavLink>
+      </nav>
     </div>
   )
 }
