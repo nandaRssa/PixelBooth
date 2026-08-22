@@ -33,25 +33,26 @@ export const Modal: React.FC<ModalProps> = ({
   return (
     <AnimatePresence>
       {isOpen && (
-        <>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
           {/* Backdrop */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50"
+            transition={{ duration: 0.15 }}
+            className="fixed inset-0 bg-black/80 backdrop-blur-sm"
             onClick={onClose}
           />
-          {/* Modal */}
+          {/* Modal Card */}
           <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: 10 }}
+            initial={{ opacity: 0, scale: 0.94, y: 12 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 10 }}
-            transition={{ duration: 0.2 }}
+            exit={{ opacity: 0, scale: 0.94, y: 8 }}
+            transition={{ type: 'spring', damping: 26, stiffness: 380 }}
             className={`
-              fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50
-              w-[calc(100vw-2rem)] ${sizeMap[size]}
-              bg-pb-surface border border-pb-border rounded-xl shadow-2xl
+              relative z-10 my-auto
+              w-full ${sizeMap[size]}
+              bg-pb-surface border border-pb-border rounded-2xl shadow-2xl overflow-hidden
             `}
           >
             {/* Header */}
@@ -76,7 +77,7 @@ export const Modal: React.FC<ModalProps> = ({
             {/* Content */}
             <div className="p-6">{children}</div>
           </motion.div>
-        </>
+        </div>
       )}
     </AnimatePresence>
   )
