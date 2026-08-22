@@ -24,6 +24,10 @@ import {
   VideoOff,
   Eye,
   Wand2,
+  Square,
+  Circle,
+  Spline,
+  Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Spinner } from "@/components/ui/StatusBadge";
@@ -37,6 +41,7 @@ import {
   normalizeFrame,
   computeHoleMask,
   downscaleTemplate,
+  generateDefaultPolygon,
   type WorkTemplate,
 } from "@/utils/frameMask";
 import { loadImage } from "@/utils/templateOverlay";
@@ -49,7 +54,7 @@ import type { CameraFrame, Template } from "@/types";
 // Test Camera -> Confirm Template -> Ready.
 //
 // Kamera frame sepenuhnya MANUAL: move, resize H/V/corner,
-// rotation slider kontinu, flip H/V, clear settings per frame.
+// rotation slider kontinu, flip H/V, shape (rect/ellipse/poly), clear settings per frame.
 // Layer render: DESIGN (atas) > CAMERA (bawah) > MASK.
 // ==========================================
 
@@ -66,6 +71,7 @@ type DragType =
   | "resize-se"
   | "resize-sw"
   | "rotate"
+  | "poly-vertex"
   | "brush";
 
 interface DragState {
@@ -74,12 +80,11 @@ interface DragState {
   startCanvas: { x: number; y: number };
   startFrame: CameraFrame;
   anchor?: { x: number; y: number };
-  /** Proyeksi lokal pointer terhadap anchor saat mulai resize (anti-lompat) */
   grabLx?: number;
   grabLy?: number;
   grabAngle?: number;
-  /** Mode kuas aktif saat drag brush */
   brushKey?: BrushKey;
+  vertexIndex?: number;
 }
 
 const MIN_SIZE = 24;
@@ -286,8 +291,21 @@ const TemplateFrameEditorPage: React.FC = () => {
       ctx.translate(cx, cy);
       ctx.rotate(rad);
       ctx.scale(f.flip_h ? -1 : 1, f.flip_v ? -1 : 1);
+      
+      // Path bentuk frame (rectangle, ellipse, atau custom polygon)
       ctx.beginPath();
-      ctx.rect(-f.width / 2, -f.height / 2, f.width, f.height);
+      if (f.shape === "ellipse") {
+        ctx.ellipse(0, 0, f.width / 2, f.height / 2, 0, 0, Math.PI * 2);
+      } else if (f.shape === "polygon" && Array.isArray(f.polygon_points) && f.polygon_points.length >= 3) {
+        const pts = f.polygon_points;
+        ctx.moveTo(pts[0].x - f.width / 2, pts[0].y - f.height / 2);
+        for (let i = 1; i < pts.length; i++) {
+          ctx.lineTo(pts[i].x - f.width / 2, pts[i].y - f.height / 2);
+        }
+        ctx.closePath();
+      } else {
+        ctx.rect(-f.width / 2, -f.height / 2, f.width, f.height);
+      }
       ctx.clip();
 
       if (videoReady && video) {
@@ -324,36 +342,39 @@ const TemplateFrameEditorPage: React.FC = () => {
         }
 
         // Viewfinder 4 Corner Brackets (Siku Sudut Oranye Terang)
-        const cornerLen = Math.min(24 / S, f.width / 4, f.height / 4);
-        ctx.strokeStyle = "#FF5A36";
-        ctx.lineWidth = 3.5 / S;
-        // Top-left
-        ctx.beginPath();
-        ctx.moveTo(-f.width / 2, -f.height / 2 + cornerLen);
-        ctx.lineTo(-f.width / 2, -f.height / 2);
-        ctx.lineTo(-f.width / 2 + cornerLen, -f.height / 2);
-        ctx.stroke();
-        // Top-right
-        ctx.beginPath();
-        ctx.moveTo(f.width / 2 - cornerLen, -f.height / 2);
-        ctx.lineTo(f.width / 2, -f.height / 2);
-        ctx.lineTo(f.width / 2, -f.height / 2 + cornerLen);
-        ctx.stroke();
-        // Bottom-left
-        ctx.beginPath();
-        ctx.moveTo(-f.width / 2, f.height / 2 - cornerLen);
-        ctx.lineTo(-f.width / 2, f.height / 2);
-        ctx.lineTo(-f.width / 2 + cornerLen, f.height / 2);
-        ctx.stroke();
-        // Bottom-right
-        ctx.beginPath();
-        ctx.moveTo(f.width / 2 - cornerLen, f.height / 2);
-        ctx.lineTo(f.width / 2, f.height / 2);
-        ctx.lineTo(f.width / 2, f.height / 2 - cornerLen);
-        ctx.stroke();
+        if (f.shape !== "ellipse" && f.shape !== "polygon") {
+          const cornerLen = Math.min(24 / S, f.width / 4, f.height / 4);
+          ctx.strokeStyle = "#FF5A36";
+          ctx.lineWidth = 3.5 / S;
+          // Top-left
+          ctx.beginPath();
+          ctx.moveTo(-f.width / 2, -f.height / 2 + cornerLen);
+          ctx.lineTo(-f.width / 2, -f.height / 2);
+          ctx.lineTo(-f.width / 2 + cornerLen, -f.height / 2);
+          ctx.stroke();
+          // Top-right
+          ctx.beginPath();
+          ctx.moveTo(f.width / 2 - cornerLen, -f.height / 2);
+          ctx.lineTo(f.width / 2, -f.height / 2);
+          ctx.lineTo(f.width / 2, -f.height / 2 + cornerLen);
+          ctx.stroke();
+          // Bottom-left
+          ctx.beginPath();
+          ctx.moveTo(-f.width / 2, f.height / 2 - cornerLen);
+          ctx.lineTo(-f.width / 2, f.height / 2);
+          ctx.lineTo(-f.width / 2 + cornerLen, f.height / 2);
+          ctx.stroke();
+          // Bottom-right
+          ctx.beginPath();
+          ctx.moveTo(f.width / 2 - cornerLen, f.height / 2);
+          ctx.lineTo(f.width / 2, f.height / 2);
+          ctx.lineTo(f.width / 2, f.height / 2 - cornerLen);
+          ctx.stroke();
+        }
 
         // Badge Penanda "Area Kamera Frame N" di tengah (High-Contrast Pill)
-        const badgeText = `📷 FRAME ${frames.indexOf(f) + 1} (KAMERA)`;
+        const shapeName = f.shape === "ellipse" ? "Elips" : f.shape === "polygon" ? "Fleksibel" : "";
+        const badgeText = `📷 FRAME ${frames.indexOf(f) + 1}${shapeName ? ` (${shapeName})` : ""}`;
         const fontSize = Math.max(12 / S, Math.round(f.width / 16));
         ctx.font = `bold ${fontSize}px system-ui, sans-serif`;
         const tw = ctx.measureText(badgeText).width;
@@ -401,6 +422,23 @@ const TemplateFrameEditorPage: React.FC = () => {
       ctx.translate(cx, cy);
       ctx.rotate(rad);
 
+      // Path bentuk lokal frame
+      const traceShape = () => {
+        ctx.beginPath();
+        if (f.shape === "ellipse") {
+          ctx.ellipse(0, 0, f.width / 2, f.height / 2, 0, 0, Math.PI * 2);
+        } else if (f.shape === "polygon" && Array.isArray(f.polygon_points) && f.polygon_points.length >= 3) {
+          const pts = f.polygon_points;
+          ctx.moveTo(pts[0].x - f.width / 2, pts[0].y - f.height / 2);
+          for (let i = 1; i < pts.length; i++) {
+            ctx.lineTo(pts[i].x - f.width / 2, pts[i].y - f.height / 2);
+          }
+          ctx.closePath();
+        } else {
+          ctx.rect(-f.width / 2, -f.height / 2, f.width, f.height);
+        }
+      };
+
       // 1. ISIAN WARNA FRAME KONTRAS TINGGI DI ATAS DESAIN (selalu terlihat jelas di HP/iPhone)
       if (!testCamera) {
         if (isSel) {
@@ -416,40 +454,91 @@ const TemplateFrameEditorPage: React.FC = () => {
         } else {
           ctx.fillStyle = "rgba(16, 185, 129, 0.22)";
         }
-        ctx.fillRect(-f.width / 2, -f.height / 2, f.width, f.height);
+        traceShape();
+        ctx.fill();
       }
 
       // 2. Border frame
       ctx.lineWidth = (isSel ? 3.5 : 2.5) / S;
       ctx.setLineDash(isSel ? [] : [8 / S, 5 / S]);
       ctx.strokeStyle = isSel ? "#FF5A36" : "#10B981";
-      ctx.strokeRect(-f.width / 2, -f.height / 2, f.width, f.height);
+      traceShape();
+      ctx.stroke();
       ctx.setLineDash([]);
 
-      // 3. Siku Sudut Kontras Tinggi
-      const cornerLen = Math.min(22 / S, f.width / 4, f.height / 4);
-      ctx.strokeStyle = isSel ? "#FFFFFF" : "#10B981";
-      ctx.lineWidth = (isSel ? 3.5 : 2.5) / S;
-      ctx.beginPath();
-      ctx.moveTo(-f.width / 2, -f.height / 2 + cornerLen);
-      ctx.lineTo(-f.width / 2, -f.height / 2);
-      ctx.lineTo(-f.width / 2 + cornerLen, -f.height / 2);
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo(f.width / 2 - cornerLen, -f.height / 2);
-      ctx.lineTo(f.width / 2, -f.height / 2);
-      ctx.lineTo(f.width / 2, -f.height / 2 + cornerLen);
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo(-f.width / 2, f.height / 2 - cornerLen);
-      ctx.lineTo(-f.width / 2, f.height / 2);
-      ctx.lineTo(-f.width / 2 + cornerLen, f.height / 2);
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo(f.width / 2 - cornerLen, f.height / 2);
-      ctx.lineTo(f.width / 2, f.height / 2);
-      ctx.lineTo(f.width / 2, f.height / 2 - cornerLen);
-      ctx.stroke();
+      // 3. Siku Sudut Kontras Tinggi (untuk persegi)
+      if (f.shape !== "ellipse" && f.shape !== "polygon") {
+        const cornerLen = Math.min(22 / S, f.width / 4, f.height / 4);
+        ctx.strokeStyle = isSel ? "#FFFFFF" : "#10B981";
+        ctx.lineWidth = (isSel ? 3.5 : 2.5) / S;
+        ctx.beginPath();
+        ctx.moveTo(-f.width / 2, -f.height / 2 + cornerLen);
+        ctx.lineTo(-f.width / 2, -f.height / 2);
+        ctx.lineTo(-f.width / 2 + cornerLen, -f.height / 2);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(f.width / 2 - cornerLen, -f.height / 2);
+        ctx.lineTo(f.width / 2, -f.height / 2);
+        ctx.lineTo(f.width / 2, -f.height / 2 + cornerLen);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(-f.width / 2, f.height / 2 - cornerLen);
+        ctx.lineTo(-f.width / 2, f.height / 2);
+        ctx.lineTo(-f.width / 2 + cornerLen, f.height / 2);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(f.width / 2 - cornerLen, f.height / 2);
+        ctx.lineTo(f.width / 2, f.height / 2);
+        ctx.lineTo(f.width / 2, f.height / 2 - cornerLen);
+        ctx.stroke();
+      }
+
+      // 4. Titik-titik Vertex Poligon Fleksibel & Tombol Tambah Titik [+]
+      if (isSel && f.shape === "polygon" && Array.isArray(f.polygon_points) && f.polygon_points.length >= 3 && mode === "select") {
+        const pts = f.polygon_points;
+        // Titik-titik Sudut Vertex (Orange Pill/Circle)
+        for (let i = 0; i < pts.length; i++) {
+          const vx = pts[i].x - f.width / 2;
+          const vy = pts[i].y - f.height / 2;
+          const vr = 8 / S;
+          ctx.beginPath();
+          ctx.arc(vx, vy, vr, 0, Math.PI * 2);
+          ctx.fillStyle = "#FF5A36";
+          ctx.fill();
+          ctx.strokeStyle = "#FFFFFF";
+          ctx.lineWidth = 2.5 / S;
+          ctx.stroke();
+
+          // Angka titik
+          ctx.font = `bold ${9 / S}px system-ui, sans-serif`;
+          ctx.fillStyle = "#FFFFFF";
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillText(`${i + 1}`, vx, vy);
+        }
+
+        // Titik Tambah Titik [+] di tengah setiap segmen garis
+        for (let i = 0; i < pts.length; i++) {
+          const p1 = pts[i];
+          const p2 = pts[(i + 1) % pts.length];
+          const mx = (p1.x + p2.x) / 2 - f.width / 2;
+          const my = (p1.y + p2.y) / 2 - f.height / 2;
+          const mr = 6.5 / S;
+          ctx.beginPath();
+          ctx.arc(mx, my, mr, 0, Math.PI * 2);
+          ctx.fillStyle = "#06B6D4"; // Cyan terang
+          ctx.fill();
+          ctx.strokeStyle = "#FFFFFF";
+          ctx.lineWidth = 2 / S;
+          ctx.stroke();
+
+          ctx.font = `bold ${10 / S}px system-ui, sans-serif`;
+          ctx.fillStyle = "#FFFFFF";
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillText("+", mx, my);
+        }
+      }
 
       // Area protect/remove frame terpilih
       if (isSel) {
@@ -764,29 +853,61 @@ const TemplateFrameEditorPage: React.FC = () => {
     return [dx * cos - dy * sin, dx * sin + dy * cos];
   };
 
+  const hitPolyVertex = (
+    f: CameraFrame,
+    p: { x: number; y: number },
+  ): number | null => {
+    if (f.shape !== "polygon" || !Array.isArray(f.polygon_points)) return null;
+    const [lx, ly] = localPoint(f, p);
+    const tol = 16 / viewRef.current.scale;
+    for (let i = 0; i < f.polygon_points.length; i++) {
+      const vx = f.polygon_points[i].x - f.width / 2;
+      const vy = f.polygon_points[i].y - f.height / 2;
+      if (Math.hypot(lx - vx, ly - vy) <= tol) return i;
+    }
+    return null;
+  };
+
+  const hitPolyAddPoint = (
+    f: CameraFrame,
+    p: { x: number; y: number },
+  ): number | null => {
+    if (f.shape !== "polygon" || !Array.isArray(f.polygon_points)) return null;
+    const [lx, ly] = localPoint(f, p);
+    const tol = 14 / viewRef.current.scale;
+    const pts = f.polygon_points;
+    for (let i = 0; i < pts.length; i++) {
+      const p1 = pts[i];
+      const p2 = pts[(i + 1) % pts.length];
+      const mx = (p1.x + p2.x) / 2 - f.width / 2;
+      const my = (p1.y + p2.y) / 2 - f.height / 2;
+      if (Math.hypot(lx - mx, ly - my) <= tol) return i;
+    }
+    return null;
+  };
+
   const hitHandle = (
     f: CameraFrame,
     p: { x: number; y: number },
   ): DragType | null => {
     const tol = HANDLE_TOL_PX / viewRef.current.scale;
-    const cornerTol = Math.max(tol, 10 / viewRef.current.scale); // sudut sedikit lebih besar dari handle
+    const cornerTol = Math.max(tol, 10 / viewRef.current.scale);
     const [lx, ly] = localPoint(f, p);
     const hw = f.width / 2;
     const hh = f.height / 2;
 
-    // Rotate handle: di atas tengah tepi atas
+    // Rotate handle
     const rotDist = ROT_HANDLE_DIST / viewRef.current.scale;
     if (Math.hypot(lx, ly + hh + rotDist) <= tol) return "rotate";
 
-    // Harus berada di sekitar border frame (± toleransi)
+    // Harus berada di sekitar border frame
     if (Math.abs(lx) > hw + tol || Math.abs(ly) > hh + tol) return null;
 
-    // Prioritas: sudut (persegi kecil di pojok) → tepi (pita tanpa sudut)
     const atCorner =
-      (lx <= -hw + cornerTol && ly <= -hh + cornerTol) || // NW
-      (lx >= hw - cornerTol && ly <= -hh + cornerTol) || // NE
-      (lx <= -hw + cornerTol && ly >= hh - cornerTol) || // SW
-      (lx >= hw - cornerTol && ly >= hh - cornerTol); // SE
+      (lx <= -hw + cornerTol && ly <= -hh + cornerTol) ||
+      (lx >= hw - cornerTol && ly <= -hh + cornerTol) ||
+      (lx <= -hw + cornerTol && ly >= hh - cornerTol) ||
+      (lx >= hw - cornerTol && ly >= hh - cornerTol);
 
     if (atCorner) {
       const ns = ly < 0 ? "n" : "s";
@@ -794,10 +915,9 @@ const TemplateFrameEditorPage: React.FC = () => {
       return `resize-${ns}${ew}` as DragType;
     }
 
-    // Tepi: pita sepanjang sisi TANPA area sudut
     const nearX = hw - Math.abs(lx) <= tol;
     const nearY = hh - Math.abs(ly) <= tol;
-    if (!nearX && !nearY) return null; // interior -> bukan handle
+    if (!nearX && !nearY) return null;
 
     const ns = nearY ? (ly < 0 ? "n" : "s") : "";
     const ew = nearX ? (lx < 0 ? "w" : "e") : "";
@@ -808,7 +928,24 @@ const TemplateFrameEditorPage: React.FC = () => {
     for (let i = frames.length - 1; i >= 0; i--) {
       const f = frames[i];
       const [lx, ly] = localPoint(f, p);
-      if (Math.abs(lx) <= f.width / 2 && Math.abs(ly) <= f.height / 2) return f;
+      if (f.shape === "ellipse") {
+        const rx = f.width / 2;
+        const ry = f.height / 2;
+        if ((lx * lx) / (rx * rx) + (ly * ly) / (ry * ry) <= 1) return f;
+      } else if (f.shape === "polygon" && Array.isArray(f.polygon_points) && f.polygon_points.length >= 3) {
+        const pts = f.polygon_points;
+        const localPoly = pts.map((pt) => ({ x: pt.x - f.width / 2, y: pt.y - f.height / 2 }));
+        let inPoly = false;
+        for (let a = 0, b = localPoly.length - 1; a < localPoly.length; b = a++) {
+          const xi = localPoly[a].x, yi = localPoly[a].y;
+          const xj = localPoly[b].x, yj = localPoly[b].y;
+          const intersect = yi > ly !== yj > ly && lx < ((xj - xi) * (ly - yi)) / (yj - yi) + xi;
+          if (intersect) inPoly = !inPoly;
+        }
+        if (inPoly) return f;
+      } else {
+        if (Math.abs(lx) <= f.width / 2 && Math.abs(ly) <= f.height / 2) return f;
+      }
     }
     return null;
   };
@@ -816,17 +953,11 @@ const TemplateFrameEditorPage: React.FC = () => {
   // ===== Pointer events =====
   const onPointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (!template) return;
-    // Abaikan pointer tambahan (multi-touch) saat satu gesture sedang berjalan —
-    // pointer kedua bisa mengganti jenis drag di tengah jalan dan membuat
-    // frame melompat seperti "terbalik".
     if (dragRef.current) return;
     const p = toCanvas(e.clientX, e.clientY);
     (e.target as HTMLCanvasElement).setPointerCapture(e.pointerId);
 
     if (mode === "protect" || mode === "remove" || mode === "restore") {
-      // Kuas tidak butuh seleksi manual: pilih frame di bawah kursor secara
-      // otomatis agar klik/sapuan PERTAMA langsung mengebrush (bukan memindah
-      // frame). Tanpa ini klik pertama jatuh ke jalur select+move.
       const f = selected ?? hitFrame(p);
       if (!f) return;
       if (!selected || selected.id !== f.id) setSelectedId(f.id);
@@ -836,13 +967,10 @@ const TemplateFrameEditorPage: React.FC = () => {
           : mode === "protect"
             ? "protect_seeds"
             : "keep_seeds";
-      // Alt / klik-kanan: hapus seed kuas di sekitar kursor (koreksi sapuan)
       if (e.altKey || e.button === 2) {
         eraseSeeds(f, key, p);
         return;
       }
-      // Satu sapuan = satu nomor strok; seed di sepanjang sapuan berbagi
-      // nomor yang sama dan selalu lebih baru dari strok sebelumnya.
       strokeSeqRef.current += 1;
       dragRef.current = {
         type: "brush",
@@ -856,7 +984,43 @@ const TemplateFrameEditorPage: React.FC = () => {
       return;
     }
 
-    if (selected) {
+    if (selected && mode === "select") {
+      // 1. Uji hit vertex poligon atau tombol [+] tambah titik
+      if (selected.shape === "polygon" && Array.isArray(selected.polygon_points)) {
+        const vIdx = hitPolyVertex(selected, p);
+        if (vIdx !== null) {
+          dragRef.current = {
+            type: "poly-vertex",
+            frameId: selected.id,
+            startCanvas: p,
+            startFrame: selected,
+            vertexIndex: vIdx,
+          };
+          return;
+        }
+        const addIdx = hitPolyAddPoint(selected, p);
+        if (addIdx !== null) {
+          const [lx, ly] = localPoint(selected, p);
+          const newPts = [...selected.polygon_points];
+          const newVertex = {
+            x: Math.round(lx + selected.width / 2),
+            y: Math.round(ly + selected.height / 2),
+          };
+          newPts.splice(addIdx + 1, 0, newVertex);
+          const updated = { ...selected, polygon_points: newPts };
+          updateFrame(selected.id, { polygon_points: newPts });
+          dragRef.current = {
+            type: "poly-vertex",
+            frameId: selected.id,
+            startCanvas: p,
+            startFrame: updated,
+            vertexIndex: addIdx + 1,
+          };
+          return;
+        }
+      }
+
+      // 2. Uji hit rotate handle
       const ht = hitHandle(selected, p);
       if (ht === "rotate") {
         const c = {
@@ -874,9 +1038,6 @@ const TemplateFrameEditorPage: React.FC = () => {
       }
       if (ht) {
         const f = selected;
-        // Arah diambil dari SISI handle setelah prefiks dibuang — kata
-        // "resize" mengandung huruf 's' & 'e', jadi includes() pada nama
-        // tipe mentah membuat grip atas/kiri salah arah (frame melompat).
         const d = ht.replace(/^resize-/, "");
         const sx = d.includes("e") ? 1 : d.includes("w") ? -1 : 0;
         const sy = d.includes("s") ? 1 : d.includes("n") ? -1 : 0;
@@ -896,8 +1057,6 @@ const TemplateFrameEditorPage: React.FC = () => {
             anchorLocal[0] * Math.sin(rad) +
             anchorLocal[1] * Math.cos(rad),
         };
-        // Proyeksi lokal pointer terhadap anchor saat mulai drag — dipakai
-        // sebagai basis delta agar resize 1:1 tanpa lompatan awal
         const dx0 = p.x - anchor.x;
         const dy0 = p.y - anchor.y;
         dragRef.current = {
@@ -942,7 +1101,6 @@ const TemplateFrameEditorPage: React.FC = () => {
     const cv = canvasRef.current;
     if (!cv) return;
     if (mode !== "select") {
-      // Lingkaran kuas menggantikan kursor sistem
       cursorRef.current = p;
       cv.style.cursor = "none";
       scheduleRender();
@@ -951,6 +1109,16 @@ const TemplateFrameEditorPage: React.FC = () => {
     cursorRef.current = null;
     let cur = "";
     if (selected) {
+      if (selected.shape === "polygon" && Array.isArray(selected.polygon_points)) {
+        if (hitPolyVertex(selected, p) !== null) {
+          cv.style.cursor = "pointer";
+          return;
+        }
+        if (hitPolyAddPoint(selected, p) !== null) {
+          cv.style.cursor = "copy";
+          return;
+        }
+      }
       const ht = hitHandle(selected, p);
       if (ht) cur = HANDLE_CURSORS[ht] ?? "";
       else if (hitFrame(p)) cur = "move";
@@ -967,18 +1135,26 @@ const TemplateFrameEditorPage: React.FC = () => {
     }
     const f0 = drag.startFrame;
 
+    if (drag.type === "poly-vertex" && typeof drag.vertexIndex === "number") {
+      const [lx, ly] = localPoint(f0, p);
+      const newPts = [...(f0.polygon_points || [])];
+      newPts[drag.vertexIndex] = {
+        x: Math.round(lx + f0.width / 2),
+        y: Math.round(ly + f0.height / 2),
+      };
+      updateFrame(drag.frameId, { polygon_points: newPts });
+      return;
+    }
+
     if (drag.type === "brush") {
-      // Perbarui lingkaran kuas saat mengusap
       cursorRef.current = p;
-      // Tambah seed sepanjang sapuan dengan jarak minimal (kuas HANYA
-      // menentukan titik pemicu — region akhir dihitung flood fill)
       const last = lastSeedRef.current;
-      const spacing = Math.max(4, (brushSize * 0.4) / viewRef.current.scale);
-      if (!last || Math.hypot(p.x - last.x, p.y - last.y) >= spacing) {
+      const dist = last ? Math.hypot(p.x - last.x, p.y - last.y) : Infinity;
+      if (dist >= Math.max(3, brushSize / 4)) {
         lastSeedRef.current = p;
-        const f = frames.find((x) => x.id === drag.frameId) ?? f0;
-        addSeed(drag.brushKey as BrushKey, f, p);
+        if (drag.brushKey) addSeed(drag.brushKey, f0, p);
       }
+      scheduleRender();
       return;
     }
 
@@ -1735,6 +1911,92 @@ const TemplateFrameEditorPage: React.FC = () => {
               <h3 className="text-pb-text text-sm font-semibold mb-3">
                 Transformasi Frame
               </h3>
+
+              {/* Pilihan Bentuk Frame (Rectangle, Ellipse, Flexible Polygon) */}
+              <div className="mb-4">
+                <label className="text-pb-text-secondary text-xs font-medium block mb-1.5">
+                  Bentuk Frame
+                </label>
+                <div className="grid grid-cols-3 gap-1.5 p-1 bg-pb-bg border border-pb-border rounded-xl">
+                  <button
+                    type="button"
+                    onClick={() => updateFrame(selected.id, { shape: "rectangle" })}
+                    className={`flex flex-col items-center gap-1 py-2 px-1 rounded-lg text-xs font-medium transition-all ${
+                      selected.shape === "rectangle" || !selected.shape
+                        ? "bg-cyan-500/20 text-cyan-400 border border-cyan-500/40 shadow-sm font-semibold"
+                        : "text-pb-text-secondary hover:text-pb-text"
+                    }`}
+                  >
+                    <Square size={16} />
+                    <span>Persegi</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => updateFrame(selected.id, { shape: "ellipse" })}
+                    className={`flex flex-col items-center gap-1 py-2 px-1 rounded-lg text-xs font-medium transition-all ${
+                      selected.shape === "ellipse"
+                        ? "bg-cyan-500/20 text-cyan-400 border border-cyan-500/40 shadow-sm font-semibold"
+                        : "text-pb-text-secondary hover:text-pb-text"
+                    }`}
+                  >
+                    <Circle size={16} />
+                    <span>Elips</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const pts =
+                        selected.polygon_points && selected.polygon_points.length >= 3
+                          ? selected.polygon_points
+                          : generateDefaultPolygon(selected.width, selected.height, 8);
+                      updateFrame(selected.id, { shape: "polygon", polygon_points: pts });
+                    }}
+                    className={`flex flex-col items-center gap-1 py-2 px-1 rounded-lg text-xs font-medium transition-all ${
+                      selected.shape === "polygon"
+                        ? "bg-cyan-500/20 text-cyan-400 border border-cyan-500/40 shadow-sm font-semibold"
+                        : "text-pb-text-secondary hover:text-pb-text"
+                    }`}
+                  >
+                    <Spline size={16} />
+                    <span>Fleksibel</span>
+                  </button>
+                </div>
+
+                {selected.shape === "polygon" && (
+                  <div className="mt-2.5 p-2.5 rounded-lg bg-cyan-500/10 border border-cyan-500/20 text-[11px] text-cyan-300 space-y-2">
+                    <div className="flex items-start gap-1.5">
+                      <Sparkles size={14} className="shrink-0 mt-0.5 text-cyan-400" />
+                      <div>
+                        <p className="font-semibold text-cyan-200">Mode Poligon Fleksibel:</p>
+                        <p className="text-cyan-300/90 mt-0.5">
+                          Tarik titik oranye <span className="font-bold">(1..N)</span> ke segala arah. Klik tombol <span className="font-bold text-cyan-200">[+]</span> di antara garis untuk menambah titik sudut baru.
+                        </p>
+                      </div>
+                    </div>
+                    {Array.isArray(selected.polygon_points) && selected.polygon_points.length > 3 && (
+                      <div className="pt-1 flex items-center justify-between">
+                        <span className="text-[10px] text-cyan-400/80 font-mono">
+                          {selected.polygon_points.length} Titik Sudut
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const pts = [...(selected.polygon_points || [])];
+                            if (pts.length > 3) {
+                              pts.pop();
+                              updateFrame(selected.id, { polygon_points: pts });
+                            }
+                          }}
+                          className="text-[10px] px-2 py-0.5 rounded bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/30 transition-colors"
+                        >
+                          Hapus Titik Terakhir
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
               <div className="grid grid-cols-4 gap-2 mb-3">
                 {numInput("X", selected.x, (v) =>
                   updateFrame(selected.id, { x: v }),

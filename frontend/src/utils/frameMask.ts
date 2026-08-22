@@ -47,6 +47,16 @@ export function normalizeFrame(frame: Partial<CameraFrame>): CameraFrame {
     return out
   }
 
+  const polyPoints = (v: unknown): Array<{ x: number; y: number }> | undefined => {
+    if (!Array.isArray(v) || v.length < 3) return undefined
+    const out: Array<{ x: number; y: number }> = []
+    for (const p of v as Record<string, unknown>[]) {
+      if (!p || typeof p !== 'object') continue
+      out.push({ x: Number(p.x ?? 0), y: Number(p.y ?? 0) })
+    }
+    return out.length >= 3 ? out : undefined
+  }
+
   return {
     id: Number(frame.id ?? 0),
     order: Number(frame.order ?? 0),
@@ -57,6 +67,8 @@ export function normalizeFrame(frame: Partial<CameraFrame>): CameraFrame {
     rotation: Number(frame.rotation ?? 0),
     flip_h: Boolean(frame.flip_h ?? false),
     flip_v: Boolean(frame.flip_v ?? false),
+    shape: (frame.shape as any) || 'rectangle',
+    polygon_points: polyPoints(frame.polygon_points),
     clear_zone: clamp(Number(frame.clear_zone ?? 60), 5, 100),
     clear_expansion: clamp(Number(frame.clear_expansion ?? 25), 0, 200),
     region_sensitivity: clamp(Number(frame.region_sensitivity ?? 50), 0, 100),
@@ -75,6 +87,21 @@ export function normalizeFrame(frame: Partial<CameraFrame>): CameraFrame {
     protect_seeds: points(frame.protect_seeds),
     keep_seeds: points(frame.keep_seeds),
   }
+}
+
+/** Buat titik poligon default berbentuk elips mulus */
+export function generateDefaultPolygon(width: number, height: number, count: number = 8): Array<{ x: number; y: number }> {
+  const pts: Array<{ x: number; y: number }> = []
+  const rx = width / 2
+  const ry = height / 2
+  for (let i = 0; i < count; i++) {
+    const angle = (i / count) * Math.PI * 2 - Math.PI / 2
+    pts.push({
+      x: Math.round(rx + rx * Math.cos(angle)),
+      y: Math.round(ry + ry * Math.sin(angle)),
+    })
+  }
+  return pts
 }
 
 export interface WorkTemplate {
@@ -205,6 +232,11 @@ export function computeHoleMask(
   const prot = new Uint8Array(bw * bh)
   const rem = new Uint8Array(bw * bh)
 
+  // Point in polygon helper
+  const polyPointsLocal = f.shape === 'polygon' && Array.isArray(f.polygon_points) && f.polygon_points.length >= 3
+    ? f.polygon_points.map(p => ({ x: p.x * scale - hw, y: p.y * scale - hh }))
+    : null
+
   for (let gy = by0; gy <= by1; gy++) {
     for (let gx = bx0; gx <= bx1; gx++) {
       const dx = gx + 0.5 - cx
@@ -212,6 +244,21 @@ export function computeHoleMask(
       const lx = dx * cos + dy * sin
       const ly = -dx * sin + dy * cos
       if (Math.abs(lx) > hw || Math.abs(ly) > hh) continue
+
+      // Uji bentuk frame
+      if (f.shape === 'ellipse') {
+        if ((lx * lx) / (hw * hw) + (ly * ly) / (hh * hh) > 1) continue
+      } else if (polyPointsLocal) {
+        let inPoly = false
+        for (let i = 0, j = polyPointsLocal.length - 1; i < polyPointsLocal.length; j = i++) {
+          const xi = polyPointsLocal[i].x, yi = polyPointsLocal[i].y
+          const xj = polyPointsLocal[j].x, yj = polyPointsLocal[j].y
+          const intersect = ((yi > ly) !== (yj > ly)) && (lx < ((xj - xi) * (ly - yi)) / (yj - yi) + xi)
+          if (intersect) inPoly = !inPoly
+        }
+        if (!inPoly) continue
+      }
+
       const idx = (gy - by0) * bw + (gx - bx0)
       inside[idx] = 1
       if (Math.abs(lx) <= hzW && Math.abs(ly) <= hzH) seed[idx] = 1

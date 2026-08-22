@@ -45,8 +45,10 @@ export interface CameraFrame {
   confidence?: number | null
   /** Metode deteksi sumber frame: 'transparent' | 'smart_clear' */
   source?: string | null
-  /** Bentuk geometri frame (rectangle, circle, oval, polygon, custom) */
-  shape?: string | null
+  /** Bentuk geometri frame ('rectangle' | 'ellipse' | 'polygon') */
+  shape?: 'rectangle' | 'ellipse' | 'polygon' | string | null
+  /** Titik-titik vertex poligon untuk bentuk fleksibel (koordinat lokal frame 0..width, 0..height) */
+  polygon_points?: Array<{ x: number; y: number }>
   /** Mask titik poligon untuk custom/polygon shape */
   mask?: any[]
   /** Area yang dilindungi dari clear (kecuali di Hard Clear Zone) */
