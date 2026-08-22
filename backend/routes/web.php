@@ -6,6 +6,9 @@ Route::get('/', function () {
     return response()->json(['status' => 'ok', 'app' => config('app.name')]);
 });
 
+// Explicit API route group for serverless environments (Vercel)
+Route::prefix('api')->group(base_path('routes/api.php'));
+
 Route::get('/storage/{path}', function ($path) {
     $fullPath = storage_path('app/public/' . $path);
     if (! file_exists($fullPath)) {
@@ -20,4 +23,3 @@ Route::get('/storage/{path}', function ($path) {
         'Cache-Control' => 'public, max-age=86400',
     ]);
 })->where('path', '.*');
-
