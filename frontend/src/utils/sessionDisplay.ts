@@ -8,6 +8,10 @@ export type SessionDisplayMode = 'default' | 'fullscreen'
 const STORAGE_KEY = 'pb-session-display-mode'
 
 export function getSessionDisplayMode(): SessionDisplayMode {
+  // Layar mobile/smartphone (< 1024px) otomatis WAJIB Fullscreen
+  if (typeof window !== 'undefined' && window.innerWidth < 1024) {
+    return 'fullscreen'
+  }
   return localStorage.getItem(STORAGE_KEY) === 'fullscreen' ? 'fullscreen' : 'default'
 }
 
