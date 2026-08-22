@@ -229,7 +229,7 @@ const PhotoMenuPage: React.FC = () => {
             </Button>
           </div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-2 sm:gap-3">
             {templates.map((template) => {
               const isStarting = startingTemplateId === template.id
               return (
@@ -238,12 +238,12 @@ const PhotoMenuPage: React.FC = () => {
                   type="button"
                   initial={{ opacity: 0, scale: 0.97 }}
                   animate={{ opacity: 1, scale: 1 }}
-                  whileHover={startingTemplateId ? {} : { y: -5, scale: 1.02 }}
+                  whileHover={startingTemplateId ? {} : { y: -4, scale: 1.02 }}
                   whileTap={startingTemplateId ? {} : { scale: 0.98 }}
                   transition={{ type: "spring", stiffness: 350, damping: 25 }}
                   onClick={() => handleSelectTemplate(template)}
                   disabled={!!startingTemplateId}
-                  className="relative aspect-[3/4] bg-pb-surface border border-pb-border hover:border-pb-border-strong rounded-xl overflow-hidden text-left shadow-xs hover:shadow-xl transition-colors duration-200 group disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
+                  className="relative aspect-[3/4] bg-pb-surface border border-pb-border hover:border-[#FF5A36] rounded-xl overflow-hidden text-left shadow-xs hover:shadow-xl transition-all duration-200 group disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
                 >
                   {template.preview_url ? (
                     <img
@@ -259,28 +259,28 @@ const PhotoMenuPage: React.FC = () => {
                     />
                   ) : (
                     <div className="absolute inset-0 flex items-center justify-center bg-pb-elevated">
-                      <ImageIcon size={32} className="text-pb-faint" />
+                      <ImageIcon size={24} className="text-pb-faint" />
                     </div>
                   )}
 
                   {/* Loading Overlay jika card sedang diklik */}
                   {isStarting && (
-                    <div className="absolute inset-0 bg-black/60 backdrop-blur-xs flex flex-col items-center justify-center gap-2 z-10">
+                    <div className="absolute inset-0 bg-black/70 backdrop-blur-xs flex flex-col items-center justify-center gap-1.5 z-10">
                       <Spinner size="md" className="text-white" />
-                      <span className="text-white text-xs font-medium">Memuat Sesi...</span>
+                      <span className="text-white text-[10px] sm:text-xs font-medium">Memuat Sesi...</span>
                     </div>
                   )}
 
                   {/* Badge jumlah frame */}
-                  <span className="absolute top-2 right-2 px-2 py-0.5 rounded-md bg-black/60 backdrop-blur-sm
-                    text-white text-xs font-medium">
-                    {template.frame_count} frame
+                  <span className="absolute top-1.5 right-1.5 px-1.5 py-0.5 rounded-md bg-black/75 backdrop-blur-md
+                    text-white text-[9px] sm:text-[10px] font-medium border border-white/10 shadow-md">
+                    {template.frame_count} f
                   </span>
 
                   {/* Info bawah */}
-                  <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/90 to-transparent">
-                    <p className="text-white text-sm font-medium truncate">{template.name}</p>
-                    <p className="text-white/70 text-xs">
+                  <div className="absolute bottom-0 left-0 right-0 p-1.5 sm:p-2.5 bg-gradient-to-t from-black/95 via-black/70 to-transparent">
+                    <p className="text-white text-[11px] sm:text-xs font-semibold truncate leading-tight">{template.name}</p>
+                    <p className="text-white/70 text-[9px] sm:text-[10px] mt-0.5">
                       {template.canvas_width} x {template.canvas_height}
                     </p>
                   </div>

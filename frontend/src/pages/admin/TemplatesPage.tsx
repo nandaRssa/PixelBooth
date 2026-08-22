@@ -290,7 +290,7 @@ const TemplatesPage: React.FC = () => {
             />
           </div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-2 sm:gap-3">
             {templates.map((template) => {
               const isSelected = selectedIds.has(template.id);
               return (
@@ -298,7 +298,7 @@ const TemplatesPage: React.FC = () => {
                   key={template.id}
                   initial={{ opacity: 0, scale: 0.97 }}
                   animate={{ opacity: 1, scale: 1 }}
-                  whileHover={{ y: -5, scale: 1.02 }}
+                  whileHover={{ y: -4, scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                   transition={{ type: "spring", stiffness: 350, damping: 25 }}
                   onClick={
@@ -310,7 +310,7 @@ const TemplatesPage: React.FC = () => {
                     selectionMode ? "cursor-pointer select-none" : ""
                   } ${
                     isSelected
-                      ? "border-pb-accent ring-2 ring-pb-accent/50"
+                      ? "border-[#FF5A36] ring-2 ring-[#FF5A36]/50"
                       : template.status === "draft"
                         ? "border-amber-500/40"
                         : "border-pb-border hover:border-pb-border-strong"
@@ -333,41 +333,41 @@ const TemplatesPage: React.FC = () => {
                     />
                   ) : (
                     <div className="absolute inset-0 flex items-center justify-center bg-pb-elevated">
-                      <ImageIcon size={32} className="text-pb-faint" />
+                      <ImageIcon size={24} className="text-pb-faint" />
                     </div>
                   )}
 
                   {/* Mode Seleksi: Checkbox / Selection Circle */}
                   {selectionMode ? (
-                    <div className="absolute top-2 left-2 z-10">
+                    <div className="absolute top-1.5 left-1.5 z-10">
                       <div
-                        className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all ${
+                        className={`w-6 h-6 rounded-lg flex items-center justify-center transition-all ${
                           isSelected
-                            ? "bg-pb-accent text-pb-on-accent shadow-md"
+                            ? "bg-[#FF5A36] text-white shadow-md"
                             : "bg-black/60 backdrop-blur-sm border border-white/40 text-white/60"
                         }`}
                       >
                         {isSelected ? (
-                          <Check size={16} className="stroke-[3]" />
+                          <Check size={14} className="stroke-[3]" />
                         ) : (
-                          <Square size={16} />
+                          <Square size={14} />
                         )}
                       </div>
                     </div>
                   ) : (
-                    /* Tombol Edit & Hapus: SELALU TAMPIL (Ramah Tablet/Touch & Kontras Tinggi) */
-                    <div className="absolute top-2 left-2 z-10 flex flex-col gap-1.5">
+                    /* Tombol Edit & Hapus: SELALU TAMPIL */
+                    <div className="absolute top-1.5 left-1.5 z-10 flex flex-col gap-1">
                       <button
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
                           navigate(`/templates/${template.id}/editor`);
                         }}
-                        className="w-9 h-9 rounded-xl bg-black/75 backdrop-blur-md text-cyan-300 hover:text-cyan-200 border border-white/20 shadow-lg active:scale-95 transition-all flex items-center justify-center"
+                        className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-black/80 backdrop-blur-md text-cyan-300 hover:text-cyan-200 border border-white/20 shadow-md active:scale-95 transition-all flex items-center justify-center"
                         title="Buka Frame Editor"
                         aria-label="Buka Frame Editor"
                       >
-                        <SlidersHorizontal size={15} />
+                        <SlidersHorizontal size={13} />
                       </button>
                       <button
                         type="button"
@@ -375,34 +375,34 @@ const TemplatesPage: React.FC = () => {
                           e.stopPropagation();
                           setDeleteTarget(template);
                         }}
-                        className="w-9 h-9 rounded-xl bg-black/75 backdrop-blur-md text-red-400 hover:text-red-300 border border-white/20 shadow-lg active:scale-95 transition-all flex items-center justify-center"
+                        className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-black/80 backdrop-blur-md text-red-400 hover:text-red-300 border border-white/20 shadow-md active:scale-95 transition-all flex items-center justify-center"
                         title="Hapus Template"
                         aria-label="Hapus Template"
                       >
-                        <Trash2 size={15} />
+                        <Trash2 size={13} />
                       </button>
                     </div>
                   )}
 
                   {/* Status badge */}
                   {template.status === "draft" ? (
-                    <span className="absolute top-2 right-2 flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-500 text-black text-xs font-semibold shadow-md z-10">
-                      <AlertCircle size={12} />
+                    <span className="absolute top-1.5 right-1.5 flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-amber-500 text-black text-[9px] sm:text-[10px] font-bold shadow-md z-10">
+                      <AlertCircle size={10} />
                       Draft
                     </span>
                   ) : (
-                    <span className="absolute top-2 right-2 px-2.5 py-1 rounded-lg bg-black/75 backdrop-blur-md text-white text-xs font-medium border border-white/10 shadow-md z-10">
-                      {template.frame_count} frame
+                    <span className="absolute top-1.5 right-1.5 px-1.5 py-0.5 rounded-md bg-black/75 backdrop-blur-md text-white text-[9px] sm:text-[10px] font-medium border border-white/10 shadow-md z-10">
+                      {template.frame_count} f
                     </span>
                   )}
 
                   {/* Overlay Bawah */}
-                  <div className="absolute bottom-0 left-0 right-0 p-2.5 sm:p-3 bg-gradient-to-t from-black/95 via-black/70 to-transparent flex items-end justify-between gap-2">
+                  <div className="absolute bottom-0 left-0 right-0 p-1.5 sm:p-2.5 bg-gradient-to-t from-black/95 via-black/70 to-transparent flex items-end justify-between gap-1">
                     <div className="min-w-0 flex-1">
-                      <p className="text-white text-xs sm:text-sm font-semibold truncate">
+                      <p className="text-white text-[11px] sm:text-xs font-semibold truncate leading-tight">
                         {template.name}
                       </p>
-                      <p className="text-white/80 text-[11px] mt-0.5">
+                      <p className="text-white/70 text-[9px] sm:text-[10px] mt-0.5">
                         {template.canvas_width} x {template.canvas_height}
                       </p>
                     </div>
@@ -413,11 +413,11 @@ const TemplatesPage: React.FC = () => {
                           e.stopPropagation();
                           navigate(`/templates/${template.id}/editor`);
                         }}
-                        className="w-7 h-7 rounded-lg bg-[#FF5A36] text-white hover:bg-[#ff7354] active:scale-95 shadow-md flex items-center justify-center transition-all shrink-0"
+                        className="w-6 h-6 sm:w-7 sm:h-7 rounded-md bg-[#FF5A36] text-white hover:bg-[#ff7354] active:scale-95 shadow-md flex items-center justify-center transition-all shrink-0"
                         title="Konfigurasi Frame"
                         aria-label="Konfigurasi Frame"
                       >
-                        <SlidersHorizontal size={13} />
+                        <SlidersHorizontal size={11} />
                       </button>
                     )}
                   </div>
