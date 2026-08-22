@@ -50,7 +50,7 @@ const CustomerPhotoPage: React.FC = () => {
     if (!photo?.url) return
     setIsDownloading(true)
     try {
-      await downloadFile(photo.url, `pixelbooth-${token ? token.slice(0, 8) : 'photo'}.jpg`)
+      await downloadFile(photo.url, photo.filename || `PixelBooth-${token ? token.slice(0, 8) : 'photo'}.jpg`)
     } finally {
       setIsDownloading(false)
     }

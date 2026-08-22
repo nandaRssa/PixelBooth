@@ -226,12 +226,25 @@ class SessionController extends Controller
         [$finalPath, $fileSize] = $this->photoRenderService->renderFinal($session);
         $thumbnailPath = $this->photoRenderService->renderThumbnail($session, $finalPath);
 
+        // Generate custom filename: PixelBooth-{Event/Folder/Template}-{Number}.jpg
+        $scopeName = 'Photo';
+        if ($session->folder && !empty($session->folder->name)) {
+            $cleanName = preg_replace('/[^A-Za-z0-9]/', '', $session->folder->name);
+            $scopeName = !empty($cleanName) ? $cleanName : 'Photo';
+        } elseif ($session->template && !empty($session->template->name)) {
+            $cleanName = preg_replace('/[^A-Za-z0-9]/', '', $session->template->name);
+            $scopeName = !empty($cleanName) ? $cleanName : 'Photo';
+        }
+
+        $photoCount = Photo::where('folder_id', $session->folder_id)->where('is_final', true)->count() + 1;
+        $formattedFilename = "PixelBooth-{$scopeName}-{$photoCount}.jpg";
+
         // Update atau buat data Photo final
         $photo = Photo::updateOrCreate(
             ['session_id' => $session->id, 'is_final' => true],
             [
                 'folder_id' => $session->folder_id,
-                'filename' => "final-{$session->session_token}.jpg",
+                'filename' => $formattedFilename,
                 'storage_path' => $finalPath,
                 'thumbnail_path' => $thumbnailPath ?: null,
                 'is_temporary' => false,

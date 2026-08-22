@@ -189,6 +189,7 @@ export interface QrCode {
 // ===== CUSTOMER / PUBLIC =====
 export interface CustomerPhoto {
   id: string
+  filename?: string
   url: string
   thumbnail_url: string | null
   qr_url: string | null
@@ -198,6 +199,7 @@ export interface CustomerPhoto {
 
 export interface CustomerFolderPhoto {
   token: string
+  filename?: string
   url: string
   thumbnail_url: string | null
   qr_url: string | null

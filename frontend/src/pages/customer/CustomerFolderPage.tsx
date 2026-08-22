@@ -60,7 +60,10 @@ const CustomerFolderPage: React.FC = () => {
 
   const handleDownload = async (photo: CustomerFolderPhoto) => {
     if (!photo?.url) return
-    await downloadFile(photo.url, `pixelbooth-${photo.token ? photo.token.slice(0, 8) : 'photo'}.jpg`)
+    const scopeName = folder?.name ? folder.name.replace(/[^A-Za-z0-9]/g, '') : 'Photo'
+    const index = folder?.photos ? folder.photos.indexOf(photo) + 1 : 1
+    const filename = `PixelBooth-${scopeName || 'Photo'}-${index}.jpg`
+    await downloadFile(photo.url, filename)
   }
 
   // ===== Loading =====
