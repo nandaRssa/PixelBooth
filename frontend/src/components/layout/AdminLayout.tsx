@@ -135,46 +135,44 @@ export const AdminLayout: React.FC = () => {
       </main>
 
       {/* ===== Mobile Bottom Navigation Bar (< lg) ===== */}
-      <nav className="lg:hidden fixed bottom-0 left-0 right-0 h-16 bg-pb-surface/95 backdrop-blur-lg border-t border-pb-border flex items-center justify-around px-2 z-30 shadow-lg">
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 h-15 bg-pb-surface/95 backdrop-blur-lg border-t border-pb-border flex items-center justify-around px-4 z-30 shadow-lg">
         {navItems.map((item) => (
           <NavLink
             key={item.to}
             to={item.to}
-            className={({ isActive }) => `
-              flex flex-col items-center justify-center flex-1 py-1 px-1 rounded-xl transition-all
-              ${isActive
-                ? 'text-[#FF5A36] font-semibold'
-                : 'text-pb-text-muted hover:text-pb-text'
-              }
-            `}
+            title={item.label}
+            aria-label={item.label}
+            className="flex items-center justify-center flex-1 py-1 transition-all"
           >
             {({ isActive }) => (
-              <>
-                <div className={`p-1 rounded-lg transition-colors ${isActive ? 'bg-orange-500/10' : ''}`}>
-                  {item.icon}
-                </div>
-                <span className="text-[10px] mt-0.5 leading-none">{item.label}</span>
-              </>
+              <div
+                className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${
+                  isActive
+                    ? 'bg-gradient-to-tr from-[#FF5A36] to-[#FF8836] text-white shadow-md shadow-orange-500/30 scale-105'
+                    : 'text-pb-text-muted hover:text-pb-text hover:bg-pb-elevated'
+                }`}
+              >
+                {item.icon}
+              </div>
             )}
           </NavLink>
         ))}
         <NavLink
           to="/settings"
-          className={({ isActive }) => `
-            flex flex-col items-center justify-center flex-1 py-1 px-1 rounded-xl transition-all
-            ${isActive
-              ? 'text-[#FF5A36] font-semibold'
-              : 'text-pb-text-muted hover:text-pb-text'
-            }
-          `}
+          title="Pengaturan"
+          aria-label="Pengaturan"
+          className="flex items-center justify-center flex-1 py-1 transition-all"
         >
           {({ isActive }) => (
-            <>
-              <div className={`p-1 rounded-lg transition-colors ${isActive ? 'bg-orange-500/10' : ''}`}>
-                <Settings size={20} />
-              </div>
-              <span className="text-[10px] mt-0.5 leading-none">Pengaturan</span>
-            </>
+            <div
+              className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${
+                isActive
+                  ? 'bg-gradient-to-tr from-[#FF5A36] to-[#FF8836] text-white shadow-md shadow-orange-500/30 scale-105'
+                  : 'text-pb-text-muted hover:text-pb-text hover:bg-pb-elevated'
+              }`}
+            >
+              <Settings size={20} />
+            </div>
           )}
         </NavLink>
       </nav>
