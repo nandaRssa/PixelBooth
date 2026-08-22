@@ -1,11 +1,13 @@
 <?php
 
-// Check if request is debug dump
-if (isset($_GET['__dump_server'])) {
-    header('Content-Type: application/json');
-    echo json_encode($_SERVER, JSON_PRETTY_PRINT);
-    exit;
+// Restore original requested URI from ?url= rewrite query parameter
+if (!empty($_GET['url'])) {
+    $url = '/' . ltrim($_GET['url'], '/');
+    $_SERVER['REQUEST_URI'] = $url;
+    $_SERVER['PATH_INFO'] = $url;
 }
+
+$_SERVER['SCRIPT_NAME'] = '/index.php';
 
 // Setup writable storage and bootstrap cache dirs in /tmp for serverless
 $tmpDirs = [
@@ -20,8 +22,6 @@ foreach ($tmpDirs as $dir) {
         @mkdir($dir, 0777, true);
     }
 }
-
-$_SERVER['SCRIPT_NAME'] = '/index.php';
 
 // Forward all Vercel Serverless Function requests to Laravel's public/index.php
 require __DIR__ . '/../public/index.php';
