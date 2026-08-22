@@ -20,25 +20,26 @@ const apiClient = axios.create({
  */
 export function getStorageUrl(path?: string | null): string {
   if (!path) return ''
-  // Upgrade insecure HTTP to HTTPS for cloudflare tunnel & public origins
-  let cleanPath = path.replace(/^http:\/\//i, 'https://')
-  if (
-    cleanPath.startsWith('https://') ||
-    cleanPath.startsWith('data:') ||
-    cleanPath.startsWith('blob:')
-  ) {
+  if (path.startsWith('data:') || path.startsWith('blob:')) {
+    return path
+  }
+
+  // Strip localhost / 127.0.0.1 domain from backend responses
+  let cleanPath = path
+    .replace(/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?\/?/i, '')
+    .replace(/^http:\/\//i, 'https://')
+
+  if (cleanPath.startsWith('https://')) {
     return cleanPath
   }
-  const apiBase = import.meta.env.VITE_API_URL || ''
-  if (apiBase.startsWith('http://') || apiBase.startsWith('https://')) {
-    try {
-      const origin = new URL(apiBase).origin.replace(/^http:\/\//i, 'https://')
-      return `${origin}/${cleanPath.replace(/^\/+/, '')}`
-    } catch {
-      return cleanPath
-    }
+
+  const apiBase = import.meta.env.VITE_API_URL || 'https://emphasis-paths-slide-multimedia.trycloudflare.com/api'
+  try {
+    const origin = new URL(apiBase).origin.replace(/^http:\/\//i, 'https://')
+    return `${origin}/${cleanPath.replace(/^\/+/, '')}`
+  } catch {
+    return cleanPath
   }
-  return cleanPath
 }
 
 export default apiClient

@@ -24,8 +24,8 @@
   --pb-text-secondary: #d4d4d8;
   --pb-text-muted: #a1a1aa;
   --pb-faint: #71717a;
-  --pb-accent: #ffffff;
-  --pb-on-accent: #0a0a0a;
+  --pb-accent: #ff5a36;
+  --pb-on-accent: #ffffff;
 }
 
 html.light {
