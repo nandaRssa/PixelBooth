@@ -275,8 +275,10 @@ const TemplateFrameEditorPage: React.FC = () => {
     if (!ctx) return;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, cw, ch);
-    ctx.fillStyle = "#0D0D0D";
-    ctx.fillRect(0, 0, cw, ch);
+    if (!testCamera) {
+      ctx.fillStyle = "#0D0D0D";
+      ctx.fillRect(0, 0, cw, ch);
+    }
     ctx.setTransform(dpr * S, 0, 0, dpr * S, dpr * ox, dpr * oy);
 
     // --- Layer kamera / placeholder (DI BAWAH desain) ---
@@ -1743,7 +1745,7 @@ const TemplateFrameEditorPage: React.FC = () => {
           ref={containerRef}
           className="relative w-full h-[52vh] sm:h-[60vh] lg:h-auto lg:flex-1 bg-pb-bg border border-pb-border rounded-2xl overflow-hidden shrink-0 lg:shrink min-h-[300px]"
         >
-          {/* Video element untuk Test Camera Stream (kompatibel iOS Safari) */}
+          {/* Video element tersembunyi untuk fallback capture stream */}
           <video
             ref={videoRef}
             autoPlay
@@ -1760,9 +1762,56 @@ const TemplateFrameEditorPage: React.FC = () => {
               pointerEvents: "none",
             }}
           />
+
+          {/* Live Video Slots di belakang Canvas (100% Native WebKit/Safari Hardware Accelerated di iPhone & Laptop) */}
+          {testCamera && template && (
+            <div
+              className="absolute pointer-events-none"
+              style={{
+                left: `${viewRef.current.ox}px`,
+                top: `${viewRef.current.oy}px`,
+                width: `${template.canvas_width * viewRef.current.scale}px`,
+                height: `${template.canvas_height * viewRef.current.scale}px`,
+                zIndex: 1,
+              }}
+            >
+              {frames.map((f) => (
+                <div
+                  key={f.id}
+                  className="absolute overflow-hidden"
+                  style={{
+                    left: `${(f.x / template.canvas_width) * 100}%`,
+                    top: `${(f.y / template.canvas_height) * 100}%`,
+                    width: `${(f.width / template.canvas_width) * 100}%`,
+                    height: `${(f.height / template.canvas_height) * 100}%`,
+                    transform: `rotate(${f.rotation}deg)`,
+                    borderRadius: f.shape === "ellipse" ? "50%" : undefined,
+                  }}
+                >
+                  <video
+                    ref={(el) => {
+                      if (el && streamRef.current && el.srcObject !== streamRef.current) {
+                        el.srcObject = streamRef.current;
+                        el.play().catch(() => {});
+                      }
+                    }}
+                    autoPlay
+                    playsInline
+                    webkit-playsinline="true"
+                    muted
+                    className="w-full h-full object-cover"
+                    style={{
+                      transform: `scaleX(${f.flip_h ? 1 : -1}) scaleY(${f.flip_v ? -1 : 1})`,
+                    }}
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+
           <canvas
             ref={canvasRef}
-            className="absolute inset-0 touch-none"
+            className="absolute inset-0 touch-none z-10"
             style={{ cursor: mode === "select" ? "default" : "none" }}
             onPointerDown={onPointerDown}
             onPointerMove={onPointerMove}
