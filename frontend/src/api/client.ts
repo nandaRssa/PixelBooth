@@ -24,13 +24,18 @@ export function getStorageUrl(path?: string | null): string {
     return path
   }
 
-  // Strip localhost / 127.0.0.1 domain from backend responses
+  // 1. Strip localhost / 127.0.0.1 domain from backend responses & force HTTPS
   let cleanPath = path
     .replace(/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?\/?/i, '')
     .replace(/^http:\/\//i, 'https://')
 
-  // Convert raw /storage/ to /api/storage/ so CORS headers are always sent by Laravel
-  cleanPath = cleanPath.replace(/(^|\/)storage\//i, '$1api/storage/')
+  // 2. Route raw /storage/ through /api/storage/ for guaranteed CORS
+  if (!cleanPath.includes('/api/storage/') && !cleanPath.startsWith('api/storage/')) {
+    cleanPath = cleanPath.replace(/(^|\/)storage\//i, '$1api/storage/')
+  }
+
+  // 3. Deduplicate any duplicate /api/api/
+  cleanPath = cleanPath.replace(/\/api\/api\//g, '/api/')
 
   if (cleanPath.startsWith('https://')) {
     return cleanPath
