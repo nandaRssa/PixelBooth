@@ -1809,12 +1809,6 @@ const TemplateFrameEditorPage: React.FC = () => {
               </p>
             </div>
           )}
-          {frameMode === "auto" && !detecting && (
-            <div className="absolute top-3 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1.5 rounded-full bg-violet-100 text-violet-950 border border-violet-300 dark:bg-violet-950/90 dark:text-violet-200 dark:border-violet-500/40 px-3.5 py-1.5 text-xs font-semibold shadow-sm backdrop-blur-md">
-              <Wand2 size={13} />
-              Auto Render aktif
-            </div>
-          )}
           {frames.length === 0 && !detecting && (
             <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
               <Layers size={40} className="text-pb-faint mb-3" />
