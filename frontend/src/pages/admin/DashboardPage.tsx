@@ -13,24 +13,18 @@ const menuItems = [
     icon: LayoutGrid,
     title: 'Galeri',
     description: 'Kelola folder dan foto. Preview, move, delete, dan akses QR code.',
-    color: 'from-neutral-800 to-neutral-900',
-    accent: '#A0A0A0',
   },
   {
     to: '/photo',
     icon: Camera,
     title: 'Photo',
     description: 'Mulai sesi pemotretan dengan template pilihan dan kamera DSLR.',
-    color: 'from-neutral-800 to-neutral-900',
-    accent: '#A0A0A0',
   },
   {
     to: '/templates',
     icon: Layers,
     title: 'Kelola Template',
     description: 'Upload, edit frame, dan atur template untuk sesi pemotretan.',
-    color: 'from-neutral-800 to-neutral-900',
-    accent: '#A0A0A0',
   },
 ]
 
@@ -70,14 +64,14 @@ const DashboardPage: React.FC = () => {
               whileHover={{ y: -6, scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               onClick={() => navigate(item.to)}
-              className={`
-                text-left p-6 rounded-2xl bg-gradient-to-br ${item.color}
+              className="
+                text-left p-6 rounded-2xl bg-pb-surface hover:bg-pb-elevated
                 border border-pb-border hover:border-pb-border-strong shadow-xs hover:shadow-xl
-                transition-colors duration-200 cursor-pointer group
-              `}
+                transition-all duration-200 cursor-pointer group
+              "
             >
               {/* Icon */}
-              <div className="w-12 h-12 bg-pb-elevated rounded-xl flex items-center justify-center mb-4 group-hover:bg-pb-border-light transition-colors">
+              <div className="w-12 h-12 bg-pb-elevated rounded-xl flex items-center justify-center mb-4 group-hover:bg-pb-border transition-colors">
                 <Icon size={22} className="text-pb-text" />
               </div>
 
