@@ -405,7 +405,7 @@ const TemplateFrameEditorPage: React.FC = () => {
       ctx.drawImage(regionRef.current, 0, 0);
     }
 
-    // --- Chrome editor (Border & Handles dengan warna kontras) ---
+    // --- Chrome editor (Border, Fill Kontras Tinggi, & Handles) ---
     for (const f of frames) {
       const isSel = f.id === selectedId;
       const rad = (f.rotation * Math.PI) / 180;
@@ -416,30 +416,77 @@ const TemplateFrameEditorPage: React.FC = () => {
       ctx.translate(cx, cy);
       ctx.rotate(rad);
 
-      // Border frame: Oranye Terang untuk terpilih, Hijau Neon / Emas untuk tidak terpilih
-      ctx.lineWidth = (isSel ? 3 : 2) / S;
+      // 1. ISIAN WARNA FRAME KONTRAS TINGGI DI ATAS DESAIN (selalu terlihat jelas di HP/iPhone)
+      if (!testCamera) {
+        if (isSel) {
+          if (mode === "remove") {
+            ctx.fillStyle = "rgba(239, 68, 68, 0.40)"; // Merah Terang (Remove Mode)
+          } else if (mode === "protect") {
+            ctx.fillStyle = "rgba(245, 158, 11, 0.40)"; // Kuning Emas (Protect Mode)
+          } else if (mode === "restore") {
+            ctx.fillStyle = "rgba(16, 185, 129, 0.40)"; // Hijau Emerald (Restore Mode)
+          } else {
+            ctx.fillStyle = "rgba(255, 90, 54, 0.35)"; // Oranye Neon (Select Mode Aktif)
+          }
+        } else {
+          ctx.fillStyle = "rgba(16, 185, 129, 0.22)"; // Hijau Emerald Neon (Frame Tidak Aktif)
+        }
+        ctx.fillRect(-f.width / 2, -f.height / 2, f.width, f.height);
+      }
+
+      // 2. Border frame: Oranye Terang untuk terpilih, Hijau Neon untuk tidak terpilih
+      ctx.lineWidth = (isSel ? 3.5 : 2.5) / S;
       ctx.setLineDash(isSel ? [] : [8 / S, 5 / S]);
       ctx.strokeStyle = isSel ? "#FF5A36" : "#10B981";
       ctx.strokeRect(-f.width / 2, -f.height / 2, f.width, f.height);
       ctx.setLineDash([]);
+
+      // 3. Siku Sudut Kontras Tinggi
+      const cornerLen = Math.min(22 / S, f.width / 4, f.height / 4);
+      ctx.strokeStyle = isSel ? "#FFFFFF" : "#10B981";
+      ctx.lineWidth = (isSel ? 3.5 : 2.5) / S;
+      // Top-left
+      ctx.beginPath();
+      ctx.moveTo(-f.width / 2, -f.height / 2 + cornerLen);
+      ctx.lineTo(-f.width / 2, -f.height / 2);
+      ctx.lineTo(-f.width / 2 + cornerLen, -f.height / 2);
+      ctx.stroke();
+      // Top-right
+      ctx.beginPath();
+      ctx.moveTo(f.width / 2 - cornerLen, -f.height / 2);
+      ctx.lineTo(f.width / 2, -f.height / 2);
+      ctx.lineTo(f.width / 2, -f.height / 2 + cornerLen);
+      ctx.stroke();
+      // Bottom-left
+      ctx.beginPath();
+      ctx.moveTo(-f.width / 2, f.height / 2 - cornerLen);
+      ctx.lineTo(-f.width / 2, f.height / 2);
+      ctx.lineTo(-f.width / 2 + cornerLen, f.height / 2);
+      ctx.stroke();
+      // Bottom-right
+      ctx.beginPath();
+      ctx.moveTo(f.width / 2 - cornerLen, f.height / 2);
+      ctx.lineTo(f.width / 2, f.height / 2);
+      ctx.lineTo(f.width / 2, f.height / 2 - cornerLen);
+      ctx.stroke();
 
       // Area protect/remove frame terpilih (konten → ikut flip)
       if (isSel) {
         ctx.save();
         ctx.scale(f.flip_h ? -1 : 1, f.flip_v ? -1 : 1);
         for (const a of f.protected_areas) {
-          ctx.fillStyle = "rgba(34,197,94,0.22)";
+          ctx.fillStyle = "rgba(34,197,94,0.30)";
           ctx.strokeStyle = "#22C55E";
-          ctx.lineWidth = 1.5 / S;
+          ctx.lineWidth = 2 / S;
           ctx.setLineDash([4 / S, 3 / S]);
           ctx.fillRect(a.x - f.width / 2, a.y - f.height / 2, a.w, a.h);
           ctx.strokeRect(a.x - f.width / 2, a.y - f.height / 2, a.w, a.h);
           ctx.setLineDash([]);
         }
         for (const a of f.remove_areas) {
-          ctx.fillStyle = "rgba(239,68,68,0.22)";
+          ctx.fillStyle = "rgba(239,68,68,0.30)";
           ctx.strokeStyle = "#EF4444";
-          ctx.lineWidth = 1.5 / S;
+          ctx.lineWidth = 2 / S;
           ctx.setLineDash([4 / S, 3 / S]);
           ctx.fillRect(a.x - f.width / 2, a.y - f.height / 2, a.w, a.h);
           ctx.strokeRect(a.x - f.width / 2, a.y - f.height / 2, a.w, a.h);
@@ -461,8 +508,8 @@ const TemplateFrameEditorPage: React.FC = () => {
       ctx.beginPath();
       ctx.roundRect(-f.width / 2, -f.height / 2 - pad * 3 - 2 / S, tw + pad * 2, 18 / S, 4 / S);
       ctx.fill();
-      ctx.strokeStyle = "rgba(255, 255, 255, 0.4)";
-      ctx.lineWidth = 1 / S;
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.6)";
+      ctx.lineWidth = 1.5 / S;
       ctx.stroke();
 
       // Badge text
@@ -1454,7 +1501,16 @@ const TemplateFrameEditorPage: React.FC = () => {
           <Button
             variant={testCamera ? "primary" : "secondary"}
             size="sm"
-            onClick={() => setTestCamera((v) => !v)}
+            onClick={() => {
+              if (testCamera) {
+                setTestCamera(false);
+              } else {
+                if (videoRef.current) {
+                  videoRef.current.play().catch(() => {});
+                }
+                setTestCamera(true);
+              }
+            }}
             leftIcon={testCamera ? <VideoOff size={15} /> : <Video size={15} />}
           >
             {testCamera ? "Stop" : "Test Camera"}
@@ -1484,19 +1540,20 @@ const TemplateFrameEditorPage: React.FC = () => {
           ref={containerRef}
           className="relative w-full h-[52vh] sm:h-[60vh] lg:h-auto lg:flex-1 bg-pb-bg border border-pb-border rounded-2xl overflow-hidden shrink-0 lg:shrink min-h-[300px]"
         >
-          {/* Hidden Video element untuk Test Camera Stream */}
+          {/* Video element untuk Test Camera Stream (kompatibel iOS Safari) */}
           <video
             ref={videoRef}
             autoPlay
             playsInline
             muted
             style={{
-              position: "fixed",
-              top: -9999,
-              left: -9999,
-              width: 1,
-              height: 1,
-              opacity: 0,
+              position: "absolute",
+              top: 0,
+              left: 0,
+              width: "320px",
+              height: "240px",
+              opacity: 0.001,
+              zIndex: -1,
               pointerEvents: "none",
             }}
           />
