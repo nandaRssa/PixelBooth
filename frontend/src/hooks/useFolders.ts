@@ -51,3 +51,27 @@ export function useDeleteFolder() {
     },
   })
 }
+
+export function useBulkDeleteFolders() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (folderIds: number[]) => folderApi.bulkDelete(folderIds),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['folders'] })
+      queryClient.invalidateQueries({ queryKey: ['photos'] })
+    },
+  })
+}
+
+export function useBulkMoveFolders() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (payload: { folderIds: number[]; parentFolderId: number | null }) =>
+      folderApi.bulkMove(payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['folders'] })
+    },
+  })
+}

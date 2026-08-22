@@ -65,6 +65,8 @@ Route::middleware('throttle:120,1')->group(function () {
     Route::post('/folders', [FolderController::class, 'store'])->name('folders.store');
     Route::put('/folders/{folder}', [FolderController::class, 'update'])->name('folders.update');
     Route::delete('/folders/{folder}', [FolderController::class, 'destroy'])->name('folders.destroy');
+    Route::post('/folders/bulk-delete', [FolderController::class, 'bulkDelete'])->name('folders.bulk-delete');
+    Route::post('/folders/bulk-move', [FolderController::class, 'bulkMove'])->name('folders.bulk-move');
 
     // Photos
     Route::get('/photos', [PhotoController::class, 'index'])->name('photos.index');

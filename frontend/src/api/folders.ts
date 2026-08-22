@@ -35,4 +35,15 @@ export const folderApi = {
   remove: async (id: number): Promise<void> => {
     await apiClient.delete(`/folders/${id}`)
   },
+
+  bulkDelete: async (folderIds: number[]): Promise<void> => {
+    await apiClient.post('/folders/bulk-delete', { folder_ids: folderIds })
+  },
+
+  bulkMove: async (payload: { folderIds: number[]; parentFolderId: number | null }): Promise<void> => {
+    await apiClient.post('/folders/bulk-move', {
+      folder_ids: payload.folderIds,
+      parent_folder_id: payload.parentFolderId,
+    })
+  },
 }

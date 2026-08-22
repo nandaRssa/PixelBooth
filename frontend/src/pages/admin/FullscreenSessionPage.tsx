@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
-import { Check, FolderOpen, ImagePlus, QrCode, RefreshCw, RotateCcw, X } from 'lucide-react'
+import { Check, Download, FolderOpen, ImagePlus, QrCode, RefreshCw, RotateCcw, X } from 'lucide-react'
 import { Spinner } from '@/components/ui/StatusBadge'
 import { toast } from '@/components/ui/Toast'
 import { sessionApi } from '@/api/sessions'
@@ -9,6 +9,7 @@ import { useFolders } from '@/hooks/useFolders'
 import { resolvePreviewSlots } from '@/utils/previewSlots'
 import { buildTemplateOverlay } from '@/utils/templateOverlay'
 import { getStorageUrl } from '@/api/client'
+import { downloadFile } from '@/utils/download'
 import type { PhotoSession } from '@/types'
 import type { PreviewSlot } from '@/utils/previewSlots'
 
@@ -38,7 +39,7 @@ const FullscreenSessionPage: React.FC = () => {
   const [countdown, setCountdown] = useState<number | null>(null)
   const [isCapturing, setIsCapturing] = useState(false)
   const [allDone, setAllDone] = useState(false)
-  const [resultPhoto, setResultPhoto] = useState<{ url?: string; qr_url?: string } | null>(null)
+  const [resultPhoto, setResultPhoto] = useState<{ url?: string; qr_url?: string; filename?: string } | null>(null)
   const completingRef = useRef(false)
   const [isRetaking, setIsRetaking] = useState(false)
   const [showRetakePanel, setShowRetakePanel] = useState(false)
@@ -742,8 +743,24 @@ const FullscreenSessionPage: React.FC = () => {
             </div>
           )}
 
-          {/* 4 Tombol Aksi Utama: Scan QR, Buka Galeri, Ulangi, Selesai */}
+          {/* 5 Tombol Aksi Utama: Unduh Foto, Scan QR, Buka Galeri, Ulangi, Selesai */}
           <div className="flex items-center gap-3 flex-wrap justify-center">
+            {resultPhoto?.url && (
+              <button
+                type="button"
+                onClick={async () => {
+                  if (resultPhoto?.url) {
+                    await downloadFile(resultPhoto.url, resultPhoto.filename || 'pixelbooth-photo.jpg')
+                    toast.success('Foto berhasil diunduh!')
+                  }
+                }}
+                className="flex items-center gap-2 px-5 py-3 rounded-xl bg-gradient-to-r from-[#FF5A36] to-[#FF8836] hover:brightness-110 text-white
+                  text-sm font-semibold transition-all shadow-lg min-h-[48px] active:scale-95 cursor-pointer"
+              >
+                <Download size={18} />
+                Unduh Foto
+              </button>
+            )}
             {resultPhoto?.qr_url && (
               <button
                 type="button"

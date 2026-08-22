@@ -1,13 +1,20 @@
 import React, { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { ChevronRight, FolderOpen, Home, ImageIcon, Plus, RefreshCw } from 'lucide-react'
+import { CheckSquare, ChevronRight, FolderInput, FolderOpen, Home, ImageIcon, Plus, RefreshCw, Square, Trash2, X } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { ConfirmModal } from '@/components/ui/Modal'
 import { EmptyState, Spinner } from '@/components/ui/StatusBadge'
 import { toast } from '@/components/ui/Toast'
 import { folderApi } from '@/api/folders'
-import { useFolders, useCreateFolder, useUpdateFolder, useDeleteFolder } from '@/hooks/useFolders'
+import {
+  useFolders,
+  useCreateFolder,
+  useUpdateFolder,
+  useDeleteFolder,
+  useBulkDeleteFolders,
+  useBulkMoveFolders,
+} from '@/hooks/useFolders'
 import {
   usePhotos,
   useDeletePhoto,
@@ -22,6 +29,7 @@ import FolderQrModal from '@/components/gallery/FolderQrModal'
 import PhotoQrModal from '@/components/gallery/PhotoQrModal'
 import PhotoPreviewModal from '@/components/gallery/PhotoPreviewModal'
 import MovePhotoModal from '@/components/gallery/MovePhotoModal'
+import MoveFolderModal from '@/components/gallery/MoveFolderModal'
 import type { Folder, Photo } from '@/types'
 
 // ==========================================
@@ -131,11 +139,19 @@ const GalleryPage: React.FC = () => {
   const [deletePhotoTarget, setDeletePhotoTarget] = useState<Photo | null>(null)
   const [photoQrTarget, setPhotoQrTarget] = useState<Photo | null>(null)
 
-  // ===== Seleksi massal =====
+  // ===== Seleksi massal Foto =====
   const [selectionMode, setSelectionMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
   const [bulkMoveOpen, setBulkMoveOpen] = useState(false)
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false)
+
+  // ===== Seleksi massal Folder =====
+  const [folderSelectionMode, setFolderSelectionMode] = useState(false)
+  const [selectedFolderIds, setSelectedFolderIds] = useState<Set<number>>(new Set())
+  const [bulkFolderMoveOpen, setBulkFolderMoveOpen] = useState(false)
+  const [bulkFolderDeleteOpen, setBulkFolderDeleteOpen] = useState(false)
+  const bulkDeleteFolders = useBulkDeleteFolders()
+  const bulkMoveFolders = useBulkMoveFolders()
 
   // ===== Handlers =====
   const handleCreateFolder = async (name: string) => {
@@ -240,9 +256,57 @@ const GalleryPage: React.FC = () => {
     }
   }
 
+  // ===== Handlers Seleksi Folder =====
+  const handleToggleSelectFolder = (folder: Folder) => {
+    setSelectedFolderIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(folder.id)) next.delete(folder.id)
+      else next.add(folder.id)
+      return next
+    })
+  }
+
+  const handleSelectAllFolders = () => {
+    setSelectedFolderIds((prev) =>
+      prev.size === folders.length ? new Set() : new Set(folders.map((f) => f.id))
+    )
+  }
+
+  const handleBulkDeleteFolders = async () => {
+    if (selectedFolderIds.size === 0) return
+    try {
+      await bulkDeleteFolders.mutateAsync([...selectedFolderIds])
+      toast.success(`${selectedFolderIds.size} folder berhasil dihapus.`)
+      setSelectedFolderIds(new Set())
+      setFolderSelectionMode(false)
+      setBulkFolderDeleteOpen(false)
+    } catch (err: unknown) {
+      const error = err as { response?: { data?: { message?: string } } }
+      toast.error(error.response?.data?.message || 'Gagal menghapus folder.')
+    }
+  }
+
+  const handleBulkMoveFolders = async (targetParentFolderId: number | null) => {
+    if (selectedFolderIds.size === 0) return
+    try {
+      await bulkMoveFolders.mutateAsync({
+        folderIds: [...selectedFolderIds],
+        parentFolderId: targetParentFolderId,
+      })
+      toast.success(`${selectedFolderIds.size} folder berhasil dipindahkan.`)
+      setSelectedFolderIds(new Set())
+      setFolderSelectionMode(false)
+      setBulkFolderMoveOpen(false)
+    } catch (err: unknown) {
+      const error = err as { response?: { data?: { message?: string } } }
+      toast.error(error.response?.data?.message || 'Gagal memindahkan folder.')
+    }
+  }
+
   const folders = foldersQuery.data ?? []
   const photos = photosQuery.data?.pages.flatMap((page) => page.data) ?? []
   const hasMore = Boolean(photosQuery.hasNextPage)
+  const allFoldersSelected = folders.length > 0 && selectedFolderIds.size === folders.length
 
   return (
     <div className="flex flex-col h-[calc(100vh-4rem)]">
@@ -317,11 +381,92 @@ const GalleryPage: React.FC = () => {
         </div>
       ) : folders.length > 0 ? (
         <div className="mb-10">
-          <h2 className="text-pb-text text-sm font-semibold mb-3 flex items-center gap-2">
-            <FolderOpen size={16} className="text-pb-text-secondary" />
-            Sub-Folder
-            <span className="text-pb-text-muted font-normal">{folders.length}</span>
-          </h2>
+          {/* Toolbar Sub-folder */}
+          <div className="mb-3.5">
+            {folderSelectionMode ? (
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 p-3 rounded-2xl bg-pb-surface border border-pb-border shadow-xs w-full">
+                {/* Baris 1: Status & Pilih Semua */}
+                <div className="flex items-center justify-between sm:justify-start gap-2.5">
+                  <button
+                    type="button"
+                    onClick={handleSelectAllFolders}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-pb-elevated border border-pb-border
+                      text-pb-text text-xs font-semibold hover:bg-pb-border-light transition-colors"
+                  >
+                    {allFoldersSelected ? <CheckSquare size={14} className="text-[#FF5A36]" /> : <Square size={14} />}
+                    <span>{allFoldersSelected ? 'Batal Semua' : 'Pilih Semua'}</span>
+                  </button>
+                  <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-orange-500/15 text-[#FF5A36] border border-orange-500/30">
+                    {selectedFolderIds.size} dipilih
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFolderSelectionMode(false)
+                      setSelectedFolderIds(new Set())
+                    }}
+                    className="sm:hidden text-xs text-pb-text-muted hover:text-pb-text px-2 py-1 font-medium ml-auto"
+                  >
+                    Batal
+                  </button>
+                </div>
+
+                {/* Baris 2: Tombol Aksi Massal Folder */}
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className="flex-1 sm:flex-initial text-xs"
+                    onClick={() => setBulkFolderMoveOpen(true)}
+                    disabled={selectedFolderIds.size === 0 || bulkMoveFolders.isPending}
+                    leftIcon={<FolderInput size={14} className="text-amber-400" />}
+                  >
+                    Pindahkan
+                  </Button>
+                  <Button
+                    variant="danger"
+                    size="sm"
+                    className="flex-1 sm:flex-initial text-xs"
+                    onClick={() => setBulkFolderDeleteOpen(true)}
+                    disabled={selectedFolderIds.size === 0 || bulkDeleteFolders.isPending}
+                    leftIcon={<Trash2 size={14} />}
+                  >
+                    Hapus {selectedFolderIds.size > 0 ? `(${selectedFolderIds.size})` : ''}
+                  </Button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFolderSelectionMode(false)
+                      setSelectedFolderIds(new Set())
+                    }}
+                    className="hidden sm:flex w-8 h-8 rounded-xl bg-pb-elevated border border-pb-border
+                      text-pb-text-muted hover:text-pb-text hover:bg-pb-border-light transition-colors items-center justify-center shrink-0"
+                    title="Keluar dari mode pilih"
+                  >
+                    <X size={15} />
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between">
+                <h2 className="text-pb-text text-sm font-semibold flex items-center gap-2">
+                  <FolderOpen size={16} className="text-pb-text-secondary" />
+                  <span>Sub-Folder</span>
+                  <span className="text-pb-text-muted font-normal text-xs">({folders.length})</span>
+                </h2>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className="text-xs font-medium"
+                  onClick={() => setFolderSelectionMode(true)}
+                  leftIcon={<CheckSquare size={14} />}
+                >
+                  Pilih Folder
+                </Button>
+              </div>
+            )}
+          </div>
+
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3.5">
             {folders.map((folder) => (
               <FolderCard
@@ -331,6 +476,9 @@ const GalleryPage: React.FC = () => {
                 onRename={setRenameTarget}
                 onDelete={setDeleteTarget}
                 onShowQr={setQrTarget}
+                selectionMode={folderSelectionMode}
+                isSelected={selectedFolderIds.has(folder.id)}
+                onToggleSelect={handleToggleSelectFolder}
               />
             ))}
           </div>
@@ -493,6 +641,29 @@ const GalleryPage: React.FC = () => {
         message={`${selectedIds.size} foto akan dihapus permanen dari galeri. Lanjutkan?`}
         confirmLabel="Ya, Hapus"
         loading={bulkDeletePhotos.isPending}
+        danger
+      />
+
+      {/* ===== Modals Seleksi Folder Massal ===== */}
+      <MoveFolderModal
+        isOpen={bulkFolderMoveOpen}
+        onClose={() => setBulkFolderMoveOpen(false)}
+        onConfirm={handleBulkMoveFolders}
+        folders={allFoldersQuery.data ?? []}
+        isLoadingFolders={allFoldersQuery.isLoading}
+        isMoving={bulkMoveFolders.isPending}
+        count={selectedFolderIds.size}
+        excludeFolderIds={[...selectedFolderIds]}
+      />
+
+      <ConfirmModal
+        isOpen={bulkFolderDeleteOpen}
+        onClose={() => setBulkFolderDeleteOpen(false)}
+        onConfirm={handleBulkDeleteFolders}
+        title="Hapus Folder Terpilih"
+        message={`${selectedFolderIds.size} folder beserta seluruh isinya akan dihapus permanen dari galeri. Lanjutkan?`}
+        confirmLabel="Ya, Hapus Semua"
+        loading={bulkDeleteFolders.isPending}
         danger
       />
     </div>

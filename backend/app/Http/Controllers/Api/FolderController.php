@@ -120,4 +120,62 @@ class FolderController extends Controller
             'message' => 'Folder beserta isinya berhasil dihapus.',
         ]);
     }
+
+    /**
+     * Bulk delete folder.
+     */
+    public function bulkDelete(Request $request): JsonResponse
+    {
+        $request->validate([
+            'folder_ids' => ['required', 'array'],
+            'folder_ids.*' => ['integer', 'exists:folders,id'],
+        ]);
+
+        $folders = Folder::whereIn('id', $request->folder_ids)->get();
+
+        foreach ($folders as $folder) {
+            $photos = Photo::where('folder_id', $folder->id)->get();
+            foreach ($photos as $photo) {
+                Storage::disk('public')->delete(array_filter([
+                    $photo->storage_path,
+                    $photo->thumbnail_path,
+                    $photo->qr_path,
+                ]));
+                $photo->delete();
+            }
+            Storage::disk('public')->delete(array_filter([$folder->qr_path]));
+            $folder->delete();
+        }
+
+        return response()->json([
+            'message' => count($request->folder_ids) . ' folder berhasil dihapus.',
+        ]);
+    }
+
+    /**
+     * Bulk move folder (ubah parent folder).
+     */
+    public function bulkMove(Request $request): JsonResponse
+    {
+        $request->validate([
+            'folder_ids' => ['required', 'array'],
+            'folder_ids.*' => ['integer', 'exists:folders,id'],
+            'parent_folder_id' => ['nullable', 'integer', 'exists:folders,id'],
+        ]);
+
+        $targetParentId = $request->parent_folder_id;
+        if ($targetParentId && in_array($targetParentId, $request->folder_ids)) {
+            return response()->json([
+                'message' => 'Folder tujuan tidak valid.',
+            ], 422);
+        }
+
+        Folder::whereIn('id', $request->folder_ids)->update([
+            'parent_folder_id' => $targetParentId,
+        ]);
+
+        return response()->json([
+            'message' => count($request->folder_ids) . ' folder berhasil dipindahkan.',
+        ]);
+    }
 }

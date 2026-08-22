@@ -79,60 +79,71 @@ const PhotoPreviewModal: React.FC<PhotoPreviewModalProps> = ({
               )}
             </div>
 
-            {/* Actions Bar — Selaras dengan Theme System */}
-            <div className="flex items-center gap-2 pt-1 flex-wrap sm:flex-nowrap">
-              <Button
-                variant="secondary"
-                size="md"
-                onClick={() => window.open(getStorageUrl(photo.url), '_blank')}
-                leftIcon={<ExternalLink size={16} />}
-              >
-                Buka
-              </Button>
-              <Button
-                variant="secondary"
-                size="md"
-                onClick={async () => {
-                  await downloadFile(photo.url, photo.filename || 'pixelbooth-photo.jpg')
-                }}
-                leftIcon={<Download size={16} />}
-              >
-                Unduh
-              </Button>
-              <div className="hidden sm:block flex-1" />
-              <Button
-                variant="secondary"
-                size="md"
-                onClick={() => {
-                  onShowQr(photo)
-                  onClose()
-                }}
-                leftIcon={<QrCode size={16} />}
-              >
-                QR Code
-              </Button>
-              <Button
-                variant="secondary"
-                size="md"
-                onClick={() => {
-                  onMove(photo)
-                  onClose()
-                }}
-                leftIcon={<FolderInput size={16} />}
-              >
-                Pindah
-              </Button>
-              <Button
-                variant="danger"
-                size="md"
-                onClick={() => {
-                  onDelete(photo)
-                  onClose()
-                }}
-                leftIcon={<Trash2 size={16} />}
-              >
-                Hapus
-              </Button>
+            {/* Actions Bar — Terstruktur & Responsif */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pt-2 border-t border-pb-border/60">
+              {/* Grup Aksi Utama: Unduh & QR Code */}
+              <div className="grid grid-cols-2 sm:flex items-center gap-2">
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={async () => {
+                    await downloadFile(photo.url, photo.filename || 'pixelbooth-photo.jpg')
+                  }}
+                  leftIcon={<Download size={15} />}
+                  className="text-xs font-semibold py-2"
+                >
+                  Unduh Foto
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => {
+                    onShowQr(photo)
+                    onClose()
+                  }}
+                  leftIcon={<QrCode size={15} className="text-cyan-400" />}
+                  className="text-xs font-medium py-2"
+                >
+                  QR Code
+                </Button>
+              </div>
+
+              {/* Grup Aksi Manajemen: Buka, Pindah, Hapus */}
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => window.open(getStorageUrl(photo.url), '_blank')}
+                  leftIcon={<ExternalLink size={14} />}
+                  className="flex-1 sm:flex-initial text-xs py-2"
+                >
+                  Buka Tab
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => {
+                    onMove(photo)
+                    onClose()
+                  }}
+                  leftIcon={<FolderInput size={14} className="text-amber-400" />}
+                  className="flex-1 sm:flex-initial text-xs py-2"
+                >
+                  Pindah
+                </Button>
+                <Button
+                  variant="danger"
+                  size="sm"
+                  onClick={() => {
+                    onDelete(photo)
+                    onClose()
+                  }}
+                  leftIcon={<Trash2 size={14} />}
+                  className="text-xs py-2 px-3 shrink-0"
+                >
+                  Hapus
+                </Button>
+              </div>
             </div>
           </motion.div>
         </>
