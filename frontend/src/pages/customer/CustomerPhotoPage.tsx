@@ -6,6 +6,7 @@ import { Download, Share2, Image as ImageIcon, ArrowLeft } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Spinner } from '@/components/ui/StatusBadge'
 import { customerApi } from '@/api/customer'
+import { getStorageUrl } from '@/api/client'
 import type { CustomerPhoto } from '@/types'
 
 // ==========================================
@@ -16,6 +17,7 @@ const CustomerPhotoPage: React.FC = () => {
   const { token } = useParams<{ token: string }>()
   const [photo, setPhoto] = useState<CustomerPhoto | null>(null)
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
+  const [isDownloading, setIsDownloading] = useState<boolean>(false)
 
   useEffect(() => {
     if (!token) {
@@ -43,8 +45,27 @@ const CustomerPhotoPage: React.FC = () => {
 
   const pageUrl = typeof window !== 'undefined' ? window.location.href : ''
 
-  const handleDownload = () => {
-    if (photo?.url) window.open(photo.url, '_blank')
+  const handleDownload = async () => {
+    if (!photo?.url) return
+    setIsDownloading(true)
+    try {
+      const fileUrl = getStorageUrl(photo.url)
+      const res = await fetch(fileUrl)
+      if (!res.ok) throw new Error('Download failed')
+      const blob = await res.blob()
+      const blobUrl = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = blobUrl
+      a.download = `pixelbooth-${token ? token.slice(0, 8) : 'photo'}.jpg`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(blobUrl)
+    } catch {
+      window.open(getStorageUrl(photo.url), '_blank')
+    } finally {
+      setIsDownloading(false)
+    }
   }
 
   const handleShare = async () => {
@@ -63,10 +84,7 @@ const CustomerPhotoPage: React.FC = () => {
   if (status === 'loading') {
     return (
       <div className="min-h-screen bg-pb-bg flex items-center justify-center">
-        <div className="text-center">
-          <Spinner size="lg" className="text-pb-text mx-auto mb-3" />
-          <p className="text-pb-text-muted text-sm">Memuat foto...</p>
-        </div>
+        <Spinner size="lg" className="text-pb-text" />
       </div>
     )
   }
@@ -74,23 +92,20 @@ const CustomerPhotoPage: React.FC = () => {
   // ===== Error / Not Found =====
   if (status === 'error' || !photo) {
     return (
-      <div className="min-h-screen bg-pb-bg flex items-center justify-center p-4">
-        <div className="text-center max-w-xs">
-          <ImageIcon size={40} className="text-pb-faint mx-auto mb-4" />
-          <h1 className="text-pb-text font-semibold text-lg mb-2">Foto tidak ditemukan</h1>
-          <p className="text-pb-text-muted text-sm leading-relaxed mb-6">
-            Link mungkin sudah tidak berlaku atau foto telah dihapus.
-          </p>
-          <Button variant="secondary" size="md" onClick={() => window.history.back()} leftIcon={<ArrowLeft size={16} />}>
-            Kembali
-          </Button>
+      <div className="min-h-screen bg-pb-bg flex flex-col items-center justify-center p-6 text-center">
+        <div className="w-16 h-16 rounded-2xl bg-pb-surface border border-pb-border flex items-center justify-center mb-4 text-pb-text-muted">
+          <ImageIcon size={28} />
         </div>
+        <h1 className="text-pb-text font-bold text-xl mb-2">Foto Tidak Ditemukan</h1>
+        <p className="text-pb-text-muted text-sm max-w-xs mb-6 leading-relaxed">
+          Link ini mungkin sudah tidak berlaku atau foto telah dihapus dari galeri.
+        </p>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-pb-bg flex flex-col items-center p-4 pt-8">
+    <div className="min-h-screen bg-pb-bg flex flex-col items-center justify-center p-4 sm:p-6">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -107,7 +122,7 @@ const CustomerPhotoPage: React.FC = () => {
         {/* Photo */}
         <div className="bg-pb-surface border border-pb-border rounded-2xl overflow-hidden mb-4">
           <img
-            src={photo.url}
+            src={getStorageUrl(photo.url)}
             alt="Hasil foto photobooth"
             className="w-full aspect-[3/4] object-cover"
           />

@@ -6,10 +6,11 @@ import { Download, Share2, FolderOpen, X, Image as ImageIcon } from 'lucide-reac
 import { Button } from '@/components/ui/Button'
 import { Spinner } from '@/components/ui/StatusBadge'
 import { customerApi } from '@/api/customer'
+import { getStorageUrl } from '@/api/client'
 import type { CustomerFolder, CustomerFolderPhoto } from '@/types'
 
 // ==========================================
-// Customer Folder Page — akses via QR token folder
+// Customer Folder Page — galeri folder via QR
 // ==========================================
 
 const CustomerFolderPage: React.FC = () => {
@@ -56,8 +57,24 @@ const CustomerFolderPage: React.FC = () => {
     }
   }
 
-  const handleDownload = (photo: CustomerFolderPhoto) => {
-    window.open(photo.url, '_blank')
+  const handleDownload = async (photo: CustomerFolderPhoto) => {
+    if (!photo?.url) return
+    try {
+      const fileUrl = getStorageUrl(photo.url)
+      const res = await fetch(fileUrl)
+      if (!res.ok) throw new Error('Download failed')
+      const blob = await res.blob()
+      const blobUrl = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = blobUrl
+      a.download = `pixelbooth-${photo.token ? photo.token.slice(0, 8) : 'photo'}.jpg`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(blobUrl)
+    } catch {
+      window.open(getStorageUrl(photo.url), '_blank')
+    }
   }
 
   // ===== Loading =====
@@ -138,7 +155,7 @@ const CustomerFolderPage: React.FC = () => {
                 className="group relative aspect-square bg-pb-surface border border-pb-border rounded-xl overflow-hidden"
               >
                 <img
-                  src={photo.thumbnail_url ?? photo.url}
+                  src={getStorageUrl(photo.thumbnail_url ?? photo.url)}
                   alt="Foto galeri"
                   loading="lazy"
                   className="w-full h-full object-cover transition-transform duration-200 group-hover:scale-105"
@@ -178,7 +195,7 @@ const CustomerFolderPage: React.FC = () => {
                 </button>
               </div>
               <div className="bg-pb-bg border border-pb-border rounded-xl overflow-hidden flex items-center justify-center">
-                <img src={preview.url} alt="Foto galeri" className="max-w-full max-h-[70vh] object-contain" />
+                <img src={getStorageUrl(preview.url)} alt="Foto galeri" className="max-w-full max-h-[70vh] object-contain" />
               </div>
               <Button
                 variant="primary"
