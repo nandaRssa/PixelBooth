@@ -4,6 +4,8 @@ namespace App\Services;
 
 /**
  * Mesin mask kamera per-frame berbasis konfigurasi MANUAL dari user (Frame Editor).
+ * Smart Remove v2 — menggunakan CIELAB perceptual color distance, soft alpha ramp,
+ * Sobel gradient-guided edge refinement, dan Gaussian feather.
  *
  * Prinsip:
  * - Frame buatan user adalah sumber kebenaran. TIDAK ADA deteksi warna putih,
@@ -97,6 +99,9 @@ class FrameMaskService
             'confidence' => isset($frame['confidence']) && is_numeric($frame['confidence'])
                 ? round((float) $frame['confidence'], 1)
                 : null,
+            'source' => isset($frame['source']) ? (string) $frame['source'] : null,
+            'shape' => isset($frame['shape']) ? (string) $frame['shape'] : null,
+            'mask' => isset($frame['mask']) && is_array($frame['mask']) ? $frame['mask'] : [],
             'protected_areas' => $areas($frame['protected_areas'] ?? null),
             'remove_areas' => $areas($frame['remove_areas'] ?? null),
             'remove_seeds' => $points($frame['remove_seeds'] ?? null),
@@ -118,6 +123,13 @@ class FrameMaskService
     public function buildMask($templateImg, array $frame, int $canvasW, int $canvasH): ?array
     {
         $f = $this->normalizeFrame($frame);
+
+        // KONDISI 1 — Transparency Detection:
+        // JANGAN MENGHAPUS DESAIN / JANGAN RUN SMART CLEAR.
+        // Template desain asli tetap utuh 100% dan transparansi asli digunakan langsung.
+        if (($f['source'] ?? null) === 'transparent' || ($frame['source'] ?? null) === 'transparent') {
+            return null;
+        }
 
         $scale = min(1.0, self::WORK_MAX / max($canvasW, $canvasH));
         $gw = max(1, (int) round($canvasW * $scale));
@@ -227,9 +239,28 @@ class FrameMaskService
             return null;
         }
 
-        // Warna rata-rata seed = referensi kontinuitas connected region
-        $rs = $gs = $bs = 0;
+        // ── SMART REMOVE v2: LAB seed statistics ──────────────────────────
+        // Kumpulkan LAB semua piksel seed zone, lalu hitung mean & stddev.
+        // Mean LAB digunakan sebagai referensi flood fill; stddev menentukan
+        // lebar soft ramp alpha (daerah lebih dekat ke mean → alpha lebih penuh).
+        $seedLabs = [];
+        foreach ($seed as $idx => $_) {
+            $gxi = $bx0 + ($idx % $bw);
+            $gyi = $by0 + intdiv($idx, $bw);
+            $c   = imagecolorat($work, $gxi, $gyi);
+            $r   = ($c >> 16) & 0xFF;
+            $g   = ($c >> 8) & 0xFF;
+            $b   = $c & 0xFF;
+            $seedLabs[] = SmartColorService::rgbToLab($r, $g, $b);
+        }
+        $seedStat = SmartColorService::seedStats($seedLabs);
+        $seedMeanLab = $seedStat['mean'];
+        $seedStddev  = $seedStat['stddev'];
+
+        // RGB mean tetap dipertahankan untuk tolHard / tolFill / fillMode
+        // (digunakan pada region brush dan fill ratio check).
         $n = count($seed);
+        $rs = $gs = $bs = 0;
         foreach ($seed as $idx => $_) {
             $c = imagecolorat($work, $bx0 + ($idx % $bw), $by0 + intdiv($idx, $bw));
             $rs += ($c >> 16) & 0xFF;
@@ -579,24 +610,41 @@ class FrameMaskService
         $tolFill = max($tol * 4, 28);
         $fillRatio = 0.55;
 
-        $diffs = [];
+        // ── SMART REMOVE v2: Precompute RGB diffs (untuk fillMode & brush),
+        //   dan LAB values untuk soft alpha ramp ──────────────────────────────
+        $diffs       = [];   // RGB max-channel diff (untuk fill ratio, brush compat)
+        $labCache    = [];   // LAB per piksel inside (untuk soft alpha)
+        $holeStrength = []; // float 0.0–1.0 per piksel (output baru, ganti cleared biner)
         $insideCount = 0;
-        $sameCount = 0;
+        $sameCount   = 0;
+        $gw = imagesx($work);
+        $gh = imagesy($work);
+
         foreach ($inside as $idx => $_) {
-            $c = imagecolorat($work, $bx0 + ($idx % $bw), $by0 + intdiv($idx, $bw));
+            $pixX = $bx0 + ($idx % $bw);
+            $pixY = $by0 + intdiv($idx, $bw);
+            $c = imagecolorat($work, $pixX, $pixY);
+            $pr = ($c >> 16) & 0xFF;
+            $pg = ($c >> 8) & 0xFF;
+            $pb = $c & 0xFF;
+
+            // RGB diff (max-channel)
             $diffs[$idx] = max(
-                abs((($c >> 16) & 0xFF) - $avgR),
-                abs((($c >> 8) & 0xFF) - $avgG),
-                abs(($c & 0xFF) - $avgB)
+                abs($pr - $avgR),
+                abs($pg - $avgG),
+                abs($pb - $avgB)
             );
             $insideCount++;
             if ($diffs[$idx] <= $tolFill) {
                 $sameCount++;
             }
+
+            // LAB per piksel (untuk soft alpha ramp di bawah)
+            $labCache[$idx] = SmartColorService::rgbToLab($pr, $pg, $pb);
         }
 
-        $cleared = [];
-        $queue = [];
+        $cleared  = [];  // Tetap dipertahankan (bool) untuk kompatibilitas logika brush/guard
+        $queue    = [];
         $fillMode = false;
 
         if ($fullClear) {
@@ -665,12 +713,64 @@ class FrameMaskService
             }
         }
 
+        // ── SMART REMOVE v2: Soft Alpha Ramp ─────────────────────────────────
+        // holeStrength float 0–1 per piksel berdasarkan:
+        //   1. Color alpha — Gaussian falloff dari deltaE LAB ke seed mean
+        //   2. Dist alpha  — ramp linear dari pusat ke batas dMax
+        //   3. Grad damping — Sobel magnitude mengurangi alpha di tepi tajam
+        //
+        // CATATAN: GRAD_THRESHOLD dinaikkan ke 0.55 agar Sobel tidak terlalu
+        // agresif memblokir clearing (mencegah serbuk/residue semi-transparan).
+        $GRAD_THRESHOLD = 0.55; // dinaikkan dari 0.25 → sedikit lebih lembut
+        $twoSigSq = 2.0 * $seedStddev * $seedStddev;
+
+        foreach ($cleared as $idx => $_) {
+            if (isset($guard[$idx])) {
+                continue; // guard selalu strength 0
+            }
+            $pixX = $bx0 + ($idx % $bw);
+            $pixY = $by0 + intdiv($idx, $bw);
+
+            // 1. Color alpha: Gaussian berdasarkan deltaE LAB
+            $pixLab   = $labCache[$idx] ?? SmartColorService::rgbToLab(0, 0, 0);
+            $de       = SmartColorService::deltaE76($pixLab, $seedMeanLab);
+            $colorAlpha = exp(-0.5 * ($de * $de) / $twoSigSq);
+            if (isset($seed[$idx])) {
+                $colorAlpha = max($colorAlpha, 0.85);
+            }
+
+            // 2. Dist alpha: ramp dari pusat ke batas dMax
+            $ndx = ($pixX + 0.5) - $cx;
+            $ndy = ($pixY + 0.5) - $cy;
+            $dist = sqrt($ndx * $ndx + $ndy * $ndy);
+            $distAlpha = ($dist <= $dHard)
+                ? 1.0
+                : (($dMax > $dHard && $dist < $dMax)
+                    ? 1.0 - ($dist - $dHard) / ($dMax - $dHard)
+                    : 1.0);
+
+            // 3. Gradient damping: tepi tajam gambar mengurangi alpha
+            // Floor dinaikkan 0.1 → 0.35 agar piksel cleared tidak terlalu
+            // lemah (mencegah serbuk semi-transparan di hasil akhir).
+            $gradMag = SmartColorService::sobelGradient($work, $pixX, $pixY, $gw, $gh);
+            $gradDamping = max(0.0, 1.0 - $gradMag / max(0.001, $GRAD_THRESHOLD));
+            $gradDamping = max(0.35, $gradDamping); // minimum 35%
+
+            $strength = $colorAlpha * $distAlpha * $gradDamping;
+            if ($fullClear || $fillMode) {
+                $strength = max($strength, 0.85); // paksa kuat di mode fill
+            }
+            $holeStrength[$idx] = min(1.0, max(0.0, $strength));
+        }
+
         // Force clear kuas/rect remove - HARUS sebelum anti-fringe & Edge
         // Cleanup agar pembersihan tepi juga bekerja pada batas region
         // hasil kuas Remove. Hanya Protect yang absolut.
+        // Smart Remove v2: kuas Remove → holeStrength penuh (1.0)
         foreach ($remAll as $idx => $_) {
             if (! isset($prot[$idx]) && ! isset($seedProt[$idx]) && isset($inside[$idx])) {
                 $cleared[$idx] = 1;
+                $holeStrength[$idx] = 1.0; // kuas Remove selalu full-clear
             }
         }
 
@@ -681,41 +781,50 @@ class FrameMaskService
         // STRONG) yang bersinggungan dengan area clear dan berbatasan langsung
         // dengan warna kuat dua langkah lebih jauh. Inti warna kuat (hitam
         // pekal dsb.) tidak disentuh. Harus identik dengan frameMask.ts.
-        $strong = 150;
-        for ($pass = 0; $pass < 2; $pass++) {
+        // ── SMART REMOVE v2: Aggressive Defringe & Boundary Absorption ──────
+        // Menghapus tuntas semua serbuk sisa warna, halo anti-alias, dan
+        // fringe yang menempel di pinggir-pinggir frame/elemen desain.
+        // Setiap piksel di perbatasan area clear yang merupakan transisi
+        // warna template (bukan elemen solid kontras tinggi) ikut di-clear.
+        for ($pass = 0; $pass < 4; $pass++) {
             $snap = $cleared;
+            $changed = 0;
             foreach ($inside as $idx => $_) {
                 if (isset($snap[$idx]) || isset($guard[$idx])) {
                     continue;
                 }
-                $dP = $diffs[$idx];
-                if ($dP <= $tolFill || $dP >= $strong) {
-                    continue; // bukan pita transisi
-                }
                 $gx = $bx0 + ($idx % $bw);
                 $gy = $by0 + intdiv($idx, $bw);
-                foreach ([[-1, 0], [1, 0], [0, -1], [0, 1]] as [$ox, $oy]) {
+                $dP = $diffs[$idx] ?? 0;
+
+                // Jangan sentuh elemen desain kontras tinggi (misal border hitam pekat)
+                if ($dP >= 140) {
+                    continue;
+                }
+
+                // Cek apakah bersentuhan langsung dengan area clear di 8-arah
+                $touchClear = false;
+                foreach ([[-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [1, -1], [-1, 1], [1, 1]] as [$ox, $oy]) {
                     $nx = $gx + $ox;
                     $ny = $gy + $oy;
                     if ($nx < $bx0 || $ny < $by0 || $nx > $bx1 || $ny > $by1) {
                         continue;
                     }
                     $nidx = ($ny - $by0) * $bw + ($nx - $bx0);
-                    if (! isset($snap[$nidx])) {
-                        continue; // harus bersinggungan dengan area clear
+                    if (isset($snap[$nidx])) {
+                        $touchClear = true;
+                        break;
                     }
-                    $qx = 2 * $gx - $nx;
-                    $qy = 2 * $gy - $ny;
-                    if ($qx < $bx0 || $qy < $by0 || $qx > $bx1 || $qy > $by1) {
-                        continue;
-                    }
-                    $qidx = ($qy - $by0) * $bw + ($qx - $bx0);
-                    if (! isset($inside[$qidx]) || $diffs[$qidx] < $strong) {
-                        continue;
-                    }
-                    $cleared[$idx] = 1; // pita transisi -> ikut clear sampai warna kuat
-                    break;
                 }
+
+                if ($touchClear) {
+                    $cleared[$idx] = 1;
+                    $holeStrength[$idx] = 1.0;
+                    $changed++;
+                }
+            }
+            if ($changed === 0) {
+                break;
             }
         }
 
@@ -778,10 +887,37 @@ class FrameMaskService
             }
         }
 
-        // Feather: box blur peta hole agar tepi compositing halus
+        // ── SMART REMOVE v2: Despeckle & Morphological Hole Closing ─────────
+        // Menutup semua lubang kecil, bintik noise, dan sisa debu/serbuk warna
+        // yang terkurung di dalam area clear tanpa jalan keluar ke border frame.
+        // Elemen desain berkontras tinggi (diff >= 120) tetap dipertahankan.
+        $this->fillInternalSpeckles($cleared, $holeStrength, $guard, $inside, $diffs, $bw, $bh, $bx0, $by0, $bx1, $by1);
+
+        // ── SMART REMOVE v2: Snap-to-Clean post-pass ─────────────────────────
+        // Menjamin interior frame bersih total (100% transparan / hole = 1.0),
+        // menghapus sisa serbuk lemah (< 0.25) dan mengangkat yang valid (>= 0.4)
+        // menjadi 1.0. Transisi lembut tepi diciptakan oleh Gaussian feather.
+        foreach ($holeStrength as $idx => $s) {
+            if (! isset($cleared[$idx]) || isset($guard[$idx])) {
+                continue;
+            }
+            if (isset($remAll[$idx])) {
+                continue; // Kuas remove selalu full clear
+            }
+            if ($s < 0.25) {
+                unset($cleared[$idx]);
+                $holeStrength[$idx] = 0.0;
+            } elseif ($s >= 0.40) {
+                $holeStrength[$idx] = 1.0;
+            }
+        }
+
+        // ── SMART REMOVE v2: Gabungkan holeStrength (soft alpha) + ecStrength ─
+        // Ganti array $cleared biner dengan $holeStrength float 0.0–1.0.
         $holeGrid = [];
         foreach ($cleared as $idx => $_) {
-            $holeGrid[$idx] = 1.0;
+            // Ambil soft strength bila ada, fallback ke 1.0 (full clear)
+            $holeGrid[$idx] = $holeStrength[$idx] ?? 1.0;
         }
         foreach ($ecStrength as $idx => $s) {
             if ($s > ($holeGrid[$idx] ?? 0.0)) {
@@ -796,9 +932,12 @@ class FrameMaskService
                 $holeGrid[$idx] = 0.0;
             }
         }
+        // ── SMART REMOVE v2: Gaussian Feather (bukan box blur) ───────────────
+        // Gaussian feather mengikuti distribusi bell-curve sehingga transisi
+        // tepi terasa natural — tidak ada kotak artifact seperti pada box blur.
         $fr = (int) round($f['feather'] * $scale);
         if ($fr > 0) {
-            $holeGrid = $this->boxBlur($holeGrid, $bw, $bh, $fr);
+            $holeGrid = SmartColorService::gaussianBlur($holeGrid, $bw, $bh, $fr);
         }
 
         // GD mask kecil (alpha = jumlah lubang) lalu upscale ke resolusi canvas
@@ -885,44 +1024,55 @@ class FrameMaskService
     }
 
     /**
-     * Box blur separable dua-pass (sliding window) untuk peta hole.
+     * Menutup pinholes dan bintik serbuk noise (1-4 px) yang dikelilingi oleh area clear.
      */
-    private function boxBlur(array $grid, int $w, int $h, int $r): array
-    {
-        $div = 2 * $r + 1;
-
-        $tmp = [];
-        for ($y = 0; $y < $h; $y++) {
-            $base = $y * $w;
-            $sum = 0.0;
-            for ($k = -$r; $k <= $r; $k++) {
-                $sum += $grid[$base + min($w - 1, max(0, $k))] ?? 0.0;
-            }
-            for ($x = 0; $x < $w; $x++) {
-                $v = $sum / $div;
-                if ($v > 0) {
-                    $tmp[$base + $x] = $v;
+    private function fillInternalSpeckles(
+        array &$cleared,
+        array &$holeStrength,
+        array $guard,
+        array $inside,
+        array $diffs,
+        int $bw,
+        int $bh,
+        int $bx0,
+        int $by0,
+        int $bx1,
+        int $by1
+    ): void {
+        for ($pass = 0; $pass < 3; $pass++) {
+            $snap = $cleared;
+            $changed = 0;
+            foreach ($inside as $idx => $_) {
+                if (isset($snap[$idx]) || isset($guard[$idx]) || ($diffs[$idx] ?? 0) >= 120) {
+                    continue;
                 }
-                $sum += ($grid[$base + min($w - 1, $x + $r + 1)] ?? 0.0)
-                    - ($grid[$base + max(0, $x - $r)] ?? 0.0);
+                $gx = $bx0 + ($idx % $bw);
+                $gy = $by0 + intdiv($idx, $bw);
+
+                $clearNeighbors = 0;
+                foreach ([[-1, 0], [1, 0], [0, -1], [0, 1]] as [$ox, $oy]) {
+                    $nx = $gx + $ox;
+                    $ny = $gy + $oy;
+                    if ($nx < $bx0 || $ny < $by0 || $nx > $bx1 || $ny > $by1) {
+                        continue;
+                    }
+                    $nidx = ($ny - $by0) * $bw + ($nx - $bx0);
+                    if (isset($snap[$nidx])) {
+                        $clearNeighbors++;
+                    }
+                }
+
+                // Dikelilingi minimal 3 tetangga clear -> serbuk/pinhole yang terlewat
+                if ($clearNeighbors >= 3) {
+                    $cleared[$idx] = 1;
+                    $holeStrength[$idx] = 1.0;
+                    $changed++;
+                }
+            }
+            if ($changed === 0) {
+                break;
             }
         }
-
-        $out = [];
-        for ($x = 0; $x < $w; $x++) {
-            $sum = 0.0;
-            for ($k = -$r; $k <= $r; $k++) {
-                $sum += $tmp[min($h - 1, max(0, $k)) * $w + $x] ?? 0.0;
-            }
-            for ($y = 0; $y < $h; $y++) {
-                $v = $sum / $div;
-                if ($v > 0) {
-                    $out[$y * $w + $x] = $v;
-                }
-                $sum += ($tmp[min($h - 1, $y + $r + 1) * $w + $x] ?? 0.0)
-                    - ($tmp[max(0, $y - $r) * $w + $x] ?? 0.0);
-            }
-        }
-        return $out;
     }
 }
+

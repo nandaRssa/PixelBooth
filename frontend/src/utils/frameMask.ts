@@ -1,6 +1,8 @@
 // ==========================================
 // PIXELBOOTH — Frame Mask Engine (frontend)
-// Port 1:1 dari backend FrameMaskService.
+// Smart Remove v2 — LAB-approximate perceptual color distance,
+// soft alpha ramp, Sobel gradient-guided edge damping,
+// 4-pass anti-fringe, Gaussian feather.
 //
 // Prinsip:
 // - Frame manual user adalah sumber kebenaran (tanpa deteksi warna global).
@@ -66,6 +68,7 @@ export function normalizeFrame(frame: Partial<CameraFrame>): CameraFrame {
       typeof frame.confidence === 'number' && Number.isFinite(frame.confidence)
         ? Math.round(frame.confidence * 10) / 10
         : null,
+    source: frame.source ? String(frame.source) : null,
     protected_areas: areas(frame.protected_areas),
     remove_areas: areas(frame.remove_areas),
     remove_seeds: points(frame.remove_seeds),
@@ -129,6 +132,14 @@ export function computeHoleMask(
   frame: CameraFrame
 ): HoleMask | null {
   const f = normalizeFrame(frame)
+
+  // KONDISI 1 — Transparency Detection:
+  // JANGAN MENGHAPUS DESAIN / JANGAN RUN SMART CLEAR.
+  // Template desain asli tetap utuh 100% dan transparansi asli digunakan langsung.
+  if (f.source === 'transparent' || frame.source === 'transparent') {
+    return null
+  }
+
   const { data: wd, width: gw, height: gh, scale } = wt
 
   // Geometri frame pada ruang kerja
@@ -222,23 +233,33 @@ export function computeHoleMask(
     }
   }
 
-  // Warna rata-rata seed = referensi kontinuitas connected region
-  let rs = 0
-  let gs = 0
-  let bs = 0
-  let n = 0
+  // ── SMART REMOVE v2: LAB-approximate seed statistics ──────────────────
+  // Hitung mean weighted-RGB seed + standar deviasi untuk soft alpha ramp.
+  // Weighted RGB (2r²+4g²+3b²) mendekati persepsi LAB dengan overhead minimal.
+  let ws = 0, ms = 0, ls = 0, n = 0
+  let varSum = 0
+  const seedSamples: number[] = []
   for (let i = 0; i < seed.length; i++) {
     if (!seed[i]) continue
     const o = ((by0 + Math.floor(i / bw)) * gw + (bx0 + (i % bw))) * 4
-    rs += wd.data[o]
-    gs += wd.data[o + 1]
-    bs += wd.data[o + 2]
+    const r = wd.data[o], g = wd.data[o + 1], b = wd.data[o + 2]
+    ws += r; ms += g; ls += b
+    seedSamples.push(r, g, b)
     n++
   }
   if (n === 0) return null
-  const avgR = rs / n
-  const avgG = gs / n
-  const avgB = bs / n
+  const avgR = ws / n
+  const avgG = ms / n
+  const avgB = ls / n
+
+  // Standar deviasi LAB-approx
+  for (let i = 0; i < seedSamples.length; i += 3) {
+    const dr = seedSamples[i] - avgR
+    const dg = seedSamples[i + 1] - avgG
+    const db = seedSamples[i + 2] - avgB
+    varSum += (2 * dr * dr + 4 * dg * dg + 3 * db * db) / 9
+  }
+  const seedStddev = Math.max(4, Math.sqrt(varSum / n))
 
   // ===== REGION BRUSH (Remove / Protect / Keep-Restore) =====
   // Sapuan kuas disimpan sebagai SEED POINT. Seluruh region terhubung
@@ -581,22 +602,25 @@ export function computeHoleMask(
   }
 
   const cleared = new Uint8Array(seed.length)
+  const holeStrength = new Float32Array(seed.length) // SMART REMOVE v2: soft alpha
   const queue: number[] = []
   let fillMode = false
 
   if (fullClear) {
-    for (let i = 0; i < inside.length; i++) if (inside[i] && !guard[i]) cleared[i] = 1
+    for (let i = 0; i < inside.length; i++) if (inside[i] && !guard[i]) {
+      cleared[i] = 1; holeStrength[i] = 1.0
+    }
   } else if (insideCount > 0 && sameCount / insideCount >= FILL_RATIO) {
     fillMode = true
     for (let i = 0; i < inside.length; i++) {
       if (!inside[i] || guard[i]) continue
-      if (diffs[i] <= tolFill) cleared[i] = 1
+      if (diffs[i] <= tolFill) { cleared[i] = 1; holeStrength[i] = 1.0 }
     }
   } else {
     for (let i = 0; i < seed.length; i++) {
       if (!seed[i] || guard[i]) continue
       if (diffs[i] <= tolHard) {
-        cleared[i] = 1
+        cleared[i] = 1; holeStrength[i] = 1.0
         queue.push(i)
       }
     }
@@ -629,49 +653,95 @@ export function computeHoleMask(
         )
         if (diff > effTol) continue // elemen desain perifer — pertahankan
         cleared[nidx] = 1
+        // Soft alpha ramp: semakin jauh dari pusat, makin transparan
+        const distAlpha = dist <= dHard ? 1.0
+          : (dMax > dHard ? 1.0 - (dist - dHard) / (dMax - dHard) : 1.0)
+        holeStrength[nidx] = Math.max(holeStrength[nidx], distAlpha)
         queue.push(nidx)
       }
     }
   }
 
-  // Force clear kuas/rect remove — HARUS sebelum anti-fringe & Edge
-  // Cleanup agar pembersihan tepi juga bekerja pada batas region hasil
-  // kuas Remove (dan rim pulau Keep di dalamnya). Hanya Protect yang
-  // absolut; region Keep boleh ditimpa (strok terakhir menang).
-  for (let i = 0; i < remAll.length; i++) {
-    if (remAll[i] && !prot[i] && !seedProt[i] && inside[i]) cleared[i] = 1
+  // ── SMART REMOVE v2: Soft Alpha Ramp ─────────────────────────────
+  // GRAD_THRESHOLD dinaikkan 0.25→0.55: Sobel tidak terlalu agresif
+  // sehingga piksel cleared tidak dapat holeStrength terlalu rendah.
+  const GRAD_THRESHOLD = 0.55
+  const twoSigSq = 2 * seedStddev * seedStddev
+
+  for (let i = 0; i < cleared.length; i++) {
+    if (!cleared[i] || guard[i]) continue
+    const gx = bx0 + (i % bw)
+    const gy = by0 + Math.floor(i / bw)
+    const o = (gy * gw + gx) * 4
+    const pr = wd.data[o], pg = wd.data[o + 1], pb = wd.data[o + 2]
+
+    // 1. Color alpha (weighted RGB approx to LAB)
+    const dr = pr - avgR, dg = pg - avgG, db = pb - avgB
+    const wDist = Math.sqrt((2 * dr * dr + 4 * dg * dg + 3 * db * db) / 9)
+    let colorAlpha = Math.exp(-0.5 * wDist * wDist / twoSigSq)
+    if (seed[i]) colorAlpha = Math.max(colorAlpha, 0.85) // seed zone floor
+
+    // 2. Dist alpha (linear ramp)
+    const ndx = gx + 0.5 - cx, ndy = gy + 0.5 - cy
+    const dist = Math.sqrt(ndx * ndx + ndy * ndy)
+    const distAlpha = dist <= dHard ? 1.0
+      : (dMax > dHard && dist < dMax ? 1.0 - (dist - dHard) / (dMax - dHard) : 1.0)
+
+    // 3. Gradient damping (Sobel) — floor dinaikkan 0.1→0.35
+    const gradMag = sobelMagnitude(wd, gx, gy, gw, gh)
+    const gradDamping = Math.max(0.35, 1.0 - gradMag / Math.max(0.001, GRAD_THRESHOLD))
+
+    let strength = colorAlpha * distAlpha * gradDamping
+    if (fullClear || fillMode) strength = Math.max(strength, 0.85)
+    holeStrength[i] = Math.min(1, Math.max(holeStrength[i], strength))
   }
 
-  // PEMBERSIHAN TEPI (anti-fringe): serap pita transisi anti-alias di batas
-  // antara area clear dan warna kuat di seberangnya, sehingga tidak ada sisa
-  // tipis warna slot yang menempel di pinggiran elemen/border. Kandidat =
-  // piksel dengan diff MENENGAH (di atas ambang clear, di bawah STRONG) yang
-  // bersinggungan dengan area clear dan berbatasan langsung dengan warna kuat
-  // dua langkah lebih jauh. Inti warna kuat (hitam pekal dsb.) tidak disentuh.
-  const STRONG = 150
-  for (let pass = 0; pass < 2; pass++) {
+  // Force clear kuas/rect remove — HARUS sebelum anti-fringe & Edge
+  // Cleanup. Smart Remove v2: kuas Remove → holeStrength penuh (1.0)
+  for (let i = 0; i < remAll.length; i++) {
+    if (remAll[i] && !prot[i] && !seedProt[i] && inside[i]) {
+      cleared[i] = 1
+      holeStrength[i] = 1.0
+    }
+  }
+
+  // ── SMART REMOVE v2: Aggressive Defringe & Boundary Absorption ──────
+  // Menghapus tuntas semua serbuk sisa warna, halo anti-alias, dan
+  // fringe yang menempel di pinggir-pinggir frame/elemen desain.
+  const D8: ReadonlyArray<readonly [number, number]> = [
+    [-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [1, -1], [-1, 1], [1, 1],
+  ]
+  for (let pass = 0; pass < 4; pass++) {
     const snap = Uint8Array.from(cleared)
+    let changed = 0
     for (let i = 0; i < inside.length; i++) {
       if (!inside[i] || snap[i] || guard[i]) continue
-      const dP = diffs[i]
-      if (dP <= tolFill || dP >= STRONG) continue // bukan pita transisi
+      const dP = diffs[i] ?? 0
+
+      // Jangan sentuh elemen desain kontras tinggi (misal border hitam pekat)
+      if (dP >= 140) continue
+
       const gx = bx0 + (i % bw)
       const gy = by0 + Math.floor(i / bw)
-      for (const [ox, oy] of NEIGHBORS) {
-        const nx = gx + ox
-        const ny = gy + oy
+
+      let touchClear = false
+      for (const [ox, oy] of D8) {
+        const nx = gx + ox, ny = gy + oy
         if (nx < bx0 || ny < by0 || nx > bx1 || ny > by1) continue
         const nidx = (ny - by0) * bw + (nx - bx0)
-        if (!snap[nidx]) continue // harus bersinggungan dengan area clear
-        const qx = 2 * gx - nx
-        const qy = 2 * gy - ny
-        if (qx < bx0 || qy < by0 || qx > bx1 || qy > by1) continue
-        const qidx = (qy - by0) * bw + (qx - bx0)
-        if (!inside[qidx] || diffs[qidx] < STRONG) continue
-        cleared[i] = 1 // pita transisi -> ikut clear sampai warna kuat
-        break
+        if (snap[nidx]) {
+          touchClear = true
+          break
+        }
+      }
+
+      if (touchClear) {
+        cleared[i] = 1
+        holeStrength[i] = 1.0
+        changed++
       }
     }
+    if (changed === 0) break
   }
 
   // Minimum Region Size: buang pulau kecil tanpa seed (tidak relevan di
@@ -731,10 +801,28 @@ export function computeHoleMask(
     if (ecFrac > 0) dilateEdge(false, ecFrac)
   }
 
-  // Feather: box blur peta hole agar tepi halus
+  // ── SMART REMOVE v2: Despeckle & Morphological Hole Closing ─────────
+  fillInternalSpeckles(cleared, holeStrength, guard, inside, diffs, bw, bh, bx0, by0, bx1, by1)
+
+  // ── SMART REMOVE v2: Snap-to-Clean post-pass ───────────────────────
+  // Menjamin interior frame bersih total (100% transparan / hole = 1.0),
+  // menghapus sisa serbuk lemah (< 0.25) dan mengangkat yang valid (>= 0.4)
+  // menjadi 1.0. Transisi lembut tepi diciptakan oleh Gaussian feather.
+  for (let i = 0; i < holeStrength.length; i++) {
+    if (!cleared[i] || guard[i] || remAll[i]) continue
+    const s = holeStrength[i]
+    if (s < 0.25) {
+      cleared[i] = 0
+      holeStrength[i] = 0
+    } else if (s >= 0.40) {
+      holeStrength[i] = 1.0
+    }
+  }
+
+  // ── SMART REMOVE v2: holeGrid dari holeStrength (soft alpha) ──────────
   let holeGrid = new Float32Array(bw * bh)
   for (let i = 0; i < cleared.length; i++) {
-    if (cleared[i]) holeGrid[i] = 1
+    if (cleared[i]) holeGrid[i] = holeStrength[i] > 0 ? holeStrength[i] : 1.0
   }
   for (let i = 0; i < ecStrength.length; i++) {
     if (ecStrength[i] > holeGrid[i]) holeGrid[i] = ecStrength[i]
@@ -744,9 +832,10 @@ export function computeHoleMask(
   for (let i = 0; i < keepGrid.length; i++) {
     if (keepGrid[i] && !remAll[i]) holeGrid[i] = 0
   }
+  // ── SMART REMOVE v2: Gaussian Feather (bukan box blur) ─────────────────
   const fr = Math.round(f.feather * scale)
   if (fr > 0) {
-    holeGrid = boxBlur(holeGrid, bw, bh, fr)
+    holeGrid = gaussianBlur(holeGrid, bw, bh, fr)
   }
 
   // Rasterisasi ke ImageData bbox (ruang kerja)
@@ -854,31 +943,121 @@ function dropSmallIslands(
   }
 }
 
-/** Box blur separable dua-pass (sliding window). */
-function boxBlur(grid: Float32Array<ArrayBuffer>, w: number, h: number, r: number): Float32Array<ArrayBuffer> {
-  const div = 2 * r + 1
+// ── SMART REMOVE v2: Sobel magnitude ───────────────────────────────────
+/** Hitung magnitude Sobel (0–1) dari ImageData pada piksel (gx, gy). */
+function sobelMagnitude(data: ImageData, gx: number, gy: number, w: number, h: number): number {
+  const L: number[] = []
+  for (let dy = -1; dy <= 1; dy++) {
+    for (let dx = -1; dx <= 1; dx++) {
+      const nx = Math.max(0, Math.min(w - 1, gx + dx))
+      const ny = Math.max(0, Math.min(h - 1, gy + dy))
+      const o = (ny * w + nx) * 4
+      L.push(0.299 * data.data[o] + 0.587 * data.data[o + 1] + 0.114 * data.data[o + 2])
+    }
+  }
+  const Gx = -L[0] + L[2] - 2 * L[3] + 2 * L[5] - L[6] + L[8]
+  const Gy = -L[0] - 2 * L[1] - L[2] + L[6] + 2 * L[7] + L[8]
+  return Math.min(1, Math.sqrt(Gx * Gx + Gy * Gy) / 1443)
+}
+
+// ── SMART REMOVE v2: Gaussian Blur ────────────────────────────────────
+/** Kernel Gaussian 1D dinormalisasi (separable). */
+function gaussianKernel1D(sigma: number, r: number): number[] {
+  const kernel: number[] = []
+  let sum = 0
+  const twoSigSq = 2 * sigma * sigma
+  for (let i = -r; i <= r; i++) {
+    const v = Math.exp(-(i * i) / twoSigSq)
+    kernel.push(v)
+    sum += v
+  }
+  return kernel.map((v) => v / sum)
+}
+
+/**
+ * Gaussian blur separable dua-pass untuk Float32Array.
+ * Lebih natural dari box blur — tidak ada kotak artifact di tepi.
+ */
+function gaussianBlur(
+  grid: Float32Array<ArrayBuffer>,
+  w: number,
+  h: number,
+  r: number
+): Float32Array<ArrayBuffer> {
+  const sigma = Math.max(0.5, r / 2.5)
+  const kernel = gaussianKernel1D(sigma, r)
   const tmp = new Float32Array(w * h)
   const out = new Float32Array(w * h)
 
+  // Pass horizontal
   for (let y = 0; y < h; y++) {
     const base = y * w
-    let sum = 0
-    for (let k = -r; k <= r; k++) sum += grid[base + Math.min(w - 1, Math.max(0, k))]
     for (let x = 0; x < w; x++) {
-      tmp[base + x] = sum / div
-      sum +=
-        grid[base + Math.min(w - 1, x + r + 1)] - grid[base + Math.max(0, x - r)]
+      let sum = 0
+      for (let k = 0; k < kernel.length; k++) {
+        const sx = Math.max(0, Math.min(w - 1, x + k - r))
+        sum += grid[base + sx] * kernel[k]
+      }
+      tmp[base + x] = sum
     }
   }
 
+  // Pass vertikal
   for (let x = 0; x < w; x++) {
-    let sum = 0
-    for (let k = -r; k <= r; k++) sum += tmp[Math.min(h - 1, Math.max(0, k)) * w + x]
     for (let y = 0; y < h; y++) {
-      out[y * w + x] = sum / div
-      sum +=
-        tmp[Math.min(h - 1, y + r + 1) * w + x] - tmp[Math.max(0, y - r) * w + x]
+      let sum = 0
+      for (let k = 0; k < kernel.length; k++) {
+        const sy = Math.max(0, Math.min(h - 1, y + k - r))
+        sum += tmp[sy * w + x] * kernel[k]
+      }
+      out[y * w + x] = sum
     }
   }
   return out
 }
+
+/**
+ * Menutup semua bintik/serbuk noise dan pinholes yang terkurung di dalam area clear.
+ */
+function fillInternalSpeckles(
+  cleared: Uint8Array,
+  holeStrength: Float32Array,
+  guard: Uint8Array,
+  inside: Uint8Array,
+  diffs: Uint8Array,
+  bw: number,
+  bh: number,
+  bx0: number,
+  by0: number,
+  bx1: number,
+  by1: number
+): void {
+  for (let pass = 0; pass < 3; pass++) {
+    const snap = Uint8Array.from(cleared)
+    let changed = 0
+    for (let i = 0; i < inside.length; i++) {
+      if (!inside[i] || snap[i] || guard[i] || diffs[i] >= 120) continue
+      const gx = bx0 + (i % bw)
+      const gy = by0 + Math.floor(i / bw)
+
+      let clearNeighbors = 0
+      for (const [ox, oy] of NEIGHBORS) {
+        const nx = gx + ox
+        const ny = gy + oy
+        if (nx < bx0 || ny < by0 || nx > bx1 || ny > by1) continue
+        const nidx = (ny - by0) * bw + (nx - bx0)
+        if (snap[nidx]) clearNeighbors++
+      }
+
+      // Dikelilingi minimal 3 tetangga clear -> serbuk/pinhole yang terlewat
+      if (clearNeighbors >= 3) {
+        cleared[i] = 1
+        holeStrength[i] = 1.0
+        changed++
+      }
+    }
+    if (changed === 0) break
+  }
+}
+
+

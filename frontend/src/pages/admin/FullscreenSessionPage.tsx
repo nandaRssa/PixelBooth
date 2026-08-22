@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
-import { FolderOpen, ImagePlus, RefreshCw, RotateCcw, X } from 'lucide-react'
+import { Check, FolderOpen, ImagePlus, QrCode, RefreshCw, RotateCcw, X } from 'lucide-react'
 import { Spinner } from '@/components/ui/StatusBadge'
 import { toast } from '@/components/ui/Toast'
 import { sessionApi } from '@/api/sessions'
@@ -37,10 +37,11 @@ const FullscreenSessionPage: React.FC = () => {
   const [countdown, setCountdown] = useState<number | null>(null)
   const [isCapturing, setIsCapturing] = useState(false)
   const [allDone, setAllDone] = useState(false)
-  const [resultPhoto, setResultPhoto] = useState<{ url?: string } | null>(null)
+  const [resultPhoto, setResultPhoto] = useState<{ url?: string; qr_url?: string } | null>(null)
   const completingRef = useRef(false)
   const [isRetaking, setIsRetaking] = useState(false)
   const [showRetakePanel, setShowRetakePanel] = useState(false)
+  const [showQrModal, setShowQrModal] = useState(false)
 
   // ===== Folder tujuan =====
   const foldersQuery = useFolders(null)
@@ -302,7 +303,7 @@ const FullscreenSessionPage: React.FC = () => {
     sessionApi
       .complete(session.id)
       .then((res) => {
-        setResultPhoto(res.photo as { url?: string })
+        setResultPhoto(res.photo as { url?: string; qr_url?: string })
         toast.success('Sesi selesai! Foto tersimpan di galeri.')
       })
       .catch(() => {
@@ -327,6 +328,29 @@ const FullscreenSessionPage: React.FC = () => {
       }
     } catch {
       toast.error('Gagal memulai pengambilan ulang.')
+    } finally {
+      setIsRetaking(false)
+    }
+  }
+
+  // ===== Ulangi sesi dari awal (semua frame) =====
+  const handleRestartSession = async () => {
+    if (!session || phase === 'countdown' || isCapturing || isRetaking) return
+    setIsRetaking(true)
+    try {
+      const updated = await sessionApi.restart(session.id)
+      setSession(updated)
+      setAllDone(false)
+      setResultPhoto(null)
+      completingRef.current = false
+      setShowRetakePanel(false)
+      setPhase('idle')
+      if (!cameraActive) {
+        startCamera()
+      }
+      toast.info('Sesi diulangi dari awal (Foto 1).')
+    } catch {
+      toast.error('Gagal mengulangi sesi dari awal.')
     } finally {
       setIsRetaking(false)
     }
@@ -561,28 +585,43 @@ const FullscreenSessionPage: React.FC = () => {
             Ulangi
           </button>
 
-          {/* Chip tiap frame yang sudah difoto */}
-          {showRetakePanel &&
-            Array.from({ length: totalFrames }, (_, i) => {
-              const hasPhoto = !!frameImages[i]
-              if (!hasPhoto) return null
-              const isBusy = isRetaking || phase === 'countdown' || isCapturing
-              return (
-                <button
-                  key={i}
-                  type="button"
-                  onClick={() => handleRetakeFrame(i)}
-                  disabled={isBusy}
-                  aria-label={`Ulangi foto ${i + 1}`}
-                  title={`Ulangi foto ${i + 1}`}
-                  className="flex items-center justify-center w-9 h-9 rounded-full
-                    bg-white/15 hover:bg-amber-400/30 active:bg-amber-400/50
-                    text-white text-xs font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                >
-                  {isRetaking ? <RotateCcw size={14} className="animate-spin" /> : i + 1}
-                </button>
-              )
-            })}
+          {/* Chip tiap frame yang sudah difoto + Ulangi dari Awal */}
+          {showRetakePanel && (
+            <>
+              <button
+                type="button"
+                onClick={handleRestartSession}
+                disabled={isRetaking || phase === 'countdown' || isCapturing}
+                className="flex items-center gap-1 px-3 py-1.5 rounded-full
+                  bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30
+                  text-xs font-semibold transition-colors disabled:opacity-40"
+              >
+                {isRetaking ? <RotateCcw size={12} className="animate-spin" /> : <RotateCcw size={12} />}
+                Semua
+              </button>
+
+              {Array.from({ length: totalFrames }, (_, i) => {
+                const hasPhoto = !!frameImages[i]
+                if (!hasPhoto) return null
+                const isBusy = isRetaking || phase === 'countdown' || isCapturing
+                return (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={() => handleRetakeFrame(i)}
+                    disabled={isBusy}
+                    aria-label={`Ulangi foto ${i + 1}`}
+                    title={`Ulangi foto ${i + 1}`}
+                    className="flex items-center justify-center w-9 h-9 rounded-full
+                      bg-white/15 hover:bg-amber-400/30 active:bg-amber-400/50
+                      text-white text-xs font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    {isRetaking ? <RotateCcw size={14} className="animate-spin" /> : i + 1}
+                  </button>
+                )
+              })}
+            </>
+          )}
         </div>
       )}
 
@@ -654,23 +693,43 @@ const FullscreenSessionPage: React.FC = () => {
         </div>
       </div>
 
-      {/* ===== Overlay selesai (minimal) ===== */}
+      {/* ===== Overlay selesai ===== */}
       {allDone && (
-        <div className="absolute inset-0 z-20 bg-black/90 flex flex-col items-center justify-center gap-6 p-6">
+        <div className="absolute inset-0 z-20 bg-black/90 flex flex-col items-center justify-center gap-6 p-6 overflow-y-auto">
           {resultPhoto?.url ? (
             <img
               src={resultPhoto.url}
               alt="Foto final"
-              className="max-h-[55vh] w-auto max-w-full rounded-xl shadow-2xl"
+              className="max-h-[50vh] w-auto max-w-full rounded-xl shadow-2xl border border-white/10"
             />
           ) : (
             <Spinner size="lg" className="text-white" />
           )}
 
-          {/* Retake setelah semua selesai — chip per frame */}
-          {resultPhoto?.url && (
-            <div className="flex flex-col items-center gap-2">
-              <p className="text-white/80 text-xs font-medium">Ulangi frame tertentu?</p>
+          {/* Opsi Retake setelah semua selesai — chip per frame + Ulangi dari Awal */}
+          {showRetakePanel && resultPhoto?.url && (
+            <div className="flex flex-col items-center gap-3 bg-white/5 border border-white/10 p-5 rounded-2xl max-w-md w-full animate-in fade-in zoom-in-95">
+              <p className="text-amber-300 text-xs font-semibold uppercase tracking-wider">Opsi Pengulangan Foto</p>
+
+              {/* Tombol Ulangi dari Awal (Semua Frame) */}
+              <button
+                type="button"
+                onClick={handleRestartSession}
+                disabled={isRetaking}
+                className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl
+                  bg-amber-500/20 hover:bg-amber-500/30 active:bg-amber-500/40 text-amber-300 border border-amber-500/40
+                  text-sm font-semibold transition-colors disabled:opacity-40 shadow-sm"
+              >
+                {isRetaking ? <RotateCcw size={16} className="animate-spin" /> : <RotateCcw size={16} />}
+                Ulangi dari Awal (Semua Foto)
+              </button>
+
+              <div className="w-full flex items-center my-0.5">
+                <div className="flex-grow border-t border-white/10"></div>
+                <span className="flex-shrink mx-2 text-[11px] text-white/50">atau pilih foto tertentu</span>
+                <div className="flex-grow border-t border-white/10"></div>
+              </div>
+
               <div className="flex items-center gap-2 flex-wrap justify-center">
                 {Array.from({ length: totalFrames }, (_, i) => (
                   <button
@@ -678,35 +737,102 @@ const FullscreenSessionPage: React.FC = () => {
                     type="button"
                     onClick={() => handleRetakeFrame(i)}
                     disabled={isRetaking}
-                    aria-label={`Ulangi foto ${i + 1}`}
-                    className="flex items-center justify-center w-11 h-11 rounded-full
-                      bg-white/10 hover:bg-amber-400/30 active:bg-amber-400/50
-                      text-white text-sm font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg
+                      bg-white/10 hover:bg-white/20 active:bg-white/30 text-white border border-white/10
+                      text-xs font-bold transition-colors disabled:opacity-40"
                   >
-                    {isRetaking ? <RotateCcw size={14} className="animate-spin" /> : i + 1}
+                    {isRetaking ? <RotateCcw size={13} className="animate-spin" /> : <RotateCcw size={13} />}
+                    Foto {i + 1}
                   </button>
                 ))}
               </div>
             </div>
           )}
 
-          <div className="flex items-center gap-4">
+          {/* 4 Tombol Aksi Utama: Scan QR, Buka Galeri, Ulangi, Selesai */}
+          <div className="flex items-center gap-3 flex-wrap justify-center">
+            {resultPhoto?.qr_url && (
+              <button
+                type="button"
+                onClick={() => setShowQrModal(true)}
+                className="flex items-center gap-2 px-5 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white
+                  text-sm font-medium transition-all shadow-lg min-h-[48px]"
+              >
+                <QrCode size={18} />
+                Scan QR Foto
+              </button>
+            )}
             <button
               type="button"
               onClick={handleOpenGallery}
-              className="flex items-center gap-2 px-6 py-3.5 rounded-xl bg-pb-accent text-pb-on-accent
-                text-sm font-medium hover:opacity-85 transition-opacity min-h-[52px]"
+              className="flex items-center gap-2 px-5 py-3 rounded-xl bg-pb-accent hover:opacity-90 text-pb-on-accent
+                text-sm font-medium transition-all shadow-lg min-h-[48px]"
             >
               <ImagePlus size={18} />
-              Lihat Galeri
+              Buka Galeri
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowRetakePanel((prev) => !prev)}
+              className={`flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-medium transition-all shadow-lg min-h-[48px] ${
+                showRetakePanel
+                  ? 'bg-amber-500 text-black font-semibold'
+                  : 'bg-white/10 hover:bg-white/20 text-white'
+              }`}
+            >
+              <RotateCcw size={18} />
+              Ulangi
             </button>
             <button
               type="button"
               onClick={() => navigate('/photo', { replace: true })}
-              className="px-6 py-3.5 rounded-xl bg-white/10 hover:bg-white/20 text-white
-                text-sm font-medium transition-colors min-h-[52px]"
+              className="flex items-center gap-2 px-5 py-3 rounded-xl bg-white/10 hover:bg-white/20 text-white
+                text-sm font-medium transition-all min-h-[48px]"
             >
+              <Check size={18} />
               Selesai
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ===== Modal Scan QR Foto ===== */}
+      {showQrModal && resultPhoto?.qr_url && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-pb-surface border border-pb-border rounded-3xl p-8 max-w-md sm:max-w-lg w-full text-center flex flex-col items-center gap-5 relative shadow-2xl animate-in zoom-in-95">
+            <button
+              type="button"
+              onClick={() => setShowQrModal(false)}
+              className="absolute top-5 right-5 text-pb-text-muted hover:text-pb-text transition-colors p-1 rounded-lg hover:bg-pb-surface-hover"
+            >
+              <X size={22} />
+            </button>
+
+            <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 mt-1">
+              <QrCode size={30} />
+            </div>
+
+            <div>
+              <h3 className="text-pb-text font-bold text-xl sm:text-2xl">Scan QR Code Foto</h3>
+              <p className="text-pb-text-secondary text-sm mt-1.5 max-w-sm">
+                Arahkan kamera smartphone ke QR ini untuk langsung mengunduh foto fotobooth.
+              </p>
+            </div>
+
+            <div className="bg-white p-5 rounded-2xl border border-pb-border shadow-2xl w-full max-w-[320px] sm:max-w-[380px]">
+              <img
+                src={resultPhoto.qr_url}
+                alt="QR Code Foto"
+                className="w-full h-auto object-contain rounded-lg"
+              />
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setShowQrModal(false)}
+              className="w-full max-w-xs py-3 rounded-xl bg-pb-surface-hover text-pb-text text-sm font-semibold hover:bg-pb-border transition-colors mt-1"
+            >
+              Tutup
             </button>
           </div>
         </div>

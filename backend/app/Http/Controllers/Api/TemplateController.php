@@ -137,19 +137,24 @@ class TemplateController extends Controller
             $template->canvas_height
         );
 
+        $method = $result['detection_method'] ?? 'smart_clear';
         $frames = [];
         foreach (($result['frame_configuration'] ?? []) as $i => $slot) {
             $norm = $this->maskService->normalizeFrame($slot);
             $norm['id'] = $i + 1;
             $norm['order'] = $i;
+            $norm['source'] = $slot['source'] ?? $method;
             $frames[] = $norm;
         }
 
+        $methodLabel = $method === 'transparent' ? ' (Transparency Detection)' : ' (Smart Clear)';
+
         return response()->json([
             'message' => count($frames) > 0
-                ? 'Frames Detected: ' . count($frames) . ' bingkai.'
+                ? 'Frames Detected: ' . count($frames) . ' bingkai' . $methodLabel . '.'
                 : 'Tidak ada area foto yang terdeteksi pada template ini.',
             'data' => [
+                'detection_method' => $method,
                 'frame_count' => count($frames),
                 'frames' => $frames,
             ],

@@ -47,6 +47,11 @@ export const sessionApi = {
     return response.data.data
   },
 
+  restart: async (id: number): Promise<PhotoSession> => {
+    const response = await apiClient.post<ApiResponse<PhotoSession>>(`/sessions/${id}/restart`)
+    return response.data.data
+  },
+
   complete: async (id: number): Promise<{ session: PhotoSession; photo: unknown }> => {
     const response = await apiClient.post<ApiResponse<{ session: PhotoSession; photo: unknown }>>(
       `/sessions/${id}/complete`

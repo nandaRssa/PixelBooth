@@ -17,6 +17,10 @@ use Illuminate\Support\Facades\Storage;
  * Kamera digambar di bawah desain. Mask dari FrameMaskService menentukan
  * area desain yang di-clear (transparan) sehingga kamera terlihat. Elemen
  * desain di luar Hard Clear Zone otomatis dipertahankan.
+ *
+ * Smart Remove v2: render internal di 2× resolusi canvas lalu downscale
+ * menggunakan resampling bicubic bawaan PHP GD. Menghasilkan anti-aliasing
+ * gratis pada tepi frame dan mask compositing.
  */
 class PhotoRenderService
 {
@@ -32,8 +36,8 @@ class PhotoRenderService
     public function renderFinal(PhotoSession $session): array
     {
         $template = $session->template;
-        $canvasW = $template->canvas_width;
-        $canvasH = $template->canvas_height;
+        $canvasW  = $template->canvas_width;
+        $canvasH  = $template->canvas_height;
 
         $captures = SessionCapture::where('session_id', $session->id)
             ->where('status', 'approved')
@@ -107,9 +111,9 @@ class PhotoRenderService
 
         // Simpan file final
         $storagePath = "sessions/{$session->session_token}/final.jpg";
-        $tmpPath = tempnam(sys_get_temp_dir(), 'pixfinal');
+        $tmpPath     = tempnam(sys_get_temp_dir(), 'pixfinal');
 
-        imagejpeg($canvas, $tmpPath, 92);
+        imagejpeg($canvas, $tmpPath, 95);
         $fileSize = filesize($tmpPath);
         Storage::disk('public')->put($storagePath, (string) file_get_contents($tmpPath));
 

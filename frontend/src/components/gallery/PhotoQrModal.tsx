@@ -44,9 +44,9 @@ const PhotoQrModal: React.FC<PhotoQrModalProps> = ({ isOpen, onClose, photo }) =
   }
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="QR Code Foto" size="sm">
+    <Modal isOpen={isOpen} onClose={onClose} title="QR Code Foto" size="md">
       <div className="flex flex-col items-center text-center">
-        <div className="w-52 rounded-xl overflow-hidden border border-pb-border shadow-lg bg-white mb-5">
+        <div className="w-80 max-w-full rounded-2xl p-4 overflow-hidden border border-pb-border shadow-xl bg-white mb-5">
           {photo.qr_url ? (
             <img src={photo.qr_url} alt="QR Code foto" className="w-full h-auto" />
           ) : (
@@ -54,7 +54,7 @@ const PhotoQrModal: React.FC<PhotoQrModalProps> = ({ isOpen, onClose, photo }) =
           )}
         </div>
 
-        <p className="text-pb-text-muted text-xs leading-relaxed mb-5 max-w-xs">
+        <p className="text-pb-text-muted text-sm leading-relaxed mb-5 max-w-sm">
           Scan QR ini untuk membuka foto via perangkat customer. Gambar QR yang diunduh sudah
           dilengkapi desain kartu.
         </p>

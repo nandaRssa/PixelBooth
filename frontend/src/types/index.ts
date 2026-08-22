@@ -43,6 +43,12 @@ export interface CameraFrame {
   edge_cleanup: number
   /** Confidence hasil auto detection (0-100); null untuk frame manual */
   confidence?: number | null
+  /** Metode deteksi sumber frame: 'transparent' | 'smart_clear' */
+  source?: string | null
+  /** Bentuk geometri frame (rectangle, circle, oval, polygon, custom) */
+  shape?: string | null
+  /** Mask titik poligon untuk custom/polygon shape */
+  mask?: any[]
   /** Area yang dilindungi dari clear (kecuali di Hard Clear Zone) */
   protected_areas: ClearArea[]
   /** Area tambahan yang dipaksa menjadi area kamera */
@@ -53,6 +59,25 @@ export interface CameraFrame {
   protect_seeds: BrushPoint[]
   /** Seed kuas Keep/Restore: region terhubung dari titik ini dikembalikan jadi desain */
   keep_seeds: BrushPoint[]
+}
+
+// ===== USER & AUTH =====
+export interface User {
+  id: number
+  name: string
+  email: string
+  role: 'admin' | 'customer' | string
+}
+
+export interface LoginCredentials {
+  email: string
+  password: string
+}
+
+export interface LoginResponse {
+  message: string
+  token: string
+  user: User
 }
 
 /** Titik seed kuas brush — pemicu region terhubung, bukan batas akhir.

@@ -69,10 +69,14 @@ class SessionController extends Controller
      */
     public function capture(Request $request, PhotoSession $session): JsonResponse
     {
-        if ($session->status !== 'active') {
+        if (! in_array($session->status, ['active', 'complete'], true)) {
             return response()->json([
                 'message' => 'Sesi ini sudah tidak aktif.',
             ], 422);
+        }
+
+        if ($session->status === 'complete') {
+            $session->update(['status' => 'active']);
         }
 
         $request->validate([
@@ -152,7 +156,7 @@ class SessionController extends Controller
      */
     public function retake(Request $request, PhotoSession $session): JsonResponse
     {
-        if ($session->status !== 'active') {
+        if (! in_array($session->status, ['active', 'complete'], true)) {
             return response()->json(['message' => 'Sesi tidak aktif.'], 422);
         }
 
@@ -160,10 +164,39 @@ class SessionController extends Controller
             'frame_number' => ['required', 'integer', 'min:1', "max:{$session->total_frames}"],
         ]);
 
-        $session->update(['current_frame' => (int) $request->frame_number]);
+        // Re-activate session if it was previously completed
+        $session->update([
+            'status' => 'active',
+            'current_frame' => (int) $request->frame_number,
+        ]);
 
         return response()->json([
             'message' => "Kamera kembali ke frame {$session->current_frame} untuk pengambilan ulang.",
+            'data' => $session->fresh()->load('template', 'folder', 'captures'),
+        ]);
+    }
+
+    /**
+     * Ulangi sesi dari awal: reset semua capture dan set current_frame = 1.
+     */
+    public function restart(PhotoSession $session): JsonResponse
+    {
+        if (! in_array($session->status, ['active', 'complete'], true)) {
+            return response()->json(['message' => 'Sesi tidak aktif.'], 422);
+        }
+
+        // Tandai semua capture sebelumnya sebagai retaken
+        SessionCapture::where('session_id', $session->id)
+            ->whereIn('status', ['captured', 'approved'])
+            ->update(['status' => 'retaken']);
+
+        $session->update([
+            'status' => 'active',
+            'current_frame' => 1,
+        ]);
+
+        return response()->json([
+            'message' => 'Sesi diulangi dari awal (Frame 1).',
             'data' => $session->fresh()->load('template', 'folder', 'captures'),
         ]);
     }
@@ -173,7 +206,7 @@ class SessionController extends Controller
      */
     public function complete(Request $request, PhotoSession $session): JsonResponse
     {
-        if ($session->status !== 'active') {
+        if (! in_array($session->status, ['active', 'complete'], true)) {
             return response()->json(['message' => 'Sesi tidak aktif.'], 422);
         }
 
@@ -193,17 +226,19 @@ class SessionController extends Controller
         [$finalPath, $fileSize] = $this->photoRenderService->renderFinal($session);
         $thumbnailPath = $this->photoRenderService->renderThumbnail($session, $finalPath);
 
-        $photo = Photo::create([
-            'session_id' => $session->id,
-            'folder_id' => $session->folder_id,
-            'filename' => "final-{$session->session_token}.jpg",
-            'storage_path' => $finalPath,
-            'thumbnail_path' => $thumbnailPath ?: null,
-            'is_final' => true,
-            'is_temporary' => false,
-            'file_size' => $fileSize,
-            'mime_type' => 'image/jpeg',
-        ]);
+        // Update atau buat data Photo final
+        $photo = Photo::updateOrCreate(
+            ['session_id' => $session->id, 'is_final' => true],
+            [
+                'folder_id' => $session->folder_id,
+                'filename' => "final-{$session->session_token}.jpg",
+                'storage_path' => $finalPath,
+                'thumbnail_path' => $thumbnailPath ?: null,
+                'is_temporary' => false,
+                'file_size' => $fileSize,
+                'mime_type' => 'image/jpeg',
+            ]
+        );
 
         // Generate QR untuk foto final
         $qrPath = $this->qrCodeService->generatePhotoQr($photo);

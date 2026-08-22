@@ -5,7 +5,8 @@ import { Button } from '@/components/ui/Button'
 import { Spinner } from '@/components/ui/StatusBadge'
 import { toast } from '@/components/ui/Toast'
 import apiClient from '@/api/client'
-import type { FrameConfig, Template } from '@/types'
+import type { CameraFrame, FrameConfig, Template } from '@/types'
+import { normalizeFrame } from '@/utils/frameMask'
 
 // ==========================================
 // Template Calibration Modal
@@ -28,7 +29,7 @@ export const TemplateCalibrationModal: React.FC<TemplateCalibrationModalProps> =
 }) => {
   const containerRef = useRef<HTMLDivElement>(null)
   
-  const [frames, setFrames] = useState<FrameConfig[]>([])
+  const [frames, setFrames] = useState<CameraFrame[]>([])
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null)
   const [isSaving, setIsSaving] = useState(false)
   const [isDetecting, setIsDetecting] = useState(false)
@@ -45,22 +46,12 @@ export const TemplateCalibrationModal: React.FC<TemplateCalibrationModalProps> =
   const canvasWidth = template?.canvas_width ?? 1080
   const canvasHeight = template?.canvas_height ?? 1920
 
-  // Load existing configuration
   useEffect(() => {
     if (isOpen && template) {
       const config = template.frame_configuration
       if (Array.isArray(config)) {
         setFrames(
-          config.map((f, idx) => ({
-            id: f.id ?? idx + 1,
-            order: f.order ?? idx,
-            shape: f.shape ?? 'rectangle',
-            x: f.x ?? 100,
-            y: f.y ?? 100,
-            width: f.width ?? 300,
-            height: f.height ?? 300,
-            mask: f.mask ?? [],
-          }))
+          config.map((f, idx) => normalizeFrame({ ...f, id: f.id ?? idx + 1, order: f.order ?? idx }))
         )
       } else {
         setFrames([])
@@ -224,7 +215,7 @@ export const TemplateCalibrationModal: React.FC<TemplateCalibrationModalProps> =
   const handleAddFrame = () => {
     const defaultW = Math.round(canvasWidth * 0.3)
     const defaultH = Math.round(canvasHeight * 0.2)
-    const newFrame: FrameConfig = {
+    const newFrame: CameraFrame = normalizeFrame({
       id: frames.length + 1,
       order: frames.length,
       shape: 'rectangle',
@@ -240,8 +231,8 @@ export const TemplateCalibrationModal: React.FC<TemplateCalibrationModalProps> =
       ].map((p) => [
         Math.round(p[0] + (canvasWidth - defaultW) / 2),
         Math.round(p[1] + (canvasHeight - defaultH) / 2),
-      ]) as [number, number][],
-    }
+      ]),
+    })
     setFrames((prev) => [...prev, newFrame])
     setSelectedIdx(frames.length)
     toast.info('Bingkai baru ditambahkan.')
@@ -535,7 +526,7 @@ export const TemplateCalibrationModal: React.FC<TemplateCalibrationModalProps> =
                       <div>
                         <label className="block text-[#A0A0A0] text-xs font-medium mb-1.5">Bentuk Mask</label>
                         <select
-                          value={activeFrame.shape}
+                          value={activeFrame.shape ?? 'rectangle'}
                           onChange={(e) => changeFrameShape(selectedIdx, e.target.value)}
                           className="w-full bg-[#0A0A0A] border border-[#2A2A2A] rounded-lg px-3 py-2 text-white text-xs focus:outline-none"
                         >

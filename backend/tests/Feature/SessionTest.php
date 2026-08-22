@@ -231,6 +231,70 @@ class SessionTest extends TestCase
             ->assertJsonPath('data.all_done', true);
     }
 
+    public function test_retake_setelah_sesi_complete_berhasil(): void
+    {
+        $template = $this->makeTemplate(2);
+
+        $session = $this->postJson('/api/sessions', ['template_id' => $template->id], $this->headers())->json('data');
+
+        // Capture 2 frame
+        for ($i = 1; $i <= 2; $i++) {
+            $this->postJson("/api/sessions/{$session['id']}/capture", [
+                'image_base64' => $this->base64Png(),
+            ], $this->headers())->assertOk();
+        }
+
+        // Complete sesi -> status menjadi complete
+        $this->postJson("/api/sessions/{$session['id']}/complete", [], $this->headers())->assertOk();
+        // Retake frame 1 dari sesi yang sudah complete -> HARUS BERHASIL (re-activate status)
+        $retakeRes = $this->postJson("/api/sessions/{$session['id']}/retake", [
+            'frame_number' => 1,
+        ], $this->headers());
+
+        $retakeRes->assertOk();
+        $this->assertDatabaseHas('photo_sessions', ['id' => $session['id'], 'status' => 'active', 'current_frame' => 1]);
+
+        // Capture ulang frame 1
+        $this->postJson("/api/sessions/{$session['id']}/capture", [
+            'image_base64' => $this->base64Png(),
+        ], $this->headers())->assertOk();
+
+        // Complete kembali -> berhasil dan update foto final
+        $completeRes = $this->postJson("/api/sessions/{$session['id']}/complete", [], $this->headers());
+        $completeRes->assertOk();
+        $this->assertDatabaseHas('photo_sessions', ['id' => $session['id'], 'status' => 'complete']);
+    }
+
+    public function test_restart_sesi_dari_awal_berhasil(): void
+    {
+        $template = $this->makeTemplate(3);
+
+        $session = $this->postJson('/api/sessions', ['template_id' => $template->id], $this->headers())->json('data');
+
+        // Capture semua 3 frame
+        for ($i = 1; $i <= 3; $i++) {
+            $this->postJson("/api/sessions/{$session['id']}/capture", [
+                'image_base64' => $this->base64Png(),
+            ], $this->headers())->assertOk();
+        }
+
+        // Complete sesi
+        $this->postJson("/api/sessions/{$session['id']}/complete", [], $this->headers())->assertOk();
+
+        // Restart sesi dari awal
+        $res = $this->postJson("/api/sessions/{$session['id']}/restart", [], $this->headers());
+        $res->assertOk();
+        $this->assertDatabaseHas('photo_sessions', ['id' => $session['id'], 'status' => 'active', 'current_frame' => 1]);
+
+        // Capture frame 1 -> lanjut ke frame 2 (karena capture lama sudah ditandai retaken)
+        $this->postJson("/api/sessions/{$session['id']}/capture", [
+            'image_base64' => $this->base64Png(),
+        ], $this->headers())
+            ->assertOk()
+            ->assertJsonPath('data.session.current_frame', 2)
+            ->assertJsonPath('data.all_done', false);
+    }
+
     public function test_complete_menghasilkan_foto_final_dan_qr(): void
     {
         $template = $this->makeTemplate(1);

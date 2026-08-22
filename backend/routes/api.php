@@ -79,6 +79,7 @@ Route::middleware('throttle:120,1')->group(function () {
     Route::get('/sessions/{session}', [SessionController::class, 'show'])->name('sessions.show');
     Route::post('/sessions/{session}/capture', [SessionController::class, 'capture'])->name('sessions.capture');
     Route::post('/sessions/{session}/retake', [SessionController::class, 'retake'])->name('sessions.retake');
+    Route::post('/sessions/{session}/restart', [SessionController::class, 'restart'])->name('sessions.restart');
     Route::post('/sessions/{session}/complete', [SessionController::class, 'complete'])->name('sessions.complete');
     Route::post('/sessions/{session}/cancel', [SessionController::class, 'cancel'])->name('sessions.cancel');
     Route::post('/sessions/{session}/set-folder', [SessionController::class, 'setFolder'])->name('sessions.set-folder');

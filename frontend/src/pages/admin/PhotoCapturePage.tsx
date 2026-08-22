@@ -10,6 +10,7 @@ import {
   ExternalLink,
   FolderPlus,
   ImageIcon,
+  QrCode,
   RotateCcw,
   Video,
   VideoOff,
@@ -50,6 +51,8 @@ const PhotoCapturePage: React.FC = () => {
   const [isCapturing, setIsCapturing] = useState(false)
   const [allDone, setAllDone] = useState(false)
   const [resultPhoto, setResultPhoto] = useState<{ url?: string; qr_url?: string } | null>(null)
+  const [showQrModal, setShowQrModal] = useState(false)
+  const [showRetakeOptions, setShowRetakeOptions] = useState(false)
 
   // ===== Folder tujuan penyimpanan =====
   const [folderId, setFolderId] = useState<number | null>(null)
@@ -343,6 +346,8 @@ const PhotoCapturePage: React.FC = () => {
       const updated = await sessionApi.retake(session.id, frameIndex + 1)
       setSession(updated)
       setAllDone(false)
+      setResultPhoto(null)
+      setShowRetakeOptions(false)
       setPhase('idle')
       if (!cameraActive) {
         startCamera()
@@ -350,6 +355,25 @@ const PhotoCapturePage: React.FC = () => {
       toast.info(`Kamera kembali ke Foto ${frameIndex + 1}.`)
     } catch {
       toast.error('Gagal memulai pengambilan ulang.')
+    }
+  }
+
+  // ===== Ulangi sesi dari awal (semua frame) =====
+  const handleRestartSession = async () => {
+    if (!session || phase === 'countdown' || isCapturing) return
+    try {
+      const updated = await sessionApi.restart(session.id)
+      setSession(updated)
+      setAllDone(false)
+      setResultPhoto(null)
+      setShowRetakeOptions(false)
+      setPhase('idle')
+      if (!cameraActive) {
+        startCamera()
+      }
+      toast.info('Sesi diulangi dari awal (Foto 1).')
+    } catch {
+      toast.error('Gagal mengulangi sesi dari awal.')
     }
   }
 
@@ -438,7 +462,7 @@ const PhotoCapturePage: React.FC = () => {
             <img
               src={resultPhoto.url}
               alt="Foto final"
-              className="max-h-80 w-auto max-w-full rounded-xl mb-5 border border-pb-border"
+              className="max-h-80 w-auto max-w-full rounded-xl mb-5 border border-pb-border shadow-xl"
             />
           ) : (
             <div className="w-20 h-20 bg-green-500/10 border border-green-500/20 rounded-2xl flex items-center justify-center mb-4">
@@ -450,38 +474,64 @@ const PhotoCapturePage: React.FC = () => {
             {totalFrames} frame telah diambil. Foto final disimpan di galeri{folderName ? ` dalam folder "${folderName}"` : ''} dan siap dibagikan via QR.
           </p>
 
-          <div className="flex flex-col items-center gap-2 w-full max-w-xs mb-6">
-            {resultPhoto.qr_url && (
-              <div className="flex flex-col items-center gap-2 bg-white rounded-xl p-4">
-                <img
-                  src={resultPhoto.qr_url}
-                  alt="QR Foto"
-                  className="w-44 h-auto rounded-lg"
-                />
-                <p className="text-black/60 text-xs text-center">
-                  Scan untuk akses foto
-                </p>
+          {/* Opsi Ulangi Frame jika diaktifkan */}
+          {showRetakeOptions && (
+            <div className="mb-6 border border-amber-500/20 bg-amber-500/5 rounded-2xl p-5 w-full max-w-md animate-in fade-in zoom-in-95">
+              <div className="flex items-center justify-between gap-2 mb-3">
+                <p className="text-amber-300 text-xs font-semibold uppercase tracking-wider">Opsi Pengulangan Foto</p>
               </div>
-            )}
-          </div>
 
-          <div className="flex flex-wrap justify-center gap-3">
-            {resultPhoto.url && (
-              <a
-                href={resultPhoto.url}
-                download
-                className="inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium
-                  bg-pb-accent text-pb-on-accent hover:opacity-85 transition-opacity"
+              {/* Tombol Ulangi dari Awal (Semua Frame) */}
+              <button
+                type="button"
+                onClick={handleRestartSession}
+                className="w-full flex items-center justify-center gap-2 py-2.5 px-4 mb-3 rounded-xl
+                  bg-amber-500/20 hover:bg-amber-500/30 active:bg-amber-500/40 text-amber-300 border border-amber-500/40
+                  text-sm font-semibold transition-colors shadow-sm"
               >
-                <Download size={16} />
-                Download Foto
-              </a>
+                <RotateCcw size={16} />
+                Ulangi dari Awal (Semua Foto)
+              </button>
+
+              <div className="relative flex py-1.5 items-center mb-2.5">
+                <div className="flex-grow border-t border-amber-500/20"></div>
+                <span className="flex-shrink mx-2 text-[11px] text-amber-400/60 font-medium">atau pilih foto tertentu</span>
+                <div className="flex-grow border-t border-amber-500/20"></div>
+              </div>
+
+              <div className="flex items-center justify-center gap-2 flex-wrap">
+                {Array.from({ length: totalFrames }, (_, i) => (
+                  <Button
+                    key={i}
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => handleRetakeFrame(i)}
+                    leftIcon={<RotateCcw size={13} />}
+                  >
+                    Foto {i + 1}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* 4 Tombol Aksi Utama: Scan QR, Buka Galeri, Ulangi, Selesai */}
+          <div className="flex flex-wrap justify-center gap-3">
+            {resultPhoto.qr_url && (
+              <Button
+                variant="primary"
+                size="md"
+                onClick={() => setShowQrModal(true)}
+                leftIcon={<QrCode size={16} />}
+                className="bg-emerald-600 hover:bg-emerald-500 text-white"
+              >
+                Scan QR Foto
+              </Button>
             )}
             <Button
               variant="secondary"
               size="md"
               onClick={() => {
-                // Buang cache lama agar foto hasil sesi langsung tampil di galeri
                 queryClient.invalidateQueries({ queryKey: ['photos'] })
                 queryClient.invalidateQueries({ queryKey: ['folders'] })
                 navigate(folderId ? `/gallery?folder_id=${folderId}` : '/gallery')
@@ -493,13 +543,64 @@ const PhotoCapturePage: React.FC = () => {
             <Button
               variant="secondary"
               size="md"
-              onClick={() => navigate('/photo')}
-              leftIcon={<CameraIcon size={16} />}
+              onClick={() => setShowRetakeOptions((prev) => !prev)}
+              leftIcon={<RotateCcw size={16} />}
+              className={showRetakeOptions ? 'border-amber-500 text-amber-400 bg-amber-500/10' : ''}
             >
-              Sesi Baru
+              Ulangi
+            </Button>
+            <Button
+              variant="secondary"
+              size="md"
+              onClick={() => navigate('/photo')}
+              leftIcon={<Check size={16} />}
+            >
+              Selesai
             </Button>
           </div>
         </div>
+
+        {/* Modal QR Code */}
+        {showQrModal && resultPhoto.qr_url && (
+          <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="bg-pb-surface border border-pb-border rounded-3xl p-8 max-w-md sm:max-w-lg w-full text-center flex flex-col items-center gap-5 relative shadow-2xl animate-in zoom-in-95">
+              <button
+                type="button"
+                onClick={() => setShowQrModal(false)}
+                className="absolute top-5 right-5 text-pb-text-muted hover:text-pb-text transition-colors p-1 rounded-lg hover:bg-pb-surface-hover"
+              >
+                <X size={22} />
+              </button>
+
+              <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 mt-1">
+                <QrCode size={30} />
+              </div>
+
+              <div>
+                <h3 className="text-pb-text font-bold text-xl sm:text-2xl">Scan QR Code Foto</h3>
+                <p className="text-pb-text-secondary text-sm mt-1.5 max-w-sm">
+                  Arahkan kamera smartphone ke QR ini untuk langsung mengunduh foto fotobooth.
+                </p>
+              </div>
+
+              <div className="bg-white p-5 rounded-2xl border border-pb-border shadow-2xl w-full max-w-[320px] sm:max-w-[380px]">
+                <img
+                  src={resultPhoto.qr_url}
+                  alt="QR Code Foto"
+                  className="w-full h-auto object-contain rounded-lg"
+                />
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowQrModal(false)}
+                className="w-full max-w-xs py-3 rounded-xl bg-pb-surface-hover text-pb-text text-sm font-semibold hover:bg-pb-border transition-colors mt-1"
+              >
+                Tutup
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     )
   }
@@ -785,7 +886,20 @@ const PhotoCapturePage: React.FC = () => {
 
           {/* Status frame + retake */}
           <div className="mt-6 pt-4 border-t border-pb-border">
-            <p className="text-pb-text-secondary text-xs font-medium mb-2">Status Frame</p>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-pb-text-secondary text-xs font-medium">Status Frame</p>
+              {completedCount > 0 && !allDone && (
+                <button
+                  type="button"
+                  onClick={handleRestartSession}
+                  disabled={phase === 'countdown' || isCapturing}
+                  className="text-amber-400 hover:text-amber-300 text-xs flex items-center gap-1 transition-colors font-medium"
+                >
+                  <RotateCcw size={12} />
+                  Ulangi dari Awal
+                </button>
+              )}
+            </div>
             <div className="flex flex-col gap-2">
               {Array.from({ length: totalFrames }, (_, i) => {
                 const isActive = i === activeFrameIndex && !allDone

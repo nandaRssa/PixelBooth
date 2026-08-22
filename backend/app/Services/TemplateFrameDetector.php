@@ -56,7 +56,7 @@ class TemplateFrameDetector
      * @param string|null $canvasWidth  Lebar canvas tempat template dirender
      *                                  (bila berbeda dari ukuran file gambar).
      * @param string|null $canvasHeight Tinggi canvas tempat template dirender.
-     * @return array{frame_count: int, frame_configuration: array}|null
+     * @return array{detection_method: string, frame_count: int, frame_configuration: array}|null
      *         null bila tidak ada slot yang terdeteksi secara meyakinkan.
      */
     public function detect(string $filePath, ?int $canvasWidth = null, ?int $canvasHeight = null): ?array
@@ -70,6 +70,269 @@ class TemplateFrameDetector
             return null;
         }
 
+        $targetW = $canvasWidth ?? $info[0];
+        $targetH = $canvasHeight ?? $info[1];
+
+        // ==================================================
+        // KONDISI 1 — TEMPLATE MEMILIKI TRANSPARANSI
+        // ==================================================
+        if (in_array($info[2], [IMAGETYPE_PNG, IMAGETYPE_WEBP], true)) {
+            $transparentResult = $this->detectTransparentRegions($filePath, $targetW, $targetH);
+            if ($transparentResult !== null && $transparentResult['frame_count'] > 0) {
+                return $transparentResult;
+            }
+        }
+
+        // ==================================================
+        // KONDISI 2 — TIDAK ADA TRANSPARANSI (SMART CLEAR EXISTING)
+        // ==================================================
+        return $this->detectSmartClear($filePath, $info, $targetW, $targetH);
+    }
+
+    /**
+     * KONDISI 1: Deteksi frame berbasis area transparan / lubang transparan (PNG/WEBP).
+     *
+     * 1 VALID TRANSPARENT REGION = 1 CAMERA FRAME
+     * - Membedakan background transparan (full canvas) vs photo hole interior.
+     * - Mengabaikan noise, anti-aliasing edge, dan ornament/logo hole kecil.
+     * - 100% COVER TRANSPARENCY + SLIGHT OVERSCAN (kamera sedikit lebih besar dari lubang).
+     * - JANGAN MENGHAPUS DESAIN (source = 'transparent').
+     *
+     * @return array{detection_method: string, frame_count: int, frame_configuration: array}|null
+     */
+    private function detectTransparentRegions(string $filePath, int $targetW, int $targetH): ?array
+    {
+        $src = match (@getimagesize($filePath)[2] ?? null) {
+            IMAGETYPE_PNG => @imagecreatefrompng($filePath),
+            IMAGETYPE_WEBP => @imagecreatefromwebp($filePath),
+            default => null,
+        };
+
+        if (! $src) {
+            return null;
+        }
+
+        $srcW = imagesx($src);
+        $srcH = imagesy($src);
+        if ($srcW <= 0 || $srcH <= 0) {
+            imagedestroy($src);
+            return null;
+        }
+
+        $scale = min(1.0, self::WORK_MAX / max($srcW, $srcH));
+        $w = max(1, (int) round($srcW * $scale));
+        $h = max(1, (int) round($srcH * $scale));
+
+        imagealphablending($src, false);
+        imagesavealpha($src, true);
+        $img = imagecreatetruecolor($w, $h);
+        imagealphablending($img, false);
+        imagesavealpha($img, true);
+        imagecopyresampled($img, $src, 0, 0, 0, 0, $w, $h, $srcW, $srcH);
+        imagedestroy($src);
+
+        // Biner transparansi: 1 jika GD alpha >= 24 (lubang transparan)
+        $binary = [];
+        $transparentCount = 0;
+        for ($y = 0; $y < $h; $y++) {
+            $row = [];
+            for ($x = 0; $x < $w; $x++) {
+                $rgba = imagecolorat($img, $x, $y);
+                $alpha = ($rgba >> 24) & 0x7F; // GD alpha: 0 = opaque, 127 = fully transparent
+                $isTransparent = ($alpha >= 24) ? 1 : 0;
+                if ($isTransparent) {
+                    $transparentCount++;
+                }
+                $row[] = $isTransparent;
+            }
+            $binary[] = $row;
+        }
+        imagedestroy($img);
+
+        $totalArea = $w * $h;
+        if ($transparentCount < max(40, (int) round(0.003 * $totalArea))) {
+            return null; // Tidak ada transparansi signifikan
+        }
+
+        // Connected Components (4-connectivity)
+        $visited = array_fill(0, $h, array_fill(0, $w, false));
+        $components = [];
+
+        for ($y = 0; $y < $h; $y++) {
+            for ($x = 0; $x < $w; $x++) {
+                if (! $binary[$y][$x] || $visited[$y][$x]) {
+                    continue;
+                }
+
+                // Flood fill satu region transparan terhubung
+                $queue = [[$x, $y]];
+                $visited[$y][$x] = true;
+                $pixels = [];
+                $minX = $x; $maxX = $x;
+                $minY = $y; $maxY = $y;
+
+                while ($queue) {
+                    [$px, $py] = array_pop($queue);
+                    $pixels[] = [$px, $py];
+                    if ($px < $minX) $minX = $px;
+                    if ($px > $maxX) $maxX = $px;
+                    if ($py < $minY) $minY = $py;
+                    if ($py > $maxY) $maxY = $py;
+
+                    foreach ([[$px - 1, $py], [$px + 1, $py], [$px, $py - 1], [$px, $py + 1]] as [$nx, $ny]) {
+                        if ($nx >= 0 && $nx < $w && $ny >= 0 && $ny < $h
+                            && $binary[$ny][$nx] && ! $visited[$ny][$nx]) {
+                            $visited[$ny][$nx] = true;
+                            $queue[] = [$nx, $ny];
+                        }
+                    }
+                }
+
+                $area = count($pixels);
+                $bw = $maxX - $minX + 1;
+                $bh = $maxY - $minY + 1;
+
+                $touchesLeft = ($minX <= 1);
+                $touchesRight = ($maxX >= $w - 2);
+                $touchesTop = ($minY <= 1);
+                $touchesBottom = ($maxY >= $h - 2);
+                $borderTouches = ($touchesLeft ? 1 : 0) + ($touchesRight ? 1 : 0)
+                               + ($touchesTop ? 1 : 0) + ($touchesBottom ? 1 : 0);
+
+                $components[] = [
+                    'area' => $area,
+                    'minX' => $minX,
+                    'maxX' => $maxX,
+                    'minY' => $minY,
+                    'maxY' => $maxY,
+                    'bw' => $bw,
+                    'bh' => $bh,
+                    'pixels' => $pixels,
+                    'borderTouches' => $borderTouches,
+                ];
+            }
+        }
+
+        if (empty($components)) {
+            return null;
+        }
+
+        // Filter: Pisahkan Background Transparan vs Photo Hole
+        $selected = [];
+        foreach ($components as $comp) {
+            $relArea = $comp['area'] / $totalArea;
+            $bw = $comp['bw'];
+            $bh = $comp['bh'];
+
+            // Background transparan (menyentuh >= 3 tepi canvas, atau menyentuh >=2 tepi dan menutupi > 65% canvas)
+            if ($comp['borderTouches'] >= 3) {
+                continue;
+            }
+            if ($comp['borderTouches'] >= 2 && $relArea > 0.65) {
+                continue;
+            }
+
+            // Saring noise, anti-aliasing, lubang ornamen kecil
+            if ($relArea < 0.003) {
+                continue; // Terlalu kecil (< 0.3% canvas)
+            }
+            $minDim = min($w, $h);
+            if (min($bw, $bh) < $minDim * 0.025) {
+                continue; // Dimensi terlalu sempit (< 2.5%)
+            }
+
+            $selected[] = $comp;
+        }
+
+        if (empty($selected)) {
+            return null;
+        }
+
+        // Bangun slot frame dengan 100% COVER TRANSPARENCY + SLIGHT OVERSCAN
+        $scaleX = $targetW / $w;
+        $scaleY = $targetH / $h;
+        $slots = [];
+
+        foreach ($selected as $comp) {
+            $bw = $comp['bw'];
+            $bh = $comp['bh'];
+            $minX = $comp['minX'];
+            $minY = $comp['minY'];
+
+            // SEDIKIT OVERSCAN: perluasan kecil ~1.8% dari dimensi slot (min 2.5 px kerja)
+            $overscanW = max(2.5, $bw * 0.018);
+            $overscanH = max(2.5, $bh * 0.018);
+
+            $workX = max(0.0, $minX - $overscanW);
+            $workY = max(0.0, $minY - $overscanH);
+            $workW = min((float) $w - $workX, $bw + 2 * $overscanW);
+            $workH = min((float) $h - $workY, $bh + 2 * $overscanH);
+
+            $finalX = max(0, (int) round($workX * $scaleX));
+            $finalY = max(0, (int) round($workY * $scaleY));
+            $finalW = (int) round($workW * $scaleX);
+            $finalH = (int) round($workH * $scaleY);
+
+            if ($finalX + $finalW > $targetW) {
+                $finalW = max(1, $targetW - $finalX);
+            }
+            if ($finalY + $finalH > $targetH) {
+                $finalH = max(1, $targetH - $finalY);
+            }
+
+            // Estimasi bentuk sederhana
+            $fillRatio = $comp['area'] / max(1, $bw * $bh);
+            $aspect = abs($bw - $bh) / max(1, max($bw, $bh));
+            $shape = 'rectangle';
+            if ($fillRatio > 0.88) {
+                $shape = ($aspect < 0.06) ? 'square' : 'rectangle';
+            } elseif ($fillRatio >= 0.65 && $fillRatio <= 0.88) {
+                $shape = ($aspect < 0.08) ? 'circle' : 'oval';
+            } else {
+                $shape = 'polygon';
+            }
+
+            $slots[] = [
+                'x' => (float) $finalX,
+                'y' => (float) $finalY,
+                'width' => (float) $finalW,
+                'height' => (float) $finalH,
+                'rotation' => 0.0,
+                'confidence' => 100.0,
+                'source' => 'transparent',
+                'detection_method' => 'transparent',
+                'shape' => $shape,
+                'clear_zone' => 100,
+            ];
+        }
+
+        if (empty($slots)) {
+            return null;
+        }
+
+        $slots = $this->sortSlots($slots);
+
+        $configuration = [];
+        foreach (array_values($slots) as $index => $slot) {
+            $slot['order'] = $index;
+            $slot['id'] = $index + 1;
+            $configuration[] = $slot;
+        }
+
+        return [
+            'detection_method' => 'transparent',
+            'frame_count' => count($configuration),
+            'frame_configuration' => $configuration,
+        ];
+    }
+
+    /**
+     * KONDISI 2: Deteksi slot foto berbasis Smart Clear (region & warna).
+     *
+     * @return array{detection_method: string, frame_count: int, frame_configuration: array}|null
+     */
+    private function detectSmartClear(string $filePath, array $info, int $targetW, int $targetH): ?array
+    {
         $src = $this->load($filePath, $info[2]);
         if (! $src) {
             return null;
@@ -103,6 +366,7 @@ class TemplateFrameDetector
         foreach ($selected as $cand) {
             $slot = $this->fitRegion($cand, $cand['region']['pixels']);
             if ($slot) {
+                $slot['source'] = 'smart_clear';
                 $slots[] = $slot;
             }
         }
@@ -112,12 +376,7 @@ class TemplateFrameDetector
 
         $slots = $this->sortSlots($slots);
 
-        // Koordinat diskalakan ke ruang canvas (PhotoRenderService meregangkan
-        // gambar template ke ukuran canvas).
-        $targetW = $canvasWidth ?? $info[0];
-        $targetH = $canvasHeight ?? $info[1];
-
-        return $this->buildResult($slots, $targetW, $targetH, $width, $height);
+        return $this->buildResult($slots, $targetW, $targetH, $width, $height, 'smart_clear');
     }
 
     // ------------------------------------------------------------------
@@ -1005,9 +1264,9 @@ class TemplateFrameDetector
      * Bangun hasil akhir: skala koordinat ke resolusi canvas + beri order.
      *
      * @param array<int, array{x:float,y:float,width:float,height:float,rotation:float,confidence:float}> $slots
-     * @return array{frame_count: int, frame_configuration: array}
+     * @return array{detection_method: string, frame_count: int, frame_configuration: array}
      */
-    private function buildResult(array $slots, int $origW, int $origH, int $width, int $height): array
+    private function buildResult(array $slots, int $origW, int $origH, int $width, int $height, string $detectionMethod = 'smart_clear'): array
     {
         $scaleX = $origW / $width;
         $scaleY = $origH / $height;
@@ -1028,17 +1287,20 @@ class TemplateFrameDetector
             }
 
             $configuration[] = [
+                'id' => $index + 1,
                 'x' => (int) round($x),
                 'y' => (int) round($y),
                 'width' => (int) round($w),
                 'height' => (int) round($h),
-                'rotation' => (float) $slot['rotation'],
-                'confidence' => (float) $slot['confidence'],
+                'rotation' => (float) ($slot['rotation'] ?? 0.0),
+                'confidence' => (float) ($slot['confidence'] ?? 0.0),
+                'source' => $slot['source'] ?? $detectionMethod,
                 'order' => $index,
             ];
         }
 
         return [
+            'detection_method' => $detectionMethod,
             'frame_count' => count($configuration),
             'frame_configuration' => $configuration,
         ];

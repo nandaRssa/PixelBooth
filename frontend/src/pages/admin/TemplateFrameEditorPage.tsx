@@ -1083,7 +1083,9 @@ const TemplateFrameEditorPage: React.FC = () => {
       if (detected.length === 0) {
         toast.error("Tidak ada area foto yang terdeteksi pada template ini.");
       } else {
-        toast.success(`Frames Detected ${detected.length}`);
+        const isTransparent = detected.some((f) => f.source === "transparent");
+        const modeLabel = isTransparent ? " (Transparency Detection)" : " (Smart Clear)";
+        toast.success(`Frames Detected: ${detected.length}${modeLabel}`);
       }
     } catch {
       toast.error("Gagal menjalankan auto detection.");
