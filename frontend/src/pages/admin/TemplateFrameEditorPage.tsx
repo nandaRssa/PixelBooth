@@ -318,13 +318,13 @@ const TemplateFrameEditorPage: React.FC = () => {
         }
         ctx.drawImage(video, -dw / 2, -dh / 2, dw, dh);
       } else if (previewMask) {
-        // Lapisan visual frame kamera (jelas, kontras, dan rapi)
-        ctx.fillStyle = "rgba(15, 23, 42, 0.85)";
+        // Lapisan visual frame kamera (High Contrast Neon & Deep Charcoal)
+        ctx.fillStyle = "rgba(10, 15, 29, 0.95)";
         ctx.fillRect(-f.width / 2, -f.height / 2, f.width, f.height);
-        
-        // Kisi-kisi garis diagonal viewfinder
-        ctx.strokeStyle = "rgba(56, 189, 248, 0.25)";
-        ctx.lineWidth = 1.5 / S;
+
+        // Kisi-kisi garis diagonal oranye kontras tinggi
+        ctx.strokeStyle = "rgba(255, 90, 54, 0.4)";
+        ctx.lineWidth = 2 / S;
         const step = Math.max(f.width, f.height) / 8;
         for (
           let d = -Math.max(f.width, f.height);
@@ -337,12 +337,57 @@ const TemplateFrameEditorPage: React.FC = () => {
           ctx.stroke();
         }
 
-        // Teks penanda "Area Kamera Frame N" di tengah
-        ctx.fillStyle = "rgba(56, 189, 248, 0.85)";
-        ctx.font = `bold ${Math.max(12 / S, Math.round(f.width / 16))}px system-ui, sans-serif`;
+        // Viewfinder 4 Corner Brackets (Siku Sudut Oranye Terang)
+        const cornerLen = Math.min(24 / S, f.width / 4, f.height / 4);
+        ctx.strokeStyle = "#FF5A36";
+        ctx.lineWidth = 3.5 / S;
+        // Top-left
+        ctx.beginPath();
+        ctx.moveTo(-f.width / 2, -f.height / 2 + cornerLen);
+        ctx.lineTo(-f.width / 2, -f.height / 2);
+        ctx.lineTo(-f.width / 2 + cornerLen, -f.height / 2);
+        ctx.stroke();
+        // Top-right
+        ctx.beginPath();
+        ctx.moveTo(f.width / 2 - cornerLen, -f.height / 2);
+        ctx.lineTo(f.width / 2, -f.height / 2);
+        ctx.lineTo(f.width / 2, -f.height / 2 + cornerLen);
+        ctx.stroke();
+        // Bottom-left
+        ctx.beginPath();
+        ctx.moveTo(-f.width / 2, f.height / 2 - cornerLen);
+        ctx.lineTo(-f.width / 2, f.height / 2);
+        ctx.lineTo(-f.width / 2 + cornerLen, f.height / 2);
+        ctx.stroke();
+        // Bottom-right
+        ctx.beginPath();
+        ctx.moveTo(f.width / 2 - cornerLen, f.height / 2);
+        ctx.lineTo(f.width / 2, f.height / 2);
+        ctx.lineTo(f.width / 2, f.height / 2 - cornerLen);
+        ctx.stroke();
+
+        // Badge Penanda "Area Kamera Frame N" di tengah (High-Contrast Pill)
+        const badgeText = `📷 FRAME ${frames.indexOf(f) + 1} (KAMERA)`;
+        const fontSize = Math.max(12 / S, Math.round(f.width / 16));
+        ctx.font = `bold ${fontSize}px system-ui, sans-serif`;
+        const tw = ctx.measureText(badgeText).width;
+        const bw = tw + 20 / S;
+        const bh = fontSize + 14 / S;
+
+        // Pill background
+        ctx.fillStyle = "rgba(15, 23, 42, 0.95)";
+        ctx.beginPath();
+        ctx.roundRect(-bw / 2, -bh / 2, bw, bh, 8 / S);
+        ctx.fill();
+        ctx.strokeStyle = "#FF5A36";
+        ctx.lineWidth = 2 / S;
+        ctx.stroke();
+
+        // Pill text
+        ctx.fillStyle = "#FFFFFF";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
-        ctx.fillText(`Area Kamera Frame ${frames.indexOf(f) + 1}`, 0, 0);
+        ctx.fillText(badgeText, 0, 0);
       }
       ctx.restore();
     }
@@ -360,7 +405,7 @@ const TemplateFrameEditorPage: React.FC = () => {
       ctx.drawImage(regionRef.current, 0, 0);
     }
 
-    // --- Chrome editor ---
+    // --- Chrome editor (Border & Handles dengan warna kontras) ---
     for (const f of frames) {
       const isSel = f.id === selectedId;
       const rad = (f.rotation * Math.PI) / 180;
@@ -371,9 +416,10 @@ const TemplateFrameEditorPage: React.FC = () => {
       ctx.translate(cx, cy);
       ctx.rotate(rad);
 
-      ctx.lineWidth = (isSel ? 2 : 1.5) / S;
-      ctx.setLineDash(isSel ? [] : [6 / S, 4 / S]);
-      ctx.strokeStyle = isSel ? "#22D3EE" : "rgba(255,255,255,0.55)";
+      // Border frame: Oranye Terang untuk terpilih, Hijau Neon / Emas untuk tidak terpilih
+      ctx.lineWidth = (isSel ? 3 : 2) / S;
+      ctx.setLineDash(isSel ? [] : [8 / S, 5 / S]);
+      ctx.strokeStyle = isSel ? "#FF5A36" : "#10B981";
       ctx.strokeRect(-f.width / 2, -f.height / 2, f.width, f.height);
       ctx.setLineDash([]);
 
@@ -382,7 +428,7 @@ const TemplateFrameEditorPage: React.FC = () => {
         ctx.save();
         ctx.scale(f.flip_h ? -1 : 1, f.flip_v ? -1 : 1);
         for (const a of f.protected_areas) {
-          ctx.fillStyle = "rgba(34,197,94,0.18)";
+          ctx.fillStyle = "rgba(34,197,94,0.22)";
           ctx.strokeStyle = "#22C55E";
           ctx.lineWidth = 1.5 / S;
           ctx.setLineDash([4 / S, 3 / S]);
@@ -391,7 +437,7 @@ const TemplateFrameEditorPage: React.FC = () => {
           ctx.setLineDash([]);
         }
         for (const a of f.remove_areas) {
-          ctx.fillStyle = "rgba(239,68,68,0.18)";
+          ctx.fillStyle = "rgba(239,68,68,0.22)";
           ctx.strokeStyle = "#EF4444";
           ctx.lineWidth = 1.5 / S;
           ctx.setLineDash([4 / S, 3 / S]);
@@ -402,24 +448,33 @@ const TemplateFrameEditorPage: React.FC = () => {
         ctx.restore();
       }
 
-      // Label Frame N
-      ctx.font = `${13 / S}px system-ui, sans-serif`;
+      // Label Badge Frame N (Pill Kontras Tinggi di sudut atas)
+      ctx.font = `bold ${12 / S}px system-ui, sans-serif`;
       ctx.textAlign = "left";
       ctx.textBaseline = "bottom";
-      const label = `Frame ${frames.indexOf(f) + 1}`;
-      const pad = 4 / S;
+      const label = `Frame ${frames.indexOf(f) + 1}${isSel ? " (Aktif)" : ""}`;
+      const pad = 5 / S;
       const tw = ctx.measureText(label).width;
-      ctx.fillStyle = isSel ? "rgba(34,211,238,0.95)" : "rgba(0,0,0,0.65)";
-      ctx.fillRect(-f.width / 2, -f.height / 2 - pad * 3, tw + pad * 2, 16 / S);
-      ctx.fillStyle = isSel ? "#083344" : "#FFFFFF";
+      
+      // Badge background
+      ctx.fillStyle = isSel ? "#FF5A36" : "rgba(16, 185, 129, 0.95)";
+      ctx.beginPath();
+      ctx.roundRect(-f.width / 2, -f.height / 2 - pad * 3 - 2 / S, tw + pad * 2, 18 / S, 4 / S);
+      ctx.fill();
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.4)";
+      ctx.lineWidth = 1 / S;
+      ctx.stroke();
+
+      // Badge text
+      ctx.fillStyle = "#FFFFFF";
       ctx.fillText(label, -f.width / 2 + pad, -f.height / 2 - pad);
 
       // Handles frame terpilih
       if (isSel && mode === "select") {
-        const hs = 9 / S;
+        const hs = 10 / S;
         ctx.fillStyle = "#FFFFFF";
-        ctx.strokeStyle = "#0891B2";
-        ctx.lineWidth = 1.5 / S;
+        ctx.strokeStyle = "#FF5A36";
+        ctx.lineWidth = 2 / S;
         for (const [hx, hy] of handlePoints(f)) {
           ctx.beginPath();
           ctx.rect(hx - hs / 2, hy - hs / 2, hs, hs);
@@ -430,11 +485,15 @@ const TemplateFrameEditorPage: React.FC = () => {
         ctx.beginPath();
         ctx.moveTo(0, -f.height / 2);
         ctx.lineTo(0, -f.height / 2 - ROT_HANDLE_DIST / S);
-        ctx.strokeStyle = "#22D3EE";
+        ctx.strokeStyle = "#FF5A36";
+        ctx.lineWidth = 2 / S;
         ctx.stroke();
         ctx.beginPath();
-        ctx.arc(0, -f.height / 2 - ROT_HANDLE_DIST / S, 7 / S, 0, Math.PI * 2);
+        ctx.arc(0, -f.height / 2 - ROT_HANDLE_DIST / S, 8 / S, 0, Math.PI * 2);
+        ctx.fillStyle = "#FF5A36";
         ctx.fill();
+        ctx.strokeStyle = "#FFFFFF";
+        ctx.lineWidth = 2 / S;
         ctx.stroke();
       }
       ctx.restore();
@@ -485,7 +544,18 @@ const TemplateFrameEditorPage: React.FC = () => {
 
   // ===== Test Camera =====
   useEffect(() => {
-    if (!testCamera) return;
+    if (!testCamera) {
+      if (videoRef.current) {
+        videoRef.current.srcObject = null;
+      }
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((t) => t.stop());
+        streamRef.current = null;
+      }
+      scheduleRender();
+      return;
+    }
+
     let cancelled = false;
 
     const startCamera = async () => {
@@ -501,7 +571,7 @@ const TemplateFrameEditorPage: React.FC = () => {
             audio: false,
           });
         } catch {
-          // Fallback ke kamera default apa pun jika facingMode/resolusi spesifik gagal
+          // Fallback ke kamera default jika facingMode/resolusi gagal
           stream = await navigator.mediaDevices.getUserMedia({
             video: true,
             audio: false,
@@ -514,30 +584,29 @@ const TemplateFrameEditorPage: React.FC = () => {
         }
 
         streamRef.current = stream;
-        const video = document.createElement("video");
-        video.srcObject = stream;
-        video.muted = true;
-        video.playsInline = true;
-        video.setAttribute("playsinline", "");
-        video.setAttribute("muted", "");
-        video.onloadedmetadata = () => {
-          video.play().catch(() => {});
-          scheduleRender();
-        };
-        video.onplaying = () => {
-          scheduleRender();
-        };
-        await video.play().catch(() => {});
-        videoRef.current = video;
+        const video = videoRef.current;
+        if (video) {
+          video.srcObject = stream;
+          video.muted = true;
+          video.playsInline = true;
+          video.onloadedmetadata = () => {
+            video.play().catch(() => {});
+            scheduleRender();
+          };
+          video.onplaying = () => {
+            scheduleRender();
+          };
+          await video.play().catch(() => {});
+        }
         setCameraError(null);
         scheduleRender();
-      } catch {
+      } catch (err: unknown) {
         if (cancelled) return;
         setTestCamera(false);
         setCameraError(
           "Tidak dapat mengakses kamera. Pastikan izin kamera telah diberikan di browser.",
         );
-        toast.error("Tidak dapat mengakses kamera.");
+        toast.error("Tidak dapat mengakses kamera. Periksa izin kamera browser.");
       }
     };
 
@@ -545,9 +614,13 @@ const TemplateFrameEditorPage: React.FC = () => {
 
     return () => {
       cancelled = true;
-      streamRef.current?.getTracks().forEach((t) => t.stop());
-      streamRef.current = null;
-      videoRef.current = null;
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((t) => t.stop());
+        streamRef.current = null;
+      }
+      if (videoRef.current) {
+        videoRef.current.srcObject = null;
+      }
     };
   }, [testCamera, scheduleRender]);
 
@@ -1411,6 +1484,22 @@ const TemplateFrameEditorPage: React.FC = () => {
           ref={containerRef}
           className="relative w-full h-[52vh] sm:h-[60vh] lg:h-auto lg:flex-1 bg-pb-bg border border-pb-border rounded-2xl overflow-hidden shrink-0 lg:shrink min-h-[300px]"
         >
+          {/* Hidden Video element untuk Test Camera Stream */}
+          <video
+            ref={videoRef}
+            autoPlay
+            playsInline
+            muted
+            style={{
+              position: "fixed",
+              top: -9999,
+              left: -9999,
+              width: 1,
+              height: 1,
+              opacity: 0,
+              pointerEvents: "none",
+            }}
+          />
           <canvas
             ref={canvasRef}
             className="absolute inset-0 touch-none"
