@@ -62,31 +62,21 @@ const PhotoQrModal: React.FC<PhotoQrModalProps> = ({ isOpen, onClose, photo }) =
 
         <div className="w-full flex flex-col gap-2">
           <Button
-            variant="secondary"
+            variant="primary"
             fullWidth
             onClick={handleDownloadQr}
             leftIcon={<Download size={16} />}
           >
             Unduh QR
           </Button>
-          <div className="flex gap-2">
-            <Button
-              variant="secondary"
-              fullWidth
-              onClick={handleShare}
-              leftIcon={<Share2 size={16} />}
-            >
-              Bagikan
-            </Button>
-            <Button
-              variant="secondary"
-              fullWidth
-              onClick={() => window.open(photoUrl, '_blank')}
-              leftIcon={<ExternalLink size={16} />}
-            >
-              Buka Halaman
-            </Button>
-          </div>
+          <Button
+            variant="secondary"
+            fullWidth
+            onClick={handleShare}
+            leftIcon={<Share2 size={16} />}
+          >
+            Bagikan Link
+          </Button>
         </div>
       </div>
     </Modal>

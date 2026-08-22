@@ -1,7 +1,8 @@
 import React from 'react'
-import { NavLink, Outlet } from 'react-router-dom'
+import { Link, NavLink, Outlet } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
+  Home,
   LayoutGrid,
   Camera,
   Layers,
@@ -22,6 +23,7 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
+  { to: '/', icon: <Home size={20} />, label: 'Dashboard' },
   { to: '/gallery', icon: <LayoutGrid size={20} />, label: 'Galeri' },
   { to: '/photo', icon: <Camera size={20} />, label: 'Photo' },
   { to: '/templates', icon: <Layers size={20} />, label: 'Kelola Template' },
@@ -40,14 +42,14 @@ export const AdminLayout: React.FC = () => {
     <div className="min-h-screen bg-pb-bg flex flex-col lg:flex-row">
       {/* ===== Mobile Top Header (< lg) ===== */}
       <header className="lg:hidden fixed top-0 left-0 right-0 h-14 bg-pb-bg/90 backdrop-blur-md border-b border-pb-border flex items-center justify-between px-4 z-30">
-        <div className="flex items-center gap-2">
+        <Link to="/" className="flex items-center gap-2 hover:opacity-90 transition-opacity">
           <span className="w-8 h-8 rounded-lg bg-gradient-to-tr from-[#FF5A36] to-[#FF8836] flex items-center justify-center text-white font-bold text-xs shadow-sm shadow-orange-500/30">
             PB
           </span>
           <h1 className="text-pb-text font-bold text-base tracking-tight">
             Pixel<span className="text-[#FF5A36]">Booth</span>
           </h1>
-        </div>
+        </Link>
         <button
           type="button"
           onClick={toggleTheme}
@@ -74,12 +76,12 @@ export const AdminLayout: React.FC = () => {
             >
               {theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
             </button>
-            <div className="min-w-0 flex-1 ml-2">
-              <h1 className="text-pb-text font-bold text-lg tracking-tight">
+            <Link to="/" className="min-w-0 flex-1 ml-2 block group">
+              <h1 className="text-pb-text font-bold text-lg tracking-tight group-hover:text-pb-text transition-colors">
                 Pixel<span className="text-[#FF5A36]">Booth</span>
               </h1>
               <p className="text-pb-text-muted text-xs mt-0.5">Sistem Photobooth Profesional</p>
-            </div>
+            </Link>
           </div>
         </div>
 

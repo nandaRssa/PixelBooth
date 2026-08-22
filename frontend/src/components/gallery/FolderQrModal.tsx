@@ -66,31 +66,21 @@ const FolderQrModal: React.FC<FolderQrModalProps> = ({ isOpen, onClose, folder }
 
         <div className="w-full flex flex-col gap-2">
           <Button
-            variant="secondary"
+            variant="primary"
             fullWidth
             onClick={handleDownloadQr}
             leftIcon={<Download size={16} />}
           >
             Unduh QR
           </Button>
-          <div className="flex gap-2">
-            <Button
-              variant="secondary"
-              fullWidth
-              onClick={handleShare}
-              leftIcon={<Share2 size={16} />}
-            >
-              Bagikan
-            </Button>
-            <Button
-              variant="secondary"
-              fullWidth
-              onClick={() => window.open(folderUrl, '_blank')}
-              leftIcon={<ExternalLink size={16} />}
-            >
-              Buka Halaman Customer
-            </Button>
-          </div>
+          <Button
+            variant="secondary"
+            fullWidth
+            onClick={handleShare}
+            leftIcon={<Share2 size={16} />}
+          >
+            Bagikan Link
+          </Button>
         </div>
       </div>
     </Modal>
