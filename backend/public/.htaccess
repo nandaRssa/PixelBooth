@@ -5,6 +5,15 @@
 
     RewriteEngine On
 
+    # CORS untuk aset statis (template, foto, QR) — wajib agar canvas
+    # frontend tidak tertaint saat membangun overlay template.
+    <IfModule mod_headers.c>
+        <FilesMatch "\.(jpg|jpeg|png|gif|webp|svg|avif)$">
+            Header set Access-Control-Allow-Origin "*"
+            Header set Cache-Control "public, max-age=604800"
+        </FilesMatch>
+    </IfModule>
+
     # Handle Authorization Header
     RewriteCond %{HTTP:Authorization} .
     RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]

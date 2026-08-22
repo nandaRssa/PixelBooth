@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/Button'
 import { Spinner } from '@/components/ui/StatusBadge'
 import { customerApi } from '@/api/customer'
 import { getStorageUrl } from '@/api/client'
+import { downloadFile } from '@/utils/download'
 import type { CustomerFolder, CustomerFolderPhoto } from '@/types'
 
 // ==========================================
@@ -59,22 +60,7 @@ const CustomerFolderPage: React.FC = () => {
 
   const handleDownload = async (photo: CustomerFolderPhoto) => {
     if (!photo?.url) return
-    try {
-      const fileUrl = getStorageUrl(photo.url)
-      const res = await fetch(fileUrl)
-      if (!res.ok) throw new Error('Download failed')
-      const blob = await res.blob()
-      const blobUrl = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = blobUrl
-      a.download = `pixelbooth-${photo.token ? photo.token.slice(0, 8) : 'photo'}.jpg`
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      URL.revokeObjectURL(blobUrl)
-    } catch {
-      window.open(getStorageUrl(photo.url), '_blank')
-    }
+    await downloadFile(photo.url, `pixelbooth-${photo.token ? photo.token.slice(0, 8) : 'photo'}.jpg`)
   }
 
   // ===== Loading =====

@@ -3,6 +3,7 @@ import { Download, ExternalLink, FolderInput, QrCode, Trash2, X } from 'lucide-r
 import { motion, AnimatePresence } from 'framer-motion'
 import { Button } from '@/components/ui/Button'
 import { getStorageUrl } from '@/api/client'
+import { downloadFile } from '@/utils/download'
 import type { Photo } from '@/types'
 
 // ==========================================
@@ -92,22 +93,7 @@ const PhotoPreviewModal: React.FC<PhotoPreviewModalProps> = ({
                 variant="secondary"
                 size="md"
                 onClick={async () => {
-                  try {
-                    const fileUrl = getStorageUrl(photo.url)
-                    const res = await fetch(fileUrl)
-                    if (!res.ok) throw new Error('Download failed')
-                    const blob = await res.blob()
-                    const blobUrl = URL.createObjectURL(blob)
-                    const a = document.createElement('a')
-                    a.href = blobUrl
-                    a.download = photo.filename || 'pixelbooth-photo.jpg'
-                    document.body.appendChild(a)
-                    a.click()
-                    document.body.removeChild(a)
-                    URL.revokeObjectURL(blobUrl)
-                  } catch {
-                    window.open(getStorageUrl(photo.url), '_blank')
-                  }
+                  await downloadFile(photo.url, photo.filename || 'pixelbooth-photo.jpg')
                 }}
                 leftIcon={<Download size={16} />}
               >

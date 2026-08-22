@@ -42,11 +42,15 @@
       (function () {
         try {
           var t = localStorage.getItem('pb-theme');
-          if (t === 'light') {
+          var isLight = t === 'light';
+          if (isLight) {
             document.documentElement.classList.add('light');
           } else {
             document.documentElement.classList.remove('light');
           }
+          // Warna chrome browser harus sinkron sejak paint pertama
+          var meta = document.querySelector('meta[name="theme-color"]');
+          if (meta) meta.setAttribute('content', isLight ? '#FFFFFF' : '#0A0A0A');
         } catch (e) {}
       })();
     </script>

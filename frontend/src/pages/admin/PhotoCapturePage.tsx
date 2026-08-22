@@ -24,6 +24,7 @@ import { useFolders } from '@/hooks/useFolders'
 import { resolvePreviewSlots } from '@/utils/previewSlots'
 import { buildTemplateOverlay } from '@/utils/templateOverlay'
 import { getStorageUrl } from '@/api/client'
+import { downloadFile } from '@/utils/download'
 import type { PhotoSession } from '@/types'
 import type { PreviewSlot } from '@/utils/previewSlots'
 
@@ -518,6 +519,18 @@ const PhotoCapturePage: React.FC = () => {
 
           {/* 4 Tombol Aksi Utama: Scan QR, Buka Galeri, Ulangi, Selesai */}
           <div className="flex flex-wrap justify-center gap-3">
+            {resultPhoto.url && (
+              <Button
+                variant="primary"
+                size="md"
+                onClick={() =>
+                  downloadFile(resultPhoto.url!, `pixelbooth-${session?.id ?? 'final'}.jpg`)
+                }
+                leftIcon={<Download size={16} />}
+              >
+                Download Foto
+              </Button>
+            )}
             {resultPhoto.qr_url && (
               <Button
                 variant="primary"
