@@ -72,60 +72,78 @@ const PhotoGrid: React.FC<PhotoGridProps> = ({
   return (
     <div>
       {/* Toolbar */}
-      <div className="flex items-center justify-between gap-2 mb-3">
+      <div className="mb-4">
         {selectionMode ? (
-          <div className="flex items-center gap-2 w-full">
-            <button
-              type="button"
-              onClick={onSelectAll}
-              className="flex items-center gap-2 px-3 py-2 rounded-lg bg-pb-elevated border border-pb-border
-                text-pb-text text-sm font-medium hover:bg-pb-elevated transition-colors"
-            >
-              {allSelected ? <CheckSquare size={16} /> : <Square size={16} />}
-              {allSelected ? 'Batalkan Semua' : 'Pilih Semua'}
-            </button>
-            <span className="text-pb-text-secondary text-sm">{selectedIds.size} dipilih</span>
-            <div className="flex-1" />
-            <Button
-              variant="secondary"
-              size="md"
-              onClick={onBulkMove}
-              disabled={selectedIds.size === 0 || isBulkActionPending}
-              leftIcon={<FolderInput size={16} />}
-            >
-              Pindahkan
-            </Button>
-            <Button
-              variant="danger"
-              size="md"
-              onClick={onBulkDelete}
-              disabled={selectedIds.size === 0 || isBulkActionPending}
-              leftIcon={<Trash2 size={16} />}
-            >
-              Hapus
-            </Button>
-            <button
-              type="button"
-              onClick={() => setSelectionMode(false)}
-              className="touch-target w-9 h-9 rounded-lg bg-pb-elevated border border-pb-border
-                text-pb-text-secondary hover:text-pb-text hover:bg-pb-elevated transition-colors"
-              title="Keluar dari mode pilih"
-            >
-              <X size={16} />
-            </button>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 p-3 rounded-2xl bg-pb-surface border border-pb-border shadow-xs w-full">
+            {/* Baris 1: Status & Pilih Semua */}
+            <div className="flex items-center justify-between sm:justify-start gap-2.5">
+              <button
+                type="button"
+                onClick={onSelectAll}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-pb-elevated border border-pb-border
+                  text-pb-text text-xs font-semibold hover:bg-pb-border-light transition-colors"
+              >
+                {allSelected ? <CheckSquare size={14} className="text-[#FF5A36]" /> : <Square size={14} />}
+                <span>{allSelected ? 'Batal Semua' : 'Pilih Semua'}</span>
+              </button>
+              <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-orange-500/15 text-[#FF5A36] border border-orange-500/30">
+                {selectedIds.size} dipilih
+              </span>
+              <button
+                type="button"
+                onClick={() => setSelectionMode(false)}
+                className="sm:hidden text-xs text-pb-text-muted hover:text-pb-text px-2 py-1 font-medium ml-auto"
+              >
+                Batal
+              </button>
+            </div>
+
+            {/* Baris 2: Tombol Aksi Massal */}
+            <div className="flex items-center gap-2">
+              <Button
+                variant="secondary"
+                size="sm"
+                className="flex-1 sm:flex-initial text-xs"
+                onClick={onBulkMove}
+                disabled={selectedIds.size === 0 || isBulkActionPending}
+                leftIcon={<FolderInput size={14} />}
+              >
+                Pindahkan
+              </Button>
+              <Button
+                variant="danger"
+                size="sm"
+                className="flex-1 sm:flex-initial text-xs"
+                onClick={onBulkDelete}
+                disabled={selectedIds.size === 0 || isBulkActionPending}
+                leftIcon={<Trash2 size={14} />}
+              >
+                Hapus {selectedIds.size > 0 ? `(${selectedIds.size})` : ''}
+              </Button>
+              <button
+                type="button"
+                onClick={() => setSelectionMode(false)}
+                className="hidden sm:flex w-8 h-8 rounded-xl bg-pb-elevated border border-pb-border
+                  text-pb-text-muted hover:text-pb-text hover:bg-pb-border-light transition-colors items-center justify-center shrink-0"
+                title="Keluar dari mode pilih"
+              >
+                <X size={15} />
+              </button>
+            </div>
           </div>
         ) : (
-          <>
-            <p className="text-pb-text-muted text-sm">{photos.length} foto</p>
+          <div className="flex items-center justify-between">
+            <p className="text-pb-text-muted text-xs sm:text-sm font-medium">{photos.length} foto tersedia</p>
             <Button
-              variant="ghost"
-              size="md"
+              variant="secondary"
+              size="sm"
+              className="text-xs"
               onClick={() => setSelectionMode(true)}
-              leftIcon={<CheckSquare size={16} />}
+              leftIcon={<CheckSquare size={14} />}
             >
               Pilih Foto
             </Button>
-          </>
+          </div>
         )}
       </div>
 
