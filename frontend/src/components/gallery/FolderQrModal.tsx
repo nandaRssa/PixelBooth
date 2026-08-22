@@ -4,6 +4,7 @@ import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { toast } from '@/components/ui/Toast'
 import { downloadSvgAsPng } from '@/utils/downloadQr'
+import { getStorageUrl } from '@/api/client'
 import type { Folder } from '@/types'
 
 // ==========================================
@@ -24,7 +25,7 @@ const FolderQrModal: React.FC<FolderQrModalProps> = ({ isOpen, onClose, folder }
   const handleDownloadQr = async () => {
     if (!folder.qr_url) return
     try {
-      await downloadSvgAsPng(folder.qr_url, `qr-${folder.unique_token.slice(0, 8)}.png`)
+      await downloadSvgAsPng(getStorageUrl(folder.qr_url), `qr-${folder.unique_token.slice(0, 8)}.png`)
     } catch {
       toast.error('Gagal mengunduh QR.')
     }
@@ -53,7 +54,7 @@ const FolderQrModal: React.FC<FolderQrModalProps> = ({ isOpen, onClose, folder }
 
         <div className="w-80 max-w-full rounded-2xl p-4 overflow-hidden border border-pb-border shadow-xl bg-white mb-5">
           {folder.qr_url ? (
-            <img src={folder.qr_url} alt="QR Code folder" className="w-full h-auto" />
+            <img src={getStorageUrl(folder.qr_url)} alt="QR Code folder" className="w-full h-auto" />
           ) : (
             <div className="w-full h-72 bg-pb-elevated" />
           )}
