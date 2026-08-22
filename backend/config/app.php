@@ -64,7 +64,7 @@ return [
     |
     */
 
-    'frontend_url' => env('FRONTEND_URL', 'https://pixel-booth-git-master-nanda-raissas-projects.vercel.app'),
+    'frontend_url' => env('FRONTEND_URL', 'https://pixel-booth-spot.vercel.app'),
 
     /*
     |--------------------------------------------------------------------------
