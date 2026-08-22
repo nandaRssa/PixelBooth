@@ -210,37 +210,59 @@ const TemplateFrameEditorPage: React.FC = () => {
       if (!ctx) return;
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
-      const wt =
-        workRef.current ?? downscaleTemplate(img, canvas.width, canvas.height);
-      workRef.current = wt;
+      let wt = workRef.current;
+      if (!wt) {
+        try {
+          wt = downscaleTemplate(img, canvas.width, canvas.height);
+          workRef.current = wt;
+        } catch {
+          wt = null;
+        }
+      }
 
       const tmp = document.createElement("canvas");
       const tmpCtx = tmp.getContext("2d");
-      if (!tmpCtx) return;
 
       // Kanvas overlay tint region brush (di atas layer desain)
       const region = document.createElement("canvas");
       region.width = canvas.width;
       region.height = canvas.height;
       const regionCtx = region.getContext("2d");
-      if (!regionCtx) return;
 
       ctx.globalCompositeOperation = "destination-out";
       for (const f of frames) {
-        const mask = computeHoleMask(wt, f);
-        if (!mask) continue;
-        tmp.width = mask.imageData.width;
-        tmp.height = mask.imageData.height;
-        tmpCtx.putImageData(mask.imageData, 0, 0);
-        // bx/by/bw/bh sudah dalam koordinat canvas (computeHoleMask yang
-        // mengonversi dari ruang kerja) — JANGAN dikonversi lagi.
-        ctx.drawImage(tmp, mask.bx, mask.by, mask.bw, mask.bh);
-        tmpCtx.putImageData(mask.overlay, 0, 0);
-        regionCtx.drawImage(tmp, mask.bx, mask.by, mask.bw, mask.bh);
+        let mask = null;
+        if (wt) {
+          try {
+            mask = computeHoleMask(wt, f);
+          } catch {
+            mask = null;
+          }
+        }
+
+        if (mask && tmpCtx && regionCtx) {
+          tmp.width = mask.imageData.width;
+          tmp.height = mask.imageData.height;
+          tmpCtx.putImageData(mask.imageData, 0, 0);
+          ctx.drawImage(tmp, mask.bx, mask.by, mask.bw, mask.bh);
+          tmpCtx.putImageData(mask.overlay, 0, 0);
+          regionCtx.drawImage(tmp, mask.bx, mask.by, mask.bw, mask.bh);
+        } else {
+          // Fallback geometric cut jika smart remove belum siap/gagal di browser mobile
+          const rad = (f.rotation * Math.PI) / 180;
+          const cx = f.x + f.width / 2;
+          const cy = f.y + f.height / 2;
+          ctx.save();
+          ctx.translate(cx, cy);
+          ctx.rotate(rad);
+          ctx.fillStyle = "rgba(0, 0, 0, 1)";
+          ctx.fillRect(-f.width / 2, -f.height / 2, f.width, f.height);
+          ctx.restore();
+        }
       }
       ctx.globalCompositeOperation = "source-over";
       holesRef.current = canvas;
-      regionRef.current = region;
+      regionRef.current = regionCtx ? region : null;
     } catch {
       // abaikan kegagalan rebuild sementara
     }

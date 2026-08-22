@@ -11,28 +11,32 @@ import { computeHoleMask, downscaleTemplate, type WorkTemplate } from './frameMa
 import { getStorageUrl } from '@/api/client'
 
 /** Muat gambar dan tunggu sampai siap dengan CORS & fallback Blob. */
-export function loadImage(src: string): Promise<HTMLImageElement> {
+export async function loadImage(src: string): Promise<HTMLImageElement> {
   const url = getStorageUrl(src)
+
+  // 1. Fetch via Blob terlebih dahulu agar 100% bebas SecurityError di iOS Safari / WebKit
+  try {
+    const res = await fetch(url, { mode: 'cors' })
+    if (res.ok) {
+      const blob = await res.blob()
+      const blobUrl = URL.createObjectURL(blob)
+      return await new Promise<HTMLImageElement>((resolve, reject) => {
+        const img = new Image()
+        img.onload = () => resolve(img)
+        img.onerror = () => reject(new Error('Gagal memuat blob gambar template'))
+        img.src = blobUrl
+      })
+    }
+  } catch {
+    // Fallback ke direct image load jika fetch diblokir
+  }
+
+  // 2. Direct image load dengan crossOrigin anonymous
   return new Promise((resolve, reject) => {
     const img = new Image()
     img.crossOrigin = 'anonymous'
     img.onload = () => resolve(img)
-    img.onerror = () => {
-      // Fallback: Fetch via Blob untuk melewati blokir CORS canvas
-      fetch(url, { mode: 'cors' })
-        .then((res) => {
-          if (!res.ok) throw new Error(`HTTP error ${res.status}`)
-          return res.blob()
-        })
-        .then((blob) => {
-          const blobUrl = URL.createObjectURL(blob)
-          const fallbackImg = new Image()
-          fallbackImg.onload = () => resolve(fallbackImg)
-          fallbackImg.onerror = () => reject(new Error('Gagal memuat gambar template'))
-          fallbackImg.src = blobUrl
-        })
-        .catch(() => reject(new Error('Gagal memuat gambar template')))
-    }
+    img.onerror = () => reject(new Error('Gagal memuat gambar template'))
     img.src = url
   })
 }
