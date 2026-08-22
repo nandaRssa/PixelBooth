@@ -397,11 +397,11 @@ const TemplatesPage: React.FC = () => {
                   )}
 
                   {/* Overlay Bawah */}
-                  <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/95 via-black/70 to-transparent">
-                    <p className="text-white text-sm font-semibold truncate">
+                  <div className="absolute bottom-0 left-0 right-0 p-2.5 sm:p-3 bg-gradient-to-t from-black/95 via-black/70 to-transparent">
+                    <p className="text-white text-xs sm:text-sm font-semibold truncate">
                       {template.name}
                     </p>
-                    <p className="text-white/80 text-xs mt-0.5">
+                    <p className="text-white/80 text-[11px] mt-0.5">
                       {template.canvas_width} x {template.canvas_height}
                     </p>
                     {template.status === "draft" && !selectionMode && (
@@ -409,12 +409,12 @@ const TemplatesPage: React.FC = () => {
                         variant="primary"
                         size="sm"
                         fullWidth
-                        className="mt-2"
+                        className="mt-1.5 text-[11px] py-1 h-auto font-semibold"
                         onClick={(e) => {
                           e.stopPropagation();
                           navigate(`/templates/${template.id}/editor`);
                         }}
-                        leftIcon={<SlidersHorizontal size={13} />}
+                        leftIcon={<SlidersHorizontal size={11} />}
                       >
                         Konfigurasi Frame
                       </Button>
@@ -431,30 +431,30 @@ const TemplatesPage: React.FC = () => {
       <Modal
         isOpen={isUploadOpen}
         onClose={() => setIsUploadOpen(false)}
-        title="Upload Template"
+        title="Upload Template Baru"
         size="lg"
       >
-        <div className="space-y-4">
-          {/* Nama */}
+        <div className="space-y-3.5">
+          {/* Nama Template */}
           <div>
-            <label className="block text-pb-text-secondary text-xs font-medium mb-1.5">
-              Nama Template
+            <label className="block text-pb-text text-xs font-semibold mb-1.5">
+              Nama Template <span className="text-red-400">*</span>
             </label>
             <input
               type="text"
               value={form.name}
               onChange={(e) => setField("name", e.target.value)}
-              placeholder="Contoh: Classic Strip 3 Frame"
-              className="w-full bg-pb-bg border border-pb-border rounded-lg px-4 py-2.5
-                text-pb-text text-sm placeholder:text-pb-faint
-                focus:outline-none focus:ring-1 focus:border-pb-border-strong focus:ring-white/10 transition-colors"
+              placeholder="Contoh: Photobooth Strip Retro 3 Frame"
+              className="w-full bg-pb-bg border border-pb-border rounded-xl px-3.5 py-2.5
+                text-pb-text text-xs sm:text-sm placeholder:text-pb-faint
+                focus:outline-none focus:ring-1 focus:border-[#FF5A36] transition-colors"
             />
           </div>
 
           {/* File Template */}
           <div>
-            <label className="block text-pb-text-secondary text-xs font-medium mb-1.5">
-              File Template <span className="text-red-400">*</span>
+            <label className="block text-pb-text text-xs font-semibold mb-1.5">
+              File Template Desain <span className="text-red-400">*</span>
             </label>
             <input
               ref={templateInputRef}
@@ -466,32 +466,43 @@ const TemplatesPage: React.FC = () => {
             <button
               type="button"
               onClick={() => templateInputRef.current?.click()}
-              className="w-full flex items-center justify-center gap-2 border border-dashed border-pb-border rounded-lg px-4 py-6
-                text-pb-text-secondary hover:text-pb-text hover:border-pb-border-strong hover:bg-pb-elevated transition-colors"
+              className={`w-full flex items-center justify-center gap-2.5 border border-dashed rounded-xl px-4 py-5 transition-all text-left ${
+                templateFile
+                  ? "bg-green-500/10 border-green-500/40 text-green-400"
+                  : "border-pb-border hover:border-pb-border-strong hover:bg-pb-elevated text-pb-text-secondary hover:text-pb-text"
+              }`}
             >
               {templateFile ? (
                 <>
-                  <FileImage size={18} className="text-green-400" />
-                  <span className="text-sm">{templateFile.name}</span>
-                  <span className="text-xs text-pb-text-muted">
-                    ({(templateFile.size / 1024 / 1024).toFixed(1)} MB)
+                  <FileImage size={20} className="text-green-400 shrink-0" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs sm:text-sm font-semibold truncate text-pb-text">{templateFile.name}</p>
+                    <p className="text-[11px] text-pb-text-muted">
+                      {(templateFile.size / 1024 / 1024).toFixed(1)} MB · Siap diunggah
+                    </p>
+                  </div>
+                  <span className="text-xs text-green-400 font-semibold px-2 py-1 bg-green-500/20 rounded-lg shrink-0">
+                    Ganti
                   </span>
                 </>
               ) : (
-                <>
-                  <Upload size={18} />
-                  <span className="text-sm">
-                    Pilih file template (PNG/JPG/WEBP, maks 20 MB)
-                  </span>
-                </>
+                <div className="flex flex-col items-center justify-center text-center">
+                  <Upload size={22} className="text-[#FF5A36] mb-1.5" />
+                  <p className="text-xs sm:text-sm font-semibold text-pb-text">
+                    Pilih File Template Gambar
+                  </p>
+                  <p className="text-[11px] text-pb-text-muted mt-0.5">
+                    Format PNG, JPG, WEBP (maks. 20 MB)
+                  </p>
+                </div>
               )}
             </button>
           </div>
 
           {/* File Preview (opsional) */}
           <div>
-            <label className="block text-pb-text-secondary text-xs font-medium mb-1.5">
-              Preview (opsional)
+            <label className="block text-pb-text text-xs font-semibold mb-1.5">
+              Gambar Preview Katalog (opsional)
             </label>
             <input
               ref={previewInputRef}
@@ -503,27 +514,28 @@ const TemplatesPage: React.FC = () => {
             <button
               type="button"
               onClick={() => previewInputRef.current?.click()}
-              className="w-full flex items-center gap-2 border border-pb-border rounded-lg px-4 py-3
+              className="w-full flex items-center gap-2.5 border border-pb-border rounded-xl px-3.5 py-2.5
                 text-pb-text-secondary hover:text-pb-text hover:border-pb-border-strong hover:bg-pb-elevated transition-colors"
             >
               {previewFile ? (
                 <>
-                  <FileImage size={16} className="text-green-400" />
-                  <span className="text-sm truncate">{previewFile.name}</span>
+                  <FileImage size={16} className="text-green-400 shrink-0" />
+                  <span className="text-xs sm:text-sm truncate text-pb-text flex-1 text-left">{previewFile.name}</span>
                   <span
                     onClick={(e) => {
                       e.stopPropagation();
                       setPreviewFile(null);
                     }}
-                    className="ml-auto text-pb-text-muted hover:text-red-400"
+                    className="p-1 rounded-lg text-pb-text-muted hover:text-red-400 hover:bg-red-500/10"
+                    title="Hapus file preview"
                   >
                     <X size={14} />
                   </span>
                 </>
               ) : (
                 <>
-                  <ImageIcon size={16} />
-                  <span className="text-sm">Tidak ada file preview</span>
+                  <ImageIcon size={16} className="text-pb-text-muted shrink-0" />
+                  <span className="text-xs sm:text-sm text-pb-text-muted">Pilih thumbnail preview (opsional)</span>
                 </>
               )}
             </button>
@@ -532,55 +544,51 @@ const TemplatesPage: React.FC = () => {
           {/* Dimensi */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-pb-text-secondary text-xs font-medium mb-1.5">
-                Lebar (px)
+              <label className="block text-pb-text text-xs font-semibold mb-1.5">
+                Lebar Canvas (px)
               </label>
               <input
                 type="number"
                 value={form.canvas_width}
                 onChange={(e) => setField("canvas_width", e.target.value)}
                 min={100}
-                className="w-full bg-pb-bg border border-pb-border rounded-lg px-3 py-2.5
-                  text-pb-text text-sm focus:outline-none focus:ring-1 focus:border-pb-border-strong focus:ring-white/10"
+                className="w-full bg-pb-bg border border-pb-border rounded-xl px-3.5 py-2.5
+                  text-pb-text text-xs sm:text-sm focus:outline-none focus:ring-1 focus:border-[#FF5A36]"
               />
             </div>
             <div>
-              <label className="block text-pb-text-secondary text-xs font-medium mb-1.5">
-                Tinggi (px)
+              <label className="block text-pb-text text-xs font-semibold mb-1.5">
+                Tinggi Canvas (px)
               </label>
               <input
                 type="number"
                 value={form.canvas_height}
                 onChange={(e) => setField("canvas_height", e.target.value)}
                 min={100}
-                className="w-full bg-pb-bg border border-pb-border rounded-lg px-3 py-2.5
-                  text-pb-text text-sm focus:outline-none focus:ring-1 focus:border-pb-border-strong focus:ring-white/10"
+                className="w-full bg-pb-bg border border-pb-border rounded-xl px-3.5 py-2.5
+                  text-pb-text text-xs sm:text-sm focus:outline-none focus:ring-1 focus:border-[#FF5A36]"
               />
             </div>
           </div>
 
-          <div className="flex items-start gap-2 bg-pb-bg border border-pb-border rounded-lg px-3 py-2.5">
+          <div className="flex items-start gap-2.5 bg-pb-elevated/70 border border-pb-border rounded-xl p-3">
             <SlidersHorizontal
               size={15}
-              className="text-cyan-400 mt-0.5 shrink-0"
+              className="text-[#FF5A36] mt-0.5 shrink-0"
             />
-            <p className="text-pb-text-secondary text-xs leading-relaxed">
-              Setelah upload, kamu langsung diarahkan ke{" "}
-              <span className="text-pb-text font-medium">Frame Editor</span>{" "}
-              untuk menentukan posisi kamera secara manual: tambah frame, geser,
-              resize, rotasi, flip, atur masking, lalu{" "}
-              <span className="text-pb-text font-medium">Test Camera</span> dan{" "}
-              <span className="text-pb-text font-medium">Confirm Template</span>
-              . Template baru berstatus{" "}
-              <span className="text-amber-400 font-medium">Draft</span> dan
-              belum bisa dipakai Photo Session sebelum dikonfirmasi.
+            <p className="text-pb-text-muted text-[11px] sm:text-xs leading-relaxed">
+              Setelah upload, Anda otomatis diarahkan ke{" "}
+              <span className="text-pb-text font-semibold">Frame Editor</span>{" "}
+              untuk mengatur lubang kamera, lalu tekan{" "}
+              <span className="text-pb-text font-semibold">Confirm Template</span>.
             </p>
           </div>
         </div>
 
-        <div className="flex gap-3 mt-6">
+        <div className="flex items-center gap-2.5 mt-5">
           <Button
             variant="secondary"
+            size="md"
             fullWidth
             onClick={() => setIsUploadOpen(false)}
             disabled={createTemplate.isPending}
@@ -589,10 +597,11 @@ const TemplatesPage: React.FC = () => {
           </Button>
           <Button
             variant="primary"
+            size="md"
             fullWidth
             onClick={handleUpload}
             loading={createTemplate.isPending}
-            leftIcon={<Plus size={16} />}
+            leftIcon={<Upload size={15} />}
           >
             {createTemplate.isPending
               ? "Mengunggah..."

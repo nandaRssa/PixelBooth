@@ -636,7 +636,6 @@ const PhotoCapturePage: React.FC = () => {
 
     return style
   }
-
   // Transform video: mirror selfie default; flip frame membalik arahnya
   const videoTransform = (slot: PreviewSlot): string => {
     const sx = slot.flip_h ? 1 : -1
@@ -645,29 +644,29 @@ const PhotoCapturePage: React.FC = () => {
   }
 
   return (
-    <div>
+    <div className="max-w-6xl mx-auto pb-8">
       {/* ===== Header ===== */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
         <div>
-          <h1 className="text-pb-text text-2xl font-bold">Sesi Foto</h1>
-          <p className="text-pb-text-muted text-sm mt-1">
+          <h1 className="text-pb-text text-xl sm:text-2xl font-bold">Sesi Foto</h1>
+          <p className="text-pb-text-muted text-xs sm:text-sm mt-0.5">
             {template?.name ?? 'Template'} · {totalFrames} frame
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
           {cameraActive ? (
             <CameraStatusBadge status="connected" />
           ) : (
             <CameraStatusBadge status="disconnected" />
           )}
-          <Button variant="secondary" size="md" onClick={handleCancel} leftIcon={<X size={16} />}>
+          <Button variant="secondary" size="sm" onClick={handleCancel} leftIcon={<X size={15} />}>
             Batalkan Sesi
           </Button>
         </div>
       </div>
 
       {/* ===== Progress frame ===== */}
-      <div className="flex items-center gap-3 mb-6">
+      <div className="flex items-center gap-3 mb-5">
         <div className="flex-1 h-2 bg-pb-elevated rounded-full overflow-hidden">
           <div
             className="h-full bg-pb-accent rounded-full transition-all duration-300"
@@ -676,24 +675,22 @@ const PhotoCapturePage: React.FC = () => {
             }}
           />
         </div>
-        <span className="text-pb-text-secondary text-sm whitespace-nowrap">
+        <span className="text-pb-text-secondary text-xs sm:text-sm whitespace-nowrap font-medium">
           Foto {allDone ? totalFrames : activeFrameIndex + 1} / {totalFrames}
         </span>
       </div>
 
-      {/* ===== Camera Preview ===== */}
-      <div className="flex justify-center mb-6">
-        <div className="relative w-full max-w-2xl flex justify-center">
+      {/* ===== Main Content: Camera Viewport (Left) + Controls (Right) ===== */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        {/* Camera Preview */}
+        <div className="lg:col-span-7 xl:col-span-8 flex justify-center w-full">
           <div
-            className="relative bg-black rounded-2xl overflow-hidden shadow-2xl border border-pb-border"
+            className="relative bg-black rounded-2xl overflow-hidden shadow-2xl border border-pb-border w-full flex items-center justify-center"
             style={{
               aspectRatio: template
                 ? `${template.canvas_width} / ${template.canvas_height}`
                 : '4 / 3',
-              width: template
-                ? `min(100%, calc(78vh * ${template.canvas_width} / ${template.canvas_height}))`
-                : '100%',
-              maxHeight: '78vh',
+              maxHeight: '68vh',
             }}
           >
             {/* Video utama: sumber capture — selalu tersembunyi.
@@ -754,15 +751,15 @@ const PhotoCapturePage: React.FC = () => {
               />
             )}
 
-            {/* Indikator frame aktif: outline + glow + label */}
-            {!allDone && activeSlot && template && (
+            {/* Highlight bingkai aktif */}
+            {!allDone && cameraActive && activeSlot && (
               <div
-                className="absolute pointer-events-none"
+                className="absolute pointer-events-none z-10"
                 style={slotPosition(activeSlot)}
               >
                 <div className="absolute inset-0 border-2 border-white/80 rounded-lg shadow-[0_0_24px_rgba(255,255,255,0.35)]" />
                 <span
-                  className="absolute -top-3 left-2 bg-white text-black text-[11px] font-semibold
+                  className="absolute -top-3 left-2 bg-white text-black text-[10px] font-bold
                     px-2 py-0.5 rounded-md shadow"
                 >
                   Foto {activeFrameIndex + 1}
@@ -786,7 +783,7 @@ const PhotoCapturePage: React.FC = () => {
 
             {/* Kamera tidak aktif */}
             {!cameraActive && !allDone && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-6">
+              <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-6 z-20">
                 <VideoOff size={36} className="text-pb-faint mb-3" />
                 <p className="text-pb-text-secondary text-sm mb-4">Kamera tidak aktif</p>
                 {cameraError && <p className="text-red-400 text-xs max-w-xs mb-4">{cameraError}</p>}
@@ -803,23 +800,23 @@ const PhotoCapturePage: React.FC = () => {
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
-                  className="absolute z-10 flex items-center justify-center pointer-events-none"
+                  className="absolute z-20 flex items-center justify-center pointer-events-none"
                   style={slotPosition(activeSlot)}
                 >
                   <motion.div
                     key={countdown}
                     initial={{ scale: 1.6, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
-                    className="w-28 h-28 rounded-full bg-black/50 border border-white/40 flex items-center justify-center"
+                    className="w-24 h-24 sm:w-28 sm:h-28 rounded-full bg-black/60 border border-white/40 flex items-center justify-center shadow-2xl"
                   >
-                    <span className="text-pb-text text-6xl font-bold">{countdown}</span>
+                    <span className="text-pb-text text-5xl sm:text-6xl font-bold">{countdown}</span>
                   </motion.div>
                 </motion.div>
               )}
             </AnimatePresence>
 
             {isCapturing && (
-              <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-10">
+              <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-20">
                 <div className="text-center">
                   <Spinner size="lg" className="text-pb-text mb-2" />
                   <p className="text-pb-text-secondary text-sm">Memproses foto...</p>
@@ -829,8 +826,8 @@ const PhotoCapturePage: React.FC = () => {
           </div>
         </div>
 
-        {/* ===== Controls ===== */}
-        <div className="bg-pb-surface border border-pb-border rounded-2xl p-5 flex flex-col">
+        {/* Controls Card */}
+        <div className="lg:col-span-5 xl:col-span-4 bg-pb-surface border border-pb-border rounded-2xl p-4 sm:p-5 flex flex-col shadow-xs">
           {allDone ? (
             <>
               <h3 className="text-pb-text font-semibold text-base mb-1">

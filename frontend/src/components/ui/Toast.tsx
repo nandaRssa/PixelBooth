@@ -66,22 +66,24 @@ const ToastComponent: React.FC<ToastItemProps> = ({ toast, onDismiss }) => {
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20, scale: 0.95 }}
+      initial={{ opacity: 0, y: -16, scale: 0.95 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, y: 10, scale: 0.95 }}
+      exit={{ opacity: 0, y: -10, scale: 0.95 }}
       className={`
-        flex items-start gap-3 px-4 py-3 rounded-lg border pointer-events-auto
+        flex items-center gap-2.5 px-3.5 py-2 rounded-xl border pointer-events-auto
         ${config.bg} ${config.border}
-        shadow-2xl min-w-[260px] max-w-[380px]
+        shadow-xl w-full text-xs backdrop-blur-md
       `}
     >
-      <Icon size={16} className={`${config.iconColor} mt-0.5 flex-shrink-0`} />
-      <p className={`text-sm flex-1 leading-relaxed ${config.text}`}>{toast.message}</p>
+      <Icon size={14} className={`${config.iconColor} flex-shrink-0`} />
+      <p className={`text-xs flex-1 leading-snug font-medium ${config.text}`}>{toast.message}</p>
       <button
         onClick={() => onDismiss(toast.id)}
-        className="text-pb-text-muted hover:text-pb-text transition-colors flex-shrink-0"
+        className="text-pb-text-muted hover:text-pb-text transition-colors flex-shrink-0 p-0.5"
+        title="Tutup"
+        aria-label="Tutup notifikasi"
       >
-        <X size={14} />
+        <X size={12} />
       </button>
     </motion.div>
   )
@@ -95,10 +97,9 @@ interface ToastContainerProps {
 
 export const ToastContainer: React.FC<ToastContainerProps> = ({ toasts, onDismiss }) => {
   return (
-    // Bawah-kanan pojok: tidak menutupi area tengah atau kontrol utama.
-    // Container pointer-events-none agar klik tembus saat tidak ada toast.
-    <div className="fixed bottom-6 right-6 z-[100] flex flex-col items-end gap-2 pointer-events-none">
-      <AnimatePresence mode="popLayout">
+    // Atas tengah: compact dan tidak menutupi tombol bawah atau bottom navigation
+    <div className="fixed top-4 sm:top-6 left-1/2 -translate-x-1/2 z-[100] flex flex-col items-center gap-2 pointer-events-none w-[calc(100vw-2rem)] max-w-sm">
+      <AnimatePresence>
         {toasts.map((toast) => (
           <ToastComponent key={toast.id} toast={toast} onDismiss={onDismiss} />
         ))}
