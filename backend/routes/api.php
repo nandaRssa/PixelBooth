@@ -35,6 +35,8 @@ Route::get('/health', fn() => response()->json([
 Route::prefix('public')->middleware('throttle:60,1')->group(function () {
     Route::get('/photo/{token}', [CustomerController::class, 'showPhoto'])->name('public.photo');
     Route::get('/folder/{token}', [CustomerController::class, 'showFolder'])->name('public.folder');
+    Route::delete('/photo/{token}', [CustomerController::class, 'deletePhoto'])->name('public.photo.delete');
+    Route::post('/photos/bulk-delete', [CustomerController::class, 'bulkDeletePhotos'])->name('public.photos.bulk-delete');
 });
 
 // ==========================================

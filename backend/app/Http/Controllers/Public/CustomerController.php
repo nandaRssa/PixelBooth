@@ -75,4 +75,52 @@ class CustomerController extends Controller
             ],
         ]);
     }
+
+    /**
+     * Hapus foto via unique_token (QR Customer).
+     */
+    public function deletePhoto(string $token): JsonResponse
+    {
+        $photo = Photo::where('unique_token', $token)->first();
+
+        if (! $photo) {
+            return response()->json([
+                'message' => 'Foto tidak ditemukan.',
+            ], 404);
+        }
+
+        \Illuminate\Support\Facades\Storage::disk('public')->delete(array_filter([
+            $photo->storage_path,
+            $photo->thumbnail_path,
+            $photo->qr_path,
+        ]));
+
+        $photo->delete();
+
+        return response()->json(['message' => 'Foto berhasil dihapus.']);
+    }
+
+    /**
+     * Bulk delete foto via token (QR Customer Folder).
+     */
+    public function bulkDeletePhotos(\Illuminate\Http\Request $request): JsonResponse
+    {
+        $request->validate([
+            'tokens' => ['required', 'array'],
+            'tokens.*' => ['string'],
+        ]);
+
+        $photos = Photo::whereIn('unique_token', $request->tokens)->get();
+
+        foreach ($photos as $photo) {
+            \Illuminate\Support\Facades\Storage::disk('public')->delete(array_filter([
+                $photo->storage_path,
+                $photo->thumbnail_path,
+                $photo->qr_path,
+            ]));
+            $photo->delete();
+        }
+
+        return response()->json(['message' => count($photos) . ' foto berhasil dihapus.']);
+    }
 }
