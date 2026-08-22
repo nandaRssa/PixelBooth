@@ -13,6 +13,7 @@
    ========================================== */
 
 :root {
+  color-scheme: dark;
   --pb-bg: #0a0a0a;
   --pb-surface: #141414;
   --pb-elevated: #1e1e1e;
@@ -28,6 +29,7 @@
 }
 
 html.light {
+  color-scheme: light;
   --pb-bg: #fafafa;
   --pb-surface: #ffffff;
   --pb-elevated: #f4f4f5;
