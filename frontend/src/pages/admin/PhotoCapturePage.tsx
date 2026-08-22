@@ -23,6 +23,7 @@ import { sessionApi } from '@/api/sessions'
 import { useFolders } from '@/hooks/useFolders'
 import { resolvePreviewSlots } from '@/utils/previewSlots'
 import { buildTemplateOverlay } from '@/utils/templateOverlay'
+import { getStorageUrl } from '@/api/client'
 import type { PhotoSession } from '@/types'
 import type { PreviewSlot } from '@/utils/previewSlots'
 
@@ -118,7 +119,7 @@ const PhotoCapturePage: React.FC = () => {
 
     let cancelled = false
     buildTemplateOverlay(
-      tpl.template_url,
+      getStorageUrl(tpl.template_url),
       previewSlots,
       tpl.canvas_width,
       tpl.canvas_height
@@ -460,7 +461,7 @@ const PhotoCapturePage: React.FC = () => {
         <div className="bg-pb-surface border border-pb-border rounded-2xl p-8 flex flex-col items-center text-center">
           {resultPhoto.url ? (
             <img
-              src={resultPhoto.url}
+              src={getStorageUrl(resultPhoto.url)}
               alt="Foto final"
               className="max-h-80 w-auto max-w-full rounded-xl mb-5 border border-pb-border shadow-xl"
             />
@@ -585,7 +586,7 @@ const PhotoCapturePage: React.FC = () => {
 
               <div className="bg-white p-5 rounded-2xl border border-pb-border shadow-2xl w-full max-w-[320px] sm:max-w-[380px]">
                 <img
-                  src={resultPhoto.qr_url}
+                  src={getStorageUrl(resultPhoto.qr_url)}
                   alt="QR Code Foto"
                   className="w-full h-auto object-contain rounded-lg"
                 />
@@ -668,11 +669,10 @@ const PhotoCapturePage: React.FC = () => {
       </div>
 
       {/* ===== Camera Preview ===== */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Video / Captured */}
-        <div className="lg:col-span-2 flex justify-center">
+      <div className="flex justify-center mb-6">
+        <div className="relative w-full max-w-2xl flex justify-center">
           <div
-            className="relative bg-pb-bg border border-pb-border rounded-2xl overflow-hidden"
+            className="relative bg-black rounded-2xl overflow-hidden shadow-2xl border border-pb-border"
             style={{
               aspectRatio: template
                 ? `${template.canvas_width} / ${template.canvas_height}`
@@ -700,7 +700,7 @@ const PhotoCapturePage: React.FC = () => {
             {/* Template mentah (fallback): ditaruh di BAWAH kamera slot */}
             {!overlayUrl && template && template.template_url && (
               <img
-                src={template.template_url}
+                src={getStorageUrl(template.template_url)}
                 alt={template.name}
                 draggable={false}
                 className="absolute inset-0 w-full h-full object-fill pointer-events-none select-none"
@@ -726,7 +726,7 @@ const PhotoCapturePage: React.FC = () => {
                       />
                     ) : frameImages[i] ? (
                       <img
-                        src={frameImages[i]}
+                        src={getStorageUrl(frameImages[i])}
                         alt={`Foto ${i + 1}`}
                         className="w-full h-full object-cover"
                         style={{

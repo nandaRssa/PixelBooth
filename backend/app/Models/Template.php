@@ -37,16 +37,24 @@ class Template extends Model
 
     public function getTemplateUrlAttribute(): ?string
     {
-        return $this->template_file
-            ? '/storage/' . ltrim($this->template_file, '/')
-            : null;
+        if (! $this->template_file) {
+            return null;
+        }
+        if (str_starts_with($this->template_file, 'http://') || str_starts_with($this->template_file, 'https://')) {
+            return $this->template_file;
+        }
+        return url('storage/' . ltrim($this->template_file, '/'));
     }
 
     public function getPreviewUrlAttribute(): ?string
     {
-        return $this->preview_file
-            ? '/storage/' . ltrim($this->preview_file, '/')
-            : null;
+        if (! $this->preview_file) {
+            return null;
+        }
+        if (str_starts_with($this->preview_file, 'http://') || str_starts_with($this->preview_file, 'https://')) {
+            return $this->preview_file;
+        }
+        return url('storage/' . ltrim($this->preview_file, '/'));
     }
 
     /**

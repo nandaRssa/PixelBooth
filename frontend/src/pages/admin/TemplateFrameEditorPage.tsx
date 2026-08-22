@@ -40,6 +40,7 @@ import {
   type WorkTemplate,
 } from "@/utils/frameMask";
 import { loadImage } from "@/utils/templateOverlay";
+import { getStorageUrl } from "@/api/client";
 import type { CameraFrame, Template } from "@/types";
 
 // ==========================================
@@ -171,7 +172,7 @@ const TemplateFrameEditorPage: React.FC = () => {
   useEffect(() => {
     if (!template?.template_url) return;
     let cancelled = false;
-    loadImage(template.template_url)
+    loadImage(getStorageUrl(template.template_url))
       .then((img) => {
         if (cancelled) return;
         templateImgRef.current = img;
