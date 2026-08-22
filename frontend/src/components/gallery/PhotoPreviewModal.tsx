@@ -2,6 +2,7 @@ import React from 'react'
 import { Download, ExternalLink, FolderInput, QrCode, Trash2, X } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Button } from '@/components/ui/Button'
+import { getStorageUrl } from '@/api/client'
 import type { Photo } from '@/types'
 
 // ==========================================
@@ -68,7 +69,7 @@ const PhotoPreviewModal: React.FC<PhotoPreviewModalProps> = ({
             <div className="flex-1 min-h-0 bg-pb-bg border border-pb-border rounded-xl overflow-hidden flex items-center justify-center p-2">
               {photo.url ? (
                 <img
-                  src={photo.url}
+                  src={getStorageUrl(photo.url)}
                   alt={photo.filename}
                   className="max-w-full max-h-[65vh] object-contain rounded-lg"
                 />
@@ -82,7 +83,7 @@ const PhotoPreviewModal: React.FC<PhotoPreviewModalProps> = ({
               <Button
                 variant="secondary"
                 size="md"
-                onClick={() => window.open(photo.url, '_blank')}
+                onClick={() => window.open(getStorageUrl(photo.url), '_blank')}
                 leftIcon={<ExternalLink size={16} />}
               >
                 Buka

@@ -25,7 +25,7 @@ class FrameMaskService
      * Resolusi kerja analisis warna (HD): semakin tinggi resolusinya,
      * semakin presisi dan halus penghapusan piksel tanpa ada gerigi/serbuk kasar.
      */
-    public const WORK_MAX = 1200;
+    public const WORK_MAX = 720;
 
     /**
      * Normalisasi satu frame dari input API/user menjadi struktur lengkap ber-default.

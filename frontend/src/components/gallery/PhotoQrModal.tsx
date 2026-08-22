@@ -4,6 +4,7 @@ import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { toast } from '@/components/ui/Toast'
 import { downloadSvgAsPng } from '@/utils/downloadQr'
+import { getStorageUrl } from '@/api/client'
 import type { Photo } from '@/types'
 
 // ==========================================
@@ -24,7 +25,7 @@ const PhotoQrModal: React.FC<PhotoQrModalProps> = ({ isOpen, onClose, photo }) =
   const handleDownloadQr = async () => {
     if (!photo.qr_url) return
     try {
-      await downloadSvgAsPng(photo.qr_url, `qr-${photo.unique_token.slice(0, 8)}.png`)
+      await downloadSvgAsPng(getStorageUrl(photo.qr_url), `qr-${photo.unique_token.slice(0, 8)}.png`)
     } catch {
       toast.error('Gagal mengunduh QR.')
     }
@@ -48,7 +49,7 @@ const PhotoQrModal: React.FC<PhotoQrModalProps> = ({ isOpen, onClose, photo }) =
       <div className="flex flex-col items-center text-center">
         <div className="w-80 max-w-full rounded-2xl p-4 overflow-hidden border border-pb-border shadow-xl bg-white mb-5">
           {photo.qr_url ? (
-            <img src={photo.qr_url} alt="QR Code foto" className="w-full h-auto" />
+            <img src={getStorageUrl(photo.qr_url)} alt="QR Code foto" className="w-full h-auto" />
           ) : (
             <div className="w-full h-72 bg-pb-elevated" />
           )}

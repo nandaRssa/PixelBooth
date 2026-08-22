@@ -4,6 +4,8 @@ import { X, Plus, Trash2, Check, RefreshCw, Crop, ArrowUp, ArrowDown } from 'luc
 import { Button } from '@/components/ui/Button'
 import { Spinner } from '@/components/ui/StatusBadge'
 import { toast } from '@/components/ui/Toast'
+import { useUpdateTemplate } from '@/hooks/useTemplates'
+import { getStorageUrl } from '@/api/client'
 import apiClient from '@/api/client'
 import type { CameraFrame, FrameConfig, Template } from '@/types'
 import { normalizeFrame } from '@/utils/frameMask'
@@ -374,7 +376,7 @@ export const TemplateCalibrationModal: React.FC<TemplateCalibrationModalProps> =
                 >
                   {/* Base Template Image */}
                   <img
-                    src={template.template_url ?? undefined}
+                    src={getStorageUrl(template.template_url) || undefined}
                     alt="Template layout"
                     draggable={false}
                     className="absolute inset-0 w-full h-full object-fill pointer-events-none"

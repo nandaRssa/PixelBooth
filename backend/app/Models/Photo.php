@@ -50,21 +50,32 @@ class Photo extends Model
 
     public function getUrlAttribute(): string
     {
-        return '/storage/' . ltrim((string) $this->storage_path, '/');
+        if (str_starts_with((string) $this->storage_path, 'http://') || str_starts_with((string) $this->storage_path, 'https://')) {
+            return $this->storage_path;
+        }
+        return url('storage/' . ltrim((string) $this->storage_path, '/'));
     }
 
     public function getThumbnailUrlAttribute(): ?string
     {
-        return $this->thumbnail_path
-            ? '/storage/' . ltrim($this->thumbnail_path, '/')
-            : null;
+        if (! $this->thumbnail_path) {
+            return null;
+        }
+        if (str_starts_with($this->thumbnail_path, 'http://') || str_starts_with($this->thumbnail_path, 'https://')) {
+            return $this->thumbnail_path;
+        }
+        return url('storage/' . ltrim($this->thumbnail_path, '/'));
     }
 
     public function getQrUrlAttribute(): ?string
     {
-        return $this->qr_path
-            ? '/storage/' . ltrim($this->qr_path, '/')
-            : null;
+        if (! $this->qr_path) {
+            return null;
+        }
+        if (str_starts_with($this->qr_path, 'http://') || str_starts_with($this->qr_path, 'https://')) {
+            return $this->qr_path;
+        }
+        return url('storage/' . ltrim($this->qr_path, '/'));
     }
 
     /**

@@ -26,6 +26,7 @@ import {
   useDeleteTemplate,
   templateApi,
 } from "@/hooks/useTemplates";
+import { getStorageUrl } from "@/api/client";
 import type { Template } from "@/types";
 
 // ==========================================
@@ -318,14 +319,14 @@ const TemplatesPage: React.FC = () => {
                   {/* Image / Preview */}
                   {template.preview_url ? (
                     <img
-                      src={template.preview_url}
+                      src={getStorageUrl(template.preview_url)}
                       alt={template.name}
                       loading="lazy"
                       className="absolute inset-0 w-full h-full object-cover"
                     />
                   ) : template.template_url ? (
                     <img
-                      src={template.template_url}
+                      src={getStorageUrl(template.template_url)}
                       alt={template.name}
                       loading="lazy"
                       className="absolute inset-0 w-full h-full object-cover"

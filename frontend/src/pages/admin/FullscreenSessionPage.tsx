@@ -8,6 +8,7 @@ import { sessionApi } from '@/api/sessions'
 import { useFolders } from '@/hooks/useFolders'
 import { resolvePreviewSlots } from '@/utils/previewSlots'
 import { buildTemplateOverlay } from '@/utils/templateOverlay'
+import { getStorageUrl } from '@/api/client'
 import type { PhotoSession } from '@/types'
 import type { PreviewSlot } from '@/utils/previewSlots'
 
@@ -98,7 +99,7 @@ const FullscreenSessionPage: React.FC = () => {
     if (!tpl || !tpl.template_url || previewSlots.length === 0) return
 
     let cancelled = false
-    buildTemplateOverlay(tpl.template_url, previewSlots, tpl.canvas_width, tpl.canvas_height)
+    buildTemplateOverlay(getStorageUrl(tpl.template_url), previewSlots, tpl.canvas_width, tpl.canvas_height)
       .then((url) => {
         if (!cancelled) setOverlay({ url, token: overlayToken })
       })
@@ -466,7 +467,7 @@ const FullscreenSessionPage: React.FC = () => {
           {/* Template mentah (fallback di bawah kamera) */}
           {!overlayUrl && template?.template_url && (
             <img
-              src={template.template_url}
+              src={getStorageUrl(template.template_url)}
               alt={template.name}
               draggable={false}
               className="absolute inset-0 w-full h-full object-fill pointer-events-none"
@@ -492,7 +493,7 @@ const FullscreenSessionPage: React.FC = () => {
                     />
                   ) : frameImages[i] ? (
                     <img
-                      src={frameImages[i]}
+                      src={getStorageUrl(frameImages[i])}
                       alt={`Foto ${i + 1}`}
                       className="w-full h-full object-cover"
                       style={{
@@ -698,7 +699,7 @@ const FullscreenSessionPage: React.FC = () => {
         <div className="absolute inset-0 z-20 bg-black/90 flex flex-col items-center justify-center gap-6 p-6 overflow-y-auto">
           {resultPhoto?.url ? (
             <img
-              src={resultPhoto.url}
+              src={getStorageUrl(resultPhoto.url)}
               alt="Foto final"
               className="max-h-[50vh] w-auto max-w-full rounded-xl shadow-2xl border border-white/10"
             />
@@ -821,7 +822,7 @@ const FullscreenSessionPage: React.FC = () => {
 
             <div className="bg-white p-5 rounded-2xl border border-pb-border shadow-2xl w-full max-w-[320px] sm:max-w-[380px]">
               <img
-                src={resultPhoto.qr_url}
+                src={getStorageUrl(resultPhoto.qr_url)}
                 alt="QR Code Foto"
                 className="w-full h-auto object-contain rounded-lg"
               />

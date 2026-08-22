@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/Button'
 import { CameraStatusBadge, Spinner } from '@/components/ui/StatusBadge'
 import { toast } from '@/components/ui/Toast'
 import { useTemplates, useHardwareStatus } from '@/hooks/useTemplates'
+import { getStorageUrl } from '@/api/client'
 import { useFolders } from '@/hooks/useFolders'
 import { useCreateSession } from '@/hooks/useSessions'
 import { getSessionDisplayMode } from '@/utils/sessionDisplay'
@@ -246,13 +247,13 @@ const PhotoMenuPage: React.FC = () => {
                 >
                   {template.preview_url ? (
                     <img
-                      src={template.preview_url}
+                      src={getStorageUrl(template.preview_url)}
                       alt={template.name}
                       className="absolute inset-0 w-full h-full object-cover"
                     />
                   ) : template.template_url ? (
                     <img
-                      src={template.template_url}
+                      src={getStorageUrl(template.template_url)}
                       alt={template.name}
                       className="absolute inset-0 w-full h-full object-cover"
                     />

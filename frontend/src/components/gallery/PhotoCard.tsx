@@ -1,6 +1,7 @@
 import React from 'react'
 import { motion } from 'framer-motion'
 import { Check, Eye, FolderInput, Trash2, ImageIcon } from 'lucide-react'
+import { getStorageUrl } from '@/api/client'
 import type { Photo } from '@/types'
 
 // ==========================================
@@ -56,7 +57,7 @@ const PhotoCard: React.FC<PhotoCardProps> = ({
     >
       {(photo.thumbnail_url || photo.url) ? (
         <img
-          src={photo.thumbnail_url ?? photo.url}
+          src={getStorageUrl(photo.thumbnail_url ?? photo.url)}
           alt={photo.filename}
           loading="lazy"
           className={`absolute inset-0 w-full h-full object-cover transition-all duration-200 ${
