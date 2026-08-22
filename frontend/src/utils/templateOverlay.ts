@@ -8,15 +8,32 @@
 
 import type { CameraFrame } from '@/types'
 import { computeHoleMask, downscaleTemplate, type WorkTemplate } from './frameMask'
+import { getStorageUrl } from '@/api/client'
 
-/** Muat gambar dan tunggu sampai siap. */
+/** Muat gambar dan tunggu sampai siap dengan CORS & fallback Blob. */
 export function loadImage(src: string): Promise<HTMLImageElement> {
+  const url = getStorageUrl(src)
   return new Promise((resolve, reject) => {
     const img = new Image()
     img.crossOrigin = 'anonymous'
     img.onload = () => resolve(img)
-    img.onerror = () => reject(new Error('Gagal memuat gambar template'))
-    img.src = src
+    img.onerror = () => {
+      // Fallback: Fetch via Blob untuk melewati blokir CORS canvas
+      fetch(url, { mode: 'cors' })
+        .then((res) => {
+          if (!res.ok) throw new Error(`HTTP error ${res.status}`)
+          return res.blob()
+        })
+        .then((blob) => {
+          const blobUrl = URL.createObjectURL(blob)
+          const fallbackImg = new Image()
+          fallbackImg.onload = () => resolve(fallbackImg)
+          fallbackImg.onerror = () => reject(new Error('Gagal memuat gambar template'))
+          fallbackImg.src = blobUrl
+        })
+        .catch(() => reject(new Error('Gagal memuat gambar template')))
+    }
+    img.src = url
   })
 }
 

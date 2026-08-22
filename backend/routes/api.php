@@ -88,4 +88,20 @@ Route::middleware('throttle:120,1')->group(function () {
     Route::get('/hardware/status', [HardwareController::class, 'status'])->name('hardware.status');
     Route::post('/hardware/capture', [HardwareController::class, 'capture'])->name('hardware.capture');
     Route::get('/hardware/latest-photo', [HardwareController::class, 'latestPhoto'])->name('hardware.latest');
+
+    // Storage Files (CORS-enabled)
+    Route::get('/storage/{path}', function ($path) {
+        $fullPath = storage_path('app/public/' . $path);
+        if (! file_exists($fullPath)) {
+            abort(404);
+        }
+        $mime = mime_content_type($fullPath) ?: 'image/png';
+        return response()->file($fullPath, [
+            'Access-Control-Allow-Origin' => '*',
+            'Access-Control-Allow-Methods' => 'GET, OPTIONS',
+            'Access-Control-Allow-Headers' => '*',
+            'Content-Type' => $mime,
+            'Cache-Control' => 'public, max-age=86400',
+        ]);
+    })->where('path', '.*');
 });

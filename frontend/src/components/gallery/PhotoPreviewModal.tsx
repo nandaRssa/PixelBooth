@@ -91,13 +91,23 @@ const PhotoPreviewModal: React.FC<PhotoPreviewModalProps> = ({
               <Button
                 variant="secondary"
                 size="md"
-                onClick={() => {
-                  const a = document.createElement('a')
-                  a.href = photo.url
-                  a.download = photo.filename
-                  document.body.appendChild(a)
-                  a.click()
-                  a.remove()
+                onClick={async () => {
+                  try {
+                    const fileUrl = getStorageUrl(photo.url)
+                    const res = await fetch(fileUrl)
+                    if (!res.ok) throw new Error('Download failed')
+                    const blob = await res.blob()
+                    const blobUrl = URL.createObjectURL(blob)
+                    const a = document.createElement('a')
+                    a.href = blobUrl
+                    a.download = photo.filename || 'pixelbooth-photo.jpg'
+                    document.body.appendChild(a)
+                    a.click()
+                    document.body.removeChild(a)
+                    URL.revokeObjectURL(blobUrl)
+                  } catch {
+                    window.open(getStorageUrl(photo.url), '_blank')
+                  }
                 }}
                 leftIcon={<Download size={16} />}
               >
