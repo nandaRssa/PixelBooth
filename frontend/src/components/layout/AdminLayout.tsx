@@ -91,6 +91,7 @@ export const AdminLayout: React.FC = () => {
             <NavLink
               key={item.to}
               to={item.to}
+              onClick={() => window.scrollTo({ top: 0, left: 0, behavior: 'smooth' })}
               title={item.label}
               className={({ isActive }) => `
                 flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold
@@ -111,6 +112,7 @@ export const AdminLayout: React.FC = () => {
         <div className="px-3 py-4 border-t border-pb-border">
           <NavLink
             to="/settings"
+            onClick={() => window.scrollTo({ top: 0, left: 0, behavior: 'smooth' })}
             title="Pengaturan"
             className={({ isActive }) => `
               flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold
@@ -142,6 +144,7 @@ export const AdminLayout: React.FC = () => {
           <NavLink
             key={item.to}
             to={item.to}
+            onClick={() => window.scrollTo({ top: 0, left: 0, behavior: 'smooth' })}
             title={item.label}
             aria-label={item.label}
             className="flex items-center justify-center flex-1 py-1 transition-all"
@@ -161,6 +164,7 @@ export const AdminLayout: React.FC = () => {
         ))}
         <NavLink
           to="/settings"
+          onClick={() => window.scrollTo({ top: 0, left: 0, behavior: 'smooth' })}
           title="Pengaturan"
           aria-label="Pengaturan"
           className="flex items-center justify-center flex-1 py-1 transition-all"

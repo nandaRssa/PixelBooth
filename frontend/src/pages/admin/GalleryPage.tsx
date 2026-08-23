@@ -309,7 +309,7 @@ const GalleryPage: React.FC = () => {
   const allFoldersSelected = folders.length > 0 && selectedFolderIds.size === folders.length
 
   return (
-    <div className="flex flex-col h-[calc(100vh-4rem)]">
+    <div className="flex flex-col w-full pb-12">
       {/* ===== Header ===== */}
       <div className="flex items-center justify-between flex-wrap gap-3 mb-6 shrink-0">
         <div className="min-w-0">
@@ -372,8 +372,8 @@ const GalleryPage: React.FC = () => {
         </div>
       </div>
 
-      {/* ===== Konten (scroll area) ===== */}
-      <div className="flex-1 min-h-0 overflow-y-auto pb-6">
+      {/* ===== Konten (Full Page Scroll) ===== */}
+      <div className="w-full">
       {/* ===== Sub-folders ===== */}
       {foldersQuery.isLoading ? (
         <div className="flex items-center justify-center py-20">

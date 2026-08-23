@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 
 // Layout
 import { AdminLayout } from '@/components/layout/AdminLayout'
+import { ScrollToTop } from '@/components/layout/ScrollToTop'
 
 // Admin Pages
 import DashboardPage from '@/pages/admin/DashboardPage'
@@ -67,6 +68,7 @@ const App: React.FC = () => {
     <QueryClientProvider client={queryClient}>
       <ToastProvider>
         <BrowserRouter>
+          <ScrollToTop />
           <Routes>
             {/* Public Routes — Customer QR Access */}
             <Route path="/photo/:token" element={<CustomerPhotoPage />} />

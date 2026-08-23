@@ -193,9 +193,9 @@ const PhotoMenuPage: React.FC = () => {
         </div>
       </div>
 
-      {/* ===== Daftar Template (dibatasi sekitar 3 baris x 3 kolom di HP) ===== */}
-      <div className="flex-1 min-h-0 max-h-[360px] sm:max-h-none overflow-y-auto pb-4 pr-0.5">
-        <h2 className="text-pb-text text-xs sm:text-sm font-semibold mb-2 flex items-center gap-2 sticky top-0 bg-pb-bg/95 backdrop-blur-xs py-1 z-10">
+      {/* ===== Daftar Template (Full Page Scroll) ===== */}
+      <div className="w-full pb-8">
+        <h2 className="text-pb-text text-xs sm:text-sm font-semibold mb-2.5 flex items-center gap-2">
           <Layers size={15} className="text-[#FF5A36]" />
           <span>Pilih Template</span>
           <span className="text-pb-text-muted font-normal text-xs">
