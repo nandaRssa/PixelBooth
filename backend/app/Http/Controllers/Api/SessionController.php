@@ -87,15 +87,26 @@ class SessionController extends Controller
         $frameNumber = $session->current_frame;
         $storagePath = "sessions/{$session->session_token}/frame-{$frameNumber}";
 
-        // Handle file upload atau base64
+        // Handle file upload atau base64 via CloudStorageService
         if ($request->hasFile('image')) {
-            $path = $request->file('image')->store($storagePath, 'public');
+            $path = \App\Services\CloudStorageService::upload(
+                $request->file('image'),
+                'sessions',
+                "{$session->session_token}-frame-{$frameNumber}"
+            );
         } else {
-            // Decode base64 image dari webcam
-            $imageData = base64_decode(preg_replace('#^data:image/\w+;base64,#i', '', $request->image_base64));
-            $filename = "frame-{$frameNumber}-" . time() . ".jpg";
-            Storage::disk('public')->put("{$storagePath}/{$filename}", $imageData);
-            $path = "{$storagePath}/{$filename}";
+            // Base64 image dari webcam
+            $base64String = $request->image_base64;
+            $tmpPath = tempnam(sys_get_temp_dir(), 'cap_');
+            $imageData = base64_decode(preg_replace('#^data:image/\w+;base64,#i', '', $base64String));
+            file_put_contents($tmpPath, $imageData);
+
+            $path = \App\Services\CloudStorageService::upload(
+                $tmpPath,
+                'sessions',
+                "{$session->session_token}-frame-{$frameNumber}"
+            );
+            @unlink($tmpPath);
         }
 
         // Tandai retake capture sebelumnya jika ada
@@ -222,9 +233,29 @@ class SessionController extends Controller
             'completed_at' => now(),
         ]);
 
-        // Render foto final: gabungkan capture frame ke template
-        [$finalPath, $fileSize] = $this->photoRenderService->renderFinal($session);
-        $thumbnailPath = $this->photoRenderService->renderThumbnail($session, $finalPath);
+        // Render foto final: jika frontend mengirimkan composite image langsung, gunakan langsung; jika tidak, render via server service
+        $finalPath = null;
+        $fileSize = 0;
+        $thumbnailPath = null;
+
+        if ($request->filled('final_image_base64')) {
+            $base64 = $request->input('final_image_base64');
+            $tmpPath = tempnam(sys_get_temp_dir(), 'final_');
+            $imgData = base64_decode(preg_replace('#^data:image/\w+;base64,#i', '', $base64));
+            file_put_contents($tmpPath, $imgData);
+            $fileSize = filesize($tmpPath);
+
+            $finalPath = \App\Services\CloudStorageService::upload(
+                $tmpPath,
+                'photos',
+                $session->session_token . '-final'
+            );
+            $thumbnailPath = $finalPath;
+            @unlink($tmpPath);
+        } else {
+            [$finalPath, $fileSize] = $this->photoRenderService->renderFinal($session);
+            $thumbnailPath = $this->photoRenderService->renderThumbnail($session, $finalPath);
+        }
 
         // Generate custom filename: PixelBooth-{Event/Folder/Template}-{Number}.jpg
         $scopeName = 'Photo';

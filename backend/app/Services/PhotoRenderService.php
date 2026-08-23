@@ -46,8 +46,14 @@ class PhotoRenderService
 
         $slots = $this->resolveSlots($template, $captures->count());
 
-        $templatePath = $template->template_file ? Storage::disk('public')->path($template->template_file) : null;
-        if (!$templatePath || !is_file($templatePath)) {
+        $templatePath = $this->resolveLocalImagePath($template->template_file);
+        $isTempTemplate = false;
+        if (! $templatePath || ! is_file($templatePath)) {
+            // Coba ambil dari preview_file jika template_file tidak ditemukan
+            $templatePath = $this->resolveLocalImagePath($template->preview_file);
+        }
+
+        if (! $templatePath || ! is_file($templatePath)) {
             throw new \RuntimeException('File template tidak ditemukan.');
         }
 
@@ -109,15 +115,18 @@ class PhotoRenderService
         imagecopy($canvas, $design, 0, 0, 0, 0, $canvasW, $canvasH);
         imagedestroy($design);
 
-        // Simpan file final
-        $storagePath = "sessions/{$session->session_token}/final.jpg";
-        $tmpPath     = tempnam(sys_get_temp_dir(), 'pixfinal');
-
+        // Simpan file final ke Cloud Storage / disk
+        $tmpPath = tempnam(sys_get_temp_dir(), 'pixfinal');
         imagejpeg($canvas, $tmpPath, 95);
         $fileSize = filesize($tmpPath);
-        Storage::disk('public')->put($storagePath, (string) file_get_contents($tmpPath));
 
-        unlink($tmpPath);
+        $storagePath = \App\Services\CloudStorageService::upload(
+            $tmpPath,
+            'photos',
+            $session->session_token . '-final'
+        );
+
+        @unlink($tmpPath);
         imagedestroy($canvas);
 
         return [$storagePath, $fileSize];
@@ -130,8 +139,8 @@ class PhotoRenderService
      */
     public function renderThumbnail(PhotoSession $session, string $finalPath): string
     {
-        $sourcePath = Storage::disk('public')->path($finalPath);
-        if (! is_file($sourcePath)) {
+        $sourcePath = $this->resolveLocalImagePath($finalPath);
+        if (! $sourcePath || ! is_file($sourcePath)) {
             return '';
         }
 
@@ -148,13 +157,16 @@ class PhotoRenderService
         $thumb = imagecreatetruecolor($thumbW, $thumbH);
         imagecopyresampled($thumb, $src, 0, 0, 0, 0, $thumbW, $thumbH, $srcW, $srcH);
 
-        $storagePath = "sessions/{$session->session_token}/thumb.jpg";
         $tmpPath = tempnam(sys_get_temp_dir(), 'pixthumb');
-
         imagejpeg($thumb, $tmpPath, 80);
-        Storage::disk('public')->put($storagePath, (string) file_get_contents($tmpPath));
 
-        unlink($tmpPath);
+        $storagePath = \App\Services\CloudStorageService::upload(
+            $tmpPath,
+            'photos',
+            $session->session_token . '-thumb'
+        );
+
+        @unlink($tmpPath);
         imagedestroy($thumb);
         imagedestroy($src);
 
@@ -278,15 +290,51 @@ class PhotoRenderService
     }
 
     /**
-     * Muat capture frame dari storage.
+     * Muat capture frame dari storage atau cloud URL.
      */
     private function loadCaptureImage(SessionCapture $capture)
     {
-        $framePath = Storage::disk('public')->path($capture->photo_path);
-        if (! is_file($framePath)) {
+        $framePath = $this->resolveLocalImagePath($capture->photo_path);
+        if (! $framePath || ! is_file($framePath)) {
             return false;
         }
         return $this->loadImage($framePath);
+    }
+
+    /**
+     * Resolusi path gambar lokal dari URL remote, data URI, atau path disk storage.
+     */
+    public function resolveLocalImagePath(?string $imageRef): ?string
+    {
+        if (empty($imageRef)) {
+            return null;
+        }
+
+        if (str_starts_with($imageRef, 'http://') || str_starts_with($imageRef, 'https://')) {
+            $tempFile = tempnam(sys_get_temp_dir(), 'pix_img_');
+            $contents = @file_get_contents($imageRef);
+            if ($contents) {
+                file_put_contents($tempFile, $contents);
+                return $tempFile;
+            }
+        } elseif (str_starts_with($imageRef, 'data:')) {
+            $parts = explode(',', $imageRef, 2);
+            if (count($parts) === 2) {
+                $tempFile = tempnam(sys_get_temp_dir(), 'pix_img_');
+                file_put_contents($tempFile, base64_decode($parts[1]));
+                return $tempFile;
+            }
+        } elseif (file_exists($imageRef)) {
+            return $imageRef;
+        } elseif (Storage::disk('public')->exists($imageRef)) {
+            return Storage::disk('public')->path($imageRef);
+        } elseif (file_exists('/tmp/storage/app/public/' . ltrim($imageRef, '/'))) {
+            return '/tmp/storage/app/public/' . ltrim($imageRef, '/');
+        } elseif (file_exists(storage_path('app/public/' . ltrim($imageRef, '/')))) {
+            return storage_path('app/public/' . ltrim($imageRef, '/'));
+        }
+
+        return null;
     }
 
     /**

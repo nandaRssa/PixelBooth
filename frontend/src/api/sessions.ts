@@ -52,9 +52,13 @@ export const sessionApi = {
     return response.data.data
   },
 
-  complete: async (id: number): Promise<{ session: PhotoSession; photo: unknown }> => {
+  complete: async (
+    id: number,
+    payload?: { final_image_base64?: string }
+  ): Promise<{ session: PhotoSession; photo: unknown }> => {
     const response = await apiClient.post<ApiResponse<{ session: PhotoSession; photo: unknown }>>(
-      `/sessions/${id}/complete`
+      `/sessions/${id}/complete`,
+      payload || {}
     )
     return response.data.data
   },

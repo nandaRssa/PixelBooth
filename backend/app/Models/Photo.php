@@ -50,8 +50,12 @@ class Photo extends Model
 
     public function getUrlAttribute(): string
     {
-        if (str_starts_with((string) $this->storage_path, 'http://') || str_starts_with((string) $this->storage_path, 'https://')) {
-            return $this->storage_path;
+        if (
+            str_starts_with((string) $this->storage_path, 'http://') ||
+            str_starts_with((string) $this->storage_path, 'https://') ||
+            str_starts_with((string) $this->storage_path, 'data:')
+        ) {
+            return (string) $this->storage_path;
         }
         return url('api/storage/' . ltrim((string) $this->storage_path, '/'));
     }
@@ -61,7 +65,11 @@ class Photo extends Model
         if (! $this->thumbnail_path) {
             return null;
         }
-        if (str_starts_with($this->thumbnail_path, 'http://') || str_starts_with($this->thumbnail_path, 'https://')) {
+        if (
+            str_starts_with($this->thumbnail_path, 'http://') ||
+            str_starts_with($this->thumbnail_path, 'https://') ||
+            str_starts_with($this->thumbnail_path, 'data:')
+        ) {
             return $this->thumbnail_path;
         }
         return url('api/storage/' . ltrim($this->thumbnail_path, '/'));
@@ -72,7 +80,11 @@ class Photo extends Model
         if (! $this->qr_path) {
             return null;
         }
-        if (str_starts_with($this->qr_path, 'http://') || str_starts_with($this->qr_path, 'https://')) {
+        if (
+            str_starts_with($this->qr_path, 'http://') ||
+            str_starts_with($this->qr_path, 'https://') ||
+            str_starts_with($this->qr_path, 'data:')
+        ) {
             return $this->qr_path;
         }
         return url('api/storage/' . ltrim($this->qr_path, '/'));
