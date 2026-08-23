@@ -689,15 +689,22 @@ const PhotoCapturePage: React.FC = () => {
 
       {/* ===== Main Content: Camera Viewport (Left) + Controls (Right) ===== */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* Camera Preview */}
-        <div className="lg:col-span-7 xl:col-span-8 flex justify-center w-full">
+        {/* Camera View Area */}
+        <div className="lg:col-span-7 xl:col-span-8 flex items-center justify-center min-h-[50vh] p-1 sm:p-2">
           <div
-            className="relative bg-black rounded-2xl overflow-hidden shadow-2xl border border-pb-border w-full flex items-center justify-center"
+            className="relative bg-black rounded-2xl overflow-hidden shadow-2xl mx-auto flex items-center justify-center"
             style={{
               aspectRatio: template
                 ? `${template.canvas_width} / ${template.canvas_height}`
-                : '4 / 3',
-              maxHeight: '68vh',
+                : '3 / 4',
+              maxWidth: '100%',
+              maxHeight: '74vh',
+              width: template
+                ? `min(100%, calc(74vh * ${template.canvas_width} / ${template.canvas_height}))`
+                : 'auto',
+              height: template
+                ? `min(74vh, calc(100% * ${template.canvas_height} / ${template.canvas_width}))`
+                : 'auto',
             }}
           >
             {/* Video utama: sumber capture — selalu tersembunyi.
@@ -791,8 +798,8 @@ const PhotoCapturePage: React.FC = () => {
             {/* Kamera tidak aktif */}
             {!cameraActive && !allDone && (
               <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-6 z-20">
-                <VideoOff size={36} className="text-pb-faint mb-3" />
-                <p className="text-pb-text-secondary text-sm mb-4">Kamera tidak aktif</p>
+                <VideoOff size={36} className="text-white/60 mb-3" />
+                <p className="text-white/80 text-sm mb-4 font-medium">Kamera tidak aktif</p>
                 {cameraError && <p className="text-red-400 text-xs max-w-xs mb-4">{cameraError}</p>}
                 <Button variant="secondary" size="md" onClick={startCamera} leftIcon={<Video size={16} />}>
                   Aktifkan Kamera
@@ -800,7 +807,7 @@ const PhotoCapturePage: React.FC = () => {
               </div>
             )}
 
-            {/* Countdown di dalam bingkai frame yang sedang diambil */}
+            {/* Countdown di dalam bingkai frame yang sedang diambil (teks putih kontras) */}
             <AnimatePresence>
               {phase === 'countdown' && countdown !== null && countdown > 0 && activeSlot && template && (
                 <motion.div
@@ -814,19 +821,20 @@ const PhotoCapturePage: React.FC = () => {
                     key={countdown}
                     initial={{ scale: 1.6, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
-                    className="w-24 h-24 sm:w-28 sm:h-28 rounded-full bg-black/65 border border-white/60 flex items-center justify-center shadow-2xl"
+                    className="w-24 h-24 sm:w-28 sm:h-28 rounded-full bg-black/75 backdrop-blur-sm border-2 border-white flex items-center justify-center shadow-2xl"
                   >
-                    <span className="text-pb-text text-5xl sm:text-6xl font-bold">{countdown}</span>
+                    <span className="text-white text-5xl sm:text-6xl font-black drop-shadow-[0_4px_16px_rgba(0,0,0,0.9)]">{countdown}</span>
                   </motion.div>
                 </motion.div>
               )}
             </AnimatePresence>
 
+            {/* Overlay loading/proses foto dengan teks putih kontras */}
             {isCapturing && (
-              <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-20">
+              <div className="absolute inset-0 bg-black/80 backdrop-blur-xs flex items-center justify-center z-30">
                 <div className="text-center">
-                  <Spinner size="lg" className="text-pb-text mb-2" />
-                  <p className="text-pb-text-secondary text-sm">Memproses foto...</p>
+                  <Spinner size="lg" className="text-white mb-2 mx-auto" />
+                  <p className="text-white font-semibold text-sm drop-shadow-md">Memproses foto...</p>
                 </div>
               </div>
             )}
