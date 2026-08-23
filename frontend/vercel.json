@@ -21,8 +21,8 @@
   ],
   "rewrites": [
     {
-      "source": "/api/(.*)",
-      "destination": "/api"
+      "source": "/api/:match*",
+      "destination": "/api/[...route]"
     },
     {
       "source": "/(.*)",
