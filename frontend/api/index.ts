@@ -41,4 +41,12 @@ app.onError((err, c) => {
   return c.json({ message: err.message || 'Internal Server Error' }, 500)
 })
 
-export default app
+import { handle } from 'hono/vercel'
+
+export const GET = handle(app)
+export const POST = handle(app)
+export const PUT = handle(app)
+export const DELETE = handle(app)
+export const OPTIONS = handle(app)
+
+export default handle(app)
