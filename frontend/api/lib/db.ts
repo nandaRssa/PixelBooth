@@ -1,6 +1,5 @@
 import path from 'path'
 import fs from 'fs'
-import Database from 'better-sqlite3'
 import { supabase } from './supabase'
 
 // ==========================================
@@ -10,8 +9,14 @@ import { supabase } from './supabase'
 let sqliteDb: any = null
 
 function getSqlite() {
+  // On Vercel (production), skip SQLite entirely — always use Supabase
+  if (process.env.VERCEL || process.env.VERCEL_ENV) return null
+
   if (!sqliteDb && typeof window === 'undefined') {
     try {
+      // Dynamic require to avoid Vercel crash on native binary
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const Database = require('better-sqlite3')
       const p1 = path.resolve(process.cwd(), '../backend/database/database.sqlite')
       const p2 = path.resolve(process.cwd(), 'database/database.sqlite')
       const targetPath = fs.existsSync(p1) ? p1 : fs.existsSync(p2) ? p2 : null
@@ -24,6 +29,7 @@ function getSqlite() {
   }
   return sqliteDb
 }
+
 
 export const db = {
   isSupabaseConfigured(): boolean {
