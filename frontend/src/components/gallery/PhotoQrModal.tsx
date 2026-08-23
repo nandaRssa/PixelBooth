@@ -1,10 +1,9 @@
 import React from 'react'
 import { Download, Share2 } from 'lucide-react'
-import { QRCodeSVG } from 'qrcode.react'
+import { QRCodeCanvas } from 'qrcode.react'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { toast } from '@/components/ui/Toast'
-import { downloadQrCode } from '@/utils/downloadQr'
 import type { Photo } from '@/types'
 
 // ==========================================
@@ -22,9 +21,20 @@ const PhotoQrModal: React.FC<PhotoQrModalProps> = ({ isOpen, onClose, photo }) =
 
   const photoUrl = `${window.location.origin}/photo/${photo.unique_token}`
 
-  const handleDownloadQr = async () => {
+  const handleDownloadQr = () => {
     try {
-      await downloadQrCode('photo-qr-svg', photo.qr_url || '', `qr-photo-${photo.unique_token.slice(0, 8)}.png`)
+      const canvas = document.getElementById('photo-qr-canvas') as HTMLCanvasElement | null
+      if (!canvas) {
+        toast.error('Gagal mengambil data QR Code.')
+        return
+      }
+      const pngUrl = canvas.toDataURL('image/png')
+      const a = document.createElement('a')
+      a.href = pngUrl
+      a.download = `qr-photo-${photo.unique_token.slice(0, 8)}.png`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
       toast.success('QR Code berhasil diunduh.')
     } catch {
       toast.error('Gagal mengunduh QR.')
@@ -48,13 +58,15 @@ const PhotoQrModal: React.FC<PhotoQrModalProps> = ({ isOpen, onClose, photo }) =
     <Modal isOpen={isOpen} onClose={onClose} title="QR Code Foto" size="md">
       <div className="flex flex-col items-center text-center">
         <div className="w-72 max-w-full rounded-2xl p-5 overflow-hidden border border-pb-border shadow-xl bg-white mb-5 flex items-center justify-center">
-          <QRCodeSVG
-            id="photo-qr-svg"
+          <QRCodeCanvas
+            id="photo-qr-canvas"
             value={photoUrl}
-            size={240}
+            size={280}
             level="H"
+            bgColor="#FFFFFF"
+            fgColor="#000000"
             includeMargin={true}
-            className="w-full h-auto"
+            className="w-full h-auto max-w-[240px]"
           />
         </div>
 

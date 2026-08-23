@@ -135,15 +135,52 @@ class TemplateController extends Controller
      */
     public function detectFrames(Template $template): JsonResponse
     {
-        if (! $template->template_file || ! Storage::disk('public')->exists($template->template_file)) {
-            return response()->json(['message' => 'File template tidak ditemukan.'], 404);
+        $localPath = null;
+        $isTemporary = false;
+
+        if (! empty($template->template_file)) {
+            if (str_starts_with($template->template_file, 'http://') || str_starts_with($template->template_file, 'https://')) {
+                $tempFile = tempnam(sys_get_temp_dir(), 'tpl_detect_');
+                $contents = @file_get_contents($template->template_file);
+                if ($contents) {
+                    file_put_contents($tempFile, $contents);
+                    $localPath = $tempFile;
+                    $isTemporary = true;
+                }
+            } elseif (str_starts_with($template->template_file, 'data:')) {
+                $parts = explode(',', $template->template_file, 2);
+                if (count($parts) === 2) {
+                    $tempFile = tempnam(sys_get_temp_dir(), 'tpl_detect_');
+                    file_put_contents($tempFile, base64_decode($parts[1]));
+                    $localPath = $tempFile;
+                    $isTemporary = true;
+                }
+            } elseif (file_exists($template->template_file)) {
+                $localPath = $template->template_file;
+            } elseif (Storage::disk('public')->exists($template->template_file)) {
+                $localPath = Storage::disk('public')->path($template->template_file);
+            } elseif (file_exists('/tmp/storage/app/public/' . ltrim($template->template_file, '/'))) {
+                $localPath = '/tmp/storage/app/public/' . ltrim($template->template_file, '/');
+            } elseif (file_exists(storage_path('app/public/' . ltrim($template->template_file, '/')))) {
+                $localPath = storage_path('app/public/' . ltrim($template->template_file, '/'));
+            }
         }
 
-        $result = (new TemplateFrameDetector())->detect(
-            Storage::disk('public')->path($template->template_file),
-            $template->canvas_width,
-            $template->canvas_height
-        );
+        if (! $localPath || ! file_exists($localPath)) {
+            return response()->json(['message' => 'File template tidak ditemukan untuk dianalisis.'], 404);
+        }
+
+        try {
+            $result = (new TemplateFrameDetector())->detect(
+                $localPath,
+                $template->canvas_width,
+                $template->canvas_height
+            );
+        } finally {
+            if ($isTemporary && file_exists($localPath)) {
+                @unlink($localPath);
+            }
+        }
 
         $method = $result['detection_method'] ?? 'smart_clear';
         $frames = [];

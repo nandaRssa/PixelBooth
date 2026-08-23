@@ -1,10 +1,9 @@
 import React from 'react'
 import { Download, Folder as FolderIcon, Share2 } from 'lucide-react'
-import { QRCodeSVG } from 'qrcode.react'
+import { QRCodeCanvas } from 'qrcode.react'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { toast } from '@/components/ui/Toast'
-import { downloadQrCode } from '@/utils/downloadQr'
 import type { Folder } from '@/types'
 
 // ==========================================
@@ -22,9 +21,20 @@ const FolderQrModal: React.FC<FolderQrModalProps> = ({ isOpen, onClose, folder }
 
   const folderUrl = `${window.location.origin}/folder/${folder.unique_token}`
 
-  const handleDownloadQr = async () => {
+  const handleDownloadQr = () => {
     try {
-      await downloadQrCode('folder-qr-svg', folder.qr_url || '', `qr-folder-${folder.unique_token.slice(0, 8)}.png`)
+      const canvas = document.getElementById('folder-qr-canvas') as HTMLCanvasElement | null
+      if (!canvas) {
+        toast.error('Gagal mengambil data QR Code.')
+        return
+      }
+      const pngUrl = canvas.toDataURL('image/png')
+      const a = document.createElement('a')
+      a.href = pngUrl
+      a.download = `qr-folder-${folder.unique_token.slice(0, 8)}.png`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
       toast.success('QR Code berhasil diunduh.')
     } catch {
       toast.error('Gagal mengunduh QR.')
@@ -53,13 +63,15 @@ const FolderQrModal: React.FC<FolderQrModalProps> = ({ isOpen, onClose, folder }
         </div>
 
         <div className="w-72 max-w-full rounded-2xl p-5 overflow-hidden border border-pb-border shadow-xl bg-white mb-5 flex items-center justify-center">
-          <QRCodeSVG
-            id="folder-qr-svg"
+          <QRCodeCanvas
+            id="folder-qr-canvas"
             value={folderUrl}
-            size={240}
+            size={280}
             level="H"
+            bgColor="#FFFFFF"
+            fgColor="#000000"
             includeMargin={true}
-            className="w-full h-auto"
+            className="w-full h-auto max-w-[240px]"
           />
         </div>
 
