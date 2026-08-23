@@ -120,7 +120,7 @@ const PhotoCapturePage: React.FC = () => {
 
     let cancelled = false
     buildTemplateOverlay(
-      getStorageUrl(tpl.template_url),
+      tpl.template_url,
       previewSlots,
       tpl.canvas_width,
       tpl.canvas_height

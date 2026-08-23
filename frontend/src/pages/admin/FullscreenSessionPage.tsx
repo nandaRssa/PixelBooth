@@ -100,7 +100,7 @@ const FullscreenSessionPage: React.FC = () => {
     if (!tpl || !tpl.template_url || previewSlots.length === 0) return
 
     let cancelled = false
-    buildTemplateOverlay(getStorageUrl(tpl.template_url), previewSlots, tpl.canvas_width, tpl.canvas_height)
+    buildTemplateOverlay(tpl.template_url, previewSlots, tpl.canvas_width, tpl.canvas_height)
       .then((url) => {
         if (!cancelled) setOverlay({ url, token: overlayToken })
       })
