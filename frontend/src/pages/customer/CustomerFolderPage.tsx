@@ -10,12 +10,10 @@ import {
   Image as ImageIcon,
   CheckSquare,
   Square,
-  Trash2,
   Check,
   Sparkles,
 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
-import { ConfirmModal } from '@/components/ui/Modal'
 import { Spinner } from '@/components/ui/StatusBadge'
 import { toast } from '@/components/ui/Toast'
 import { customerApi } from '@/api/customer'
@@ -37,10 +35,7 @@ const CustomerFolderPage: React.FC = () => {
   // Selection state
   const [selectionMode, setSelectionMode] = useState(false)
   const [selectedTokens, setSelectedTokens] = useState<Set<string>>(new Set())
-  const [isDeleting, setIsDeleting] = useState(false)
   const [isDownloading, setIsDownloading] = useState(false)
-  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
-  const [singleDeleteTarget, setSingleDeleteTarget] = useState<CustomerFolderPhoto | null>(null)
 
   const loadFolderData = (currentToken: string) => {
     customerApi
@@ -147,51 +142,6 @@ const CustomerFolderPage: React.FC = () => {
       toast.error('Gagal mengunduh beberapa foto.')
     } finally {
       setIsDownloading(false)
-    }
-  }
-
-  // ===== Handlers Hapus =====
-  const handleConfirmDelete = async () => {
-    if (!folder) return
-    setIsDeleting(true)
-    try {
-      if (singleDeleteTarget) {
-        // Hapus foto tunggal dari modal preview
-        await customerApi.deletePhoto(singleDeleteTarget.token)
-        setFolder((prev) =>
-          prev
-            ? {
-                ...prev,
-                photo_count: prev.photos.length - 1,
-                photos: prev.photos.filter((p) => p.token !== singleDeleteTarget.token),
-              }
-            : null,
-        )
-        setPreview(null)
-        setSingleDeleteTarget(null)
-        toast.success('Foto berhasil dihapus.')
-      } else if (selectedTokens.size > 0) {
-        // Hapus foto terpilih secara massal
-        const tokensArray = Array.from(selectedTokens)
-        await customerApi.bulkDeletePhotos(tokensArray)
-        setFolder((prev) =>
-          prev
-            ? {
-                ...prev,
-                photo_count: prev.photos.length - tokensArray.length,
-                photos: prev.photos.filter((p) => !selectedTokens.has(p.token)),
-              }
-            : null,
-        )
-        toast.success(`${tokensArray.length} foto berhasil dihapus.`)
-        setSelectedTokens(new Set())
-        setSelectionMode(false)
-      }
-    } catch {
-      toast.error('Gagal menghapus foto.')
-    } finally {
-      setIsDeleting(false)
-      setDeleteConfirmOpen(false)
     }
   }
 
@@ -321,7 +271,6 @@ const CustomerFolderPage: React.FC = () => {
                       {selectedTokens.size} dipilih
                     </span>
                   </div>
-
                   <div className="flex items-center gap-1.5 sm:gap-2 ml-auto">
                     <Button
                       variant="primary"
@@ -332,19 +281,6 @@ const CustomerFolderPage: React.FC = () => {
                       leftIcon={<Download size={14} />}
                     >
                       Unduh ({selectedTokens.size})
-                    </Button>
-
-                    <Button
-                      variant="danger"
-                      size="sm"
-                      onClick={() => {
-                        setSingleDeleteTarget(null)
-                        setDeleteConfirmOpen(true)
-                      }}
-                      disabled={selectedTokens.size === 0 || isDeleting}
-                      leftIcon={<Trash2 size={14} />}
-                    >
-                      Hapus ({selectedTokens.size})
                     </Button>
                   </div>
                 </>
@@ -472,26 +408,15 @@ const CustomerFolderPage: React.FC = () => {
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-2 mt-3 pt-3 border-t border-pb-border">
+                <div className="mt-3 pt-3 border-t border-pb-border">
                   <Button
                     variant="primary"
                     size="md"
+                    fullWidth
                     onClick={() => handleDownloadSingle(preview)}
                     leftIcon={<Download size={16} />}
                   >
                     Unduh Foto
-                  </Button>
-
-                  <Button
-                    variant="danger"
-                    size="md"
-                    onClick={() => {
-                      setSingleDeleteTarget(preview)
-                      setDeleteConfirmOpen(true)
-                    }}
-                    leftIcon={<Trash2 size={16} />}
-                  >
-                    Hapus Foto
                   </Button>
                 </div>
               </div>
@@ -499,29 +424,6 @@ const CustomerFolderPage: React.FC = () => {
           </>
         )}
       </AnimatePresence>
-
-      {/* ===== Confirm Delete Modal ===== */}
-      <ConfirmModal
-        isOpen={deleteConfirmOpen}
-        onClose={() => {
-          setDeleteConfirmOpen(false)
-          setSingleDeleteTarget(null)
-        }}
-        onConfirm={handleConfirmDelete}
-        title={singleDeleteTarget ? 'Hapus Foto Ini' : 'Hapus Foto Terpilih'}
-        message={
-          singleDeleteTarget
-            ? 'Foto ini akan dihapus permanen dari folder. Lanjutkan?'
-            : `${selectedTokens.size} foto yang dipilih akan dihapus permanen dari folder. Lanjutkan?`
-        }
-        confirmLabel={
-          singleDeleteTarget
-            ? 'Ya, Hapus'
-            : `Ya, Hapus (${selectedTokens.size})`
-        }
-        loading={isDeleting}
-        danger
-      />
     </div>
   )
 }
