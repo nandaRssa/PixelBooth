@@ -97,9 +97,15 @@ Route::middleware('throttle:120,1')->group(function () {
     Route::get('/storage/{path}', function ($path) {
         $fullPath = storage_path('app/public/' . $path);
         if (! file_exists($fullPath)) {
+            $fullPath = '/tmp/storage/app/public/' . $path;
+        }
+        if (! file_exists($fullPath)) {
+            $fullPath = base_path('storage/app/public/' . $path);
+        }
+        if (! file_exists($fullPath)) {
             abort(404);
         }
-        $mime = mime_content_type($fullPath) ?: 'image/png';
+        $mime = @mime_content_type($fullPath) ?: 'image/png';
         return response()->file($fullPath, [
             'Access-Control-Allow-Origin' => '*',
             'Access-Control-Allow-Methods' => 'GET, OPTIONS',

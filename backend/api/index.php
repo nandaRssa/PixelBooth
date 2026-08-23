@@ -2,12 +2,20 @@
 
 // Setup writable storage and bootstrap cache dirs in /tmp for serverless
 $tmpDirs = [
+    '/tmp/storage',
+    '/tmp/storage/app',
+    '/tmp/storage/app/public',
+    '/tmp/storage/app/public/templates',
+    '/tmp/storage/app/public/photos',
+    '/tmp/storage/app/public/qr',
+    '/tmp/storage/framework',
     '/tmp/storage/framework/views',
+    '/tmp/storage/framework/cache',
     '/tmp/storage/framework/cache/data',
     '/tmp/storage/framework/sessions',
     '/tmp/storage/logs',
+    '/tmp/bootstrap',
     '/tmp/bootstrap/cache',
-    '/tmp/storage/app/public',
 ];
 foreach ($tmpDirs as $dir) {
     if (!is_dir($dir)) {
