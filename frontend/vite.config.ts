@@ -17,6 +17,7 @@ export default defineConfig({
   server: {
     port: 5173,
     host: true, // expose ke jaringan lokal (iPad access)
+    allowedHosts: true, // ijinkan akses via Cloudflare Tunnel
     proxy: {
       '/api': {
         target: 'http://localhost:8000',
