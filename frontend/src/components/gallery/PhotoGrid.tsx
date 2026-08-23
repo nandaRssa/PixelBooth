@@ -147,8 +147,8 @@ const PhotoGrid: React.FC<PhotoGridProps> = ({
         )}
       </div>
 
-      {/* Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 2xl:grid-cols-5 gap-3.5 sm:gap-4 lg:gap-5">
+      {/* Grid: 3 kolom di mobile (iPhone 14 dsb), 3-5 kolom di tablet & desktop */}
+      <div className="grid grid-cols-3 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 2xl:grid-cols-5 gap-2 sm:gap-4 lg:gap-5">
         {photos.map((photo) => (
           <PhotoCard
             key={photo.id}

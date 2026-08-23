@@ -295,7 +295,7 @@ const TemplatesPage: React.FC = () => {
             />
           </div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 2xl:grid-cols-5 gap-3.5 sm:gap-4 lg:gap-5">
+          <div className="grid grid-cols-3 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 2xl:grid-cols-5 gap-2 sm:gap-4 lg:gap-5">
             {templates.map((template) => {
               const isSelected = selectedIds.has(template.id);
               return (
@@ -338,7 +338,7 @@ const TemplatesPage: React.FC = () => {
                     />
                   ) : (
                     <div className="absolute inset-0 flex items-center justify-center bg-pb-elevated">
-                      <ImageIcon size={24} className="text-pb-faint" />
+                      <ImageIcon size={20} className="text-pb-faint" />
                     </div>
                   )}
 
@@ -346,16 +346,16 @@ const TemplatesPage: React.FC = () => {
                   {selectionMode ? (
                     <div className="absolute top-1.5 left-1.5 z-10">
                       <div
-                        className={`w-6 h-6 rounded-lg flex items-center justify-center transition-all ${
+                        className={`w-5 h-5 sm:w-6 sm:h-6 rounded-md flex items-center justify-center transition-all ${
                           isSelected
                             ? "bg-[#FF5A36] text-white shadow-md"
                             : "bg-black/60 backdrop-blur-sm border border-white/40 text-white/60"
                         }`}
                       >
                         {isSelected ? (
-                          <Check size={14} className="stroke-[3]" />
+                          <Check size={12} className="stroke-[3]" />
                         ) : (
-                          <Square size={14} />
+                          <Square size={12} />
                         )}
                       </div>
                     </div>
@@ -368,11 +368,11 @@ const TemplatesPage: React.FC = () => {
                           e.stopPropagation();
                           navigate(`/templates/${template.id}/editor`);
                         }}
-                        className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-black/80 backdrop-blur-md text-cyan-300 hover:text-cyan-200 border border-white/20 shadow-md active:scale-95 transition-all flex items-center justify-center"
+                        className="w-6 h-6 sm:w-8 sm:h-8 rounded-md sm:rounded-lg bg-black/80 backdrop-blur-md text-cyan-300 hover:text-cyan-200 border border-white/20 shadow-md active:scale-95 transition-all flex items-center justify-center"
                         title="Buka Frame Editor"
                         aria-label="Buka Frame Editor"
                       >
-                        <SlidersHorizontal size={13} />
+                        <SlidersHorizontal size={11} className="sm:w-[13px] sm:h-[13px]" />
                       </button>
                       <button
                         type="button"
@@ -381,11 +381,11 @@ const TemplatesPage: React.FC = () => {
                           setRenameTarget(template);
                           setRenameName(template.name);
                         }}
-                        className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-black/80 backdrop-blur-md text-amber-300 hover:text-amber-200 border border-white/20 shadow-md active:scale-95 transition-all flex items-center justify-center"
+                        className="w-6 h-6 sm:w-8 sm:h-8 rounded-md sm:rounded-lg bg-black/80 backdrop-blur-md text-amber-300 hover:text-amber-200 border border-white/20 shadow-md active:scale-95 transition-all flex items-center justify-center"
                         title="Ubah Nama Template"
                         aria-label="Ubah Nama Template"
                       >
-                        <Pencil size={13} />
+                        <Pencil size={11} className="sm:w-[13px] sm:h-[13px]" />
                       </button>
                       <button
                         type="button"
@@ -393,23 +393,23 @@ const TemplatesPage: React.FC = () => {
                           e.stopPropagation();
                           setDeleteTarget(template);
                         }}
-                        className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-black/80 backdrop-blur-md text-red-400 hover:text-red-300 border border-white/20 shadow-md active:scale-95 transition-all flex items-center justify-center"
+                        className="w-6 h-6 sm:w-8 sm:h-8 rounded-md sm:rounded-lg bg-black/80 backdrop-blur-md text-red-400 hover:text-red-300 border border-white/20 shadow-md active:scale-95 transition-all flex items-center justify-center"
                         title="Hapus Template"
                         aria-label="Hapus Template"
                       >
-                        <Trash2 size={13} />
+                        <Trash2 size={11} className="sm:w-[13px] sm:h-[13px]" />
                       </button>
                     </div>
                   )}
 
                   {/* Status badge */}
                   {template.status === "draft" ? (
-                    <span className="absolute top-1.5 right-1.5 flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-amber-500 text-black text-[9px] sm:text-[10px] font-bold shadow-md z-10">
-                      <AlertCircle size={10} />
+                    <span className="absolute top-1.5 right-1.5 flex items-center gap-0.5 px-1 sm:px-1.5 py-0.5 rounded-md bg-amber-500 text-black text-[8px] sm:text-[10px] font-bold shadow-md z-10">
+                      <AlertCircle size={9} />
                       Draft
                     </span>
                   ) : (
-                    <span className="absolute top-1.5 right-1.5 px-1.5 py-0.5 rounded-md bg-black/75 backdrop-blur-md text-white text-[9px] sm:text-[10px] font-medium border border-white/10 shadow-md z-10">
+                    <span className="absolute top-1.5 right-1.5 px-1 sm:px-1.5 py-0.5 rounded-md bg-black/75 backdrop-blur-md text-white text-[8px] sm:text-[10px] font-medium border border-white/10 shadow-md z-10">
                       {template.frame_count} f
                     </span>
                   )}
