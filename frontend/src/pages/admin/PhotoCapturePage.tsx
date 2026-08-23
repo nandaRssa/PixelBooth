@@ -544,60 +544,72 @@ const PhotoCapturePage: React.FC = () => {
             </div>
           )}
 
-          {/* 4 Tombol Aksi Utama: Scan QR, Buka Galeri, Ulangi, Selesai */}
-          <div className="flex flex-wrap justify-center gap-3">
-            {resultPhoto.url && (
+          {/* 5 Tombol Aksi Utama: Unduh Foto, Scan QR, Buka Galeri, Ulangi, Selesai (Presisi di HP & Laptop) */}
+          <div className="w-full max-w-sm sm:max-w-xl mx-auto flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-center sm:gap-3">
+            {/* Baris 1: Unduh & QR (Di HP 2 Kolom Sejajar) */}
+            <div className="grid grid-cols-2 gap-2 w-full sm:w-auto sm:contents">
+              {resultPhoto.url && (
+                <Button
+                  variant="primary"
+                  size="md"
+                  onClick={() =>
+                    downloadFile(resultPhoto.url!, `pixelbooth-${session?.id ?? 'final'}.jpg`)
+                  }
+                  leftIcon={<Download size={15} className="shrink-0" />}
+                  className="px-3 py-2 sm:px-5 sm:py-3 text-xs sm:text-sm min-h-[38px] sm:min-h-[48px] justify-center"
+                >
+                  Unduh Foto
+                </Button>
+              )}
+              {resultPhoto.qr_url && (
+                <Button
+                  variant="primary"
+                  size="md"
+                  onClick={() => setShowQrModal(true)}
+                  leftIcon={<QrCode size={15} className="shrink-0" />}
+                  className="bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-2 sm:px-5 sm:py-3 text-xs sm:text-sm min-h-[38px] sm:min-h-[48px] justify-center"
+                >
+                  Scan QR
+                </Button>
+              )}
+            </div>
+
+            {/* Baris 2: Galeri, Ulangi, Selesai (Di HP 3 Kolom Sejajar) */}
+            <div className="grid grid-cols-3 gap-2 w-full sm:w-auto sm:contents">
               <Button
-                variant="primary"
+                variant="secondary"
                 size="md"
-                onClick={() =>
-                  downloadFile(resultPhoto.url!, `pixelbooth-${session?.id ?? 'final'}.jpg`)
-                }
-                leftIcon={<Download size={16} />}
+                onClick={() => {
+                  queryClient.invalidateQueries({ queryKey: ['photos'] })
+                  queryClient.invalidateQueries({ queryKey: ['folders'] })
+                  navigate(folderId ? `/gallery?folder_id=${folderId}` : '/gallery')
+                }}
+                leftIcon={<ExternalLink size={15} className="shrink-0" />}
+                className="px-2 sm:px-5 py-2 sm:py-3 text-xs sm:text-sm min-h-[38px] sm:min-h-[48px] justify-center"
               >
-                Download Foto
+                <span className="truncate">Galeri</span>
               </Button>
-            )}
-            {resultPhoto.qr_url && (
               <Button
-                variant="primary"
+                variant="secondary"
                 size="md"
-                onClick={() => setShowQrModal(true)}
-                leftIcon={<QrCode size={16} />}
-                className="bg-emerald-600 hover:bg-emerald-500 text-white"
+                onClick={() => setShowRetakeOptions((prev) => !prev)}
+                leftIcon={<RotateCcw size={15} className="shrink-0" />}
+                className={`px-2 sm:px-5 py-2 sm:py-3 text-xs sm:text-sm min-h-[38px] sm:min-h-[48px] justify-center ${
+                  showRetakeOptions ? 'border-amber-500 text-amber-400 bg-amber-500/10' : ''
+                }`}
               >
-                Scan QR Foto
+                Ulangi
               </Button>
-            )}
-            <Button
-              variant="secondary"
-              size="md"
-              onClick={() => {
-                queryClient.invalidateQueries({ queryKey: ['photos'] })
-                queryClient.invalidateQueries({ queryKey: ['folders'] })
-                navigate(folderId ? `/gallery?folder_id=${folderId}` : '/gallery')
-              }}
-              leftIcon={<ExternalLink size={16} />}
-            >
-              Buka Galeri
-            </Button>
-            <Button
-              variant="secondary"
-              size="md"
-              onClick={() => setShowRetakeOptions((prev) => !prev)}
-              leftIcon={<RotateCcw size={16} />}
-              className={showRetakeOptions ? 'border-amber-500 text-amber-400 bg-amber-500/10' : ''}
-            >
-              Ulangi
-            </Button>
-            <Button
-              variant="secondary"
-              size="md"
-              onClick={() => navigate('/photo')}
-              leftIcon={<Check size={16} />}
-            >
-              Selesai
-            </Button>
+              <Button
+                variant="secondary"
+                size="md"
+                onClick={() => navigate('/photo')}
+                leftIcon={<Check size={15} className="shrink-0" />}
+                className="px-2 sm:px-5 py-2 sm:py-3 text-xs sm:text-sm min-h-[38px] sm:min-h-[48px] justify-center"
+              >
+                Selesai
+              </Button>
+            </div>
           </div>
         </div>
 

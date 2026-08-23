@@ -771,65 +771,77 @@ const FullscreenSessionPage: React.FC = () => {
             </div>
           )}
 
-          {/* 5 Tombol Aksi Utama: Unduh Foto, Scan QR, Buka Galeri, Ulangi, Selesai */}
-          <div className="flex items-center gap-3 flex-wrap justify-center">
-            {resultPhoto?.url && (
+          {/* 5 Tombol Aksi Utama: Unduh Foto, Scan QR, Buka Galeri, Ulangi, Selesai (Presisi di HP & Laptop) */}
+          <div className="w-full max-w-sm sm:max-w-xl mx-auto flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-center sm:gap-3">
+            {/* Baris 1: Unduh & QR (Di HP 2 Kolom Sejajar) */}
+            <div className="grid grid-cols-2 gap-2 w-full sm:w-auto sm:contents">
+              {resultPhoto?.url && (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (resultPhoto?.url) {
+                      await downloadFile(resultPhoto.url, resultPhoto.filename || 'pixelbooth-photo.jpg')
+                      toast.success('Foto berhasil diunduh!')
+                    }
+                  }}
+                  className="flex items-center justify-center gap-1.5 sm:gap-2 px-3 py-2 sm:px-5 sm:py-3 rounded-xl
+                    bg-gradient-to-r from-[#FF5A36] to-[#FF8836] hover:brightness-110 text-white
+                    text-xs sm:text-sm font-semibold transition-all shadow-md active:scale-95 cursor-pointer min-h-[38px] sm:min-h-[48px]"
+                >
+                  <Download size={15} className="sm:w-[18px] sm:h-[18px] shrink-0" />
+                  <span>Unduh Foto</span>
+                </button>
+              )}
+              {resultPhoto?.qr_url && (
+                <button
+                  type="button"
+                  onClick={() => setShowQrModal(true)}
+                  className="flex items-center justify-center gap-1.5 sm:gap-2 px-3 py-2 sm:px-5 sm:py-3 rounded-xl
+                    bg-emerald-600 hover:bg-emerald-500 text-white
+                    text-xs sm:text-sm font-medium transition-all shadow-md active:scale-95 min-h-[38px] sm:min-h-[48px]"
+                >
+                  <QrCode size={15} className="sm:w-[18px] sm:h-[18px] shrink-0" />
+                  <span>Scan QR</span>
+                </button>
+              )}
+            </div>
+
+            {/* Baris 2: Galeri, Ulangi, Selesai (Di HP 3 Kolom Sejajar) */}
+            <div className="grid grid-cols-3 gap-2 w-full sm:w-auto sm:contents">
               <button
                 type="button"
-                onClick={async () => {
-                  if (resultPhoto?.url) {
-                    await downloadFile(resultPhoto.url, resultPhoto.filename || 'pixelbooth-photo.jpg')
-                    toast.success('Foto berhasil diunduh!')
-                  }
-                }}
-                className="flex items-center gap-2 px-5 py-3 rounded-xl bg-gradient-to-r from-[#FF5A36] to-[#FF8836] hover:brightness-110 text-white
-                  text-sm font-semibold transition-all shadow-lg min-h-[48px] active:scale-95 cursor-pointer"
+                onClick={handleOpenGallery}
+                className="flex items-center justify-center gap-1 sm:gap-2 px-2 sm:px-5 py-2 sm:py-3 rounded-xl
+                  bg-pb-accent hover:opacity-90 text-pb-on-accent
+                  text-xs sm:text-sm font-medium transition-all shadow-md active:scale-95 min-h-[38px] sm:min-h-[48px]"
               >
-                <Download size={18} />
-                Unduh Foto
+                <ImagePlus size={15} className="sm:w-[18px] sm:h-[18px] shrink-0" />
+                <span className="truncate">Galeri</span>
               </button>
-            )}
-            {resultPhoto?.qr_url && (
               <button
                 type="button"
-                onClick={() => setShowQrModal(true)}
-                className="flex items-center gap-2 px-5 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white
-                  text-sm font-medium transition-all shadow-lg min-h-[48px]"
+                onClick={() => setShowRetakePanel((prev) => !prev)}
+                className={`flex items-center justify-center gap-1 sm:gap-2 px-2 sm:px-5 py-2 sm:py-3 rounded-xl
+                  text-xs sm:text-sm font-medium transition-all shadow-md active:scale-95 min-h-[38px] sm:min-h-[48px] ${
+                  showRetakePanel
+                    ? 'bg-amber-500 text-black font-semibold'
+                    : 'bg-white/10 hover:bg-white/20 text-white'
+                }`}
               >
-                <QrCode size={18} />
-                Scan QR Foto
+                <RotateCcw size={15} className="sm:w-[18px] sm:h-[18px] shrink-0" />
+                <span>Ulangi</span>
               </button>
-            )}
-            <button
-              type="button"
-              onClick={handleOpenGallery}
-              className="flex items-center gap-2 px-5 py-3 rounded-xl bg-pb-accent hover:opacity-90 text-pb-on-accent
-                text-sm font-medium transition-all shadow-lg min-h-[48px]"
-            >
-              <ImagePlus size={18} />
-              Buka Galeri
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowRetakePanel((prev) => !prev)}
-              className={`flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-medium transition-all shadow-lg min-h-[48px] ${
-                showRetakePanel
-                  ? 'bg-amber-500 text-black font-semibold'
-                  : 'bg-white/10 hover:bg-white/20 text-white'
-              }`}
-            >
-              <RotateCcw size={18} />
-              Ulangi
-            </button>
-            <button
-              type="button"
-              onClick={() => navigate('/photo', { replace: true })}
-              className="flex items-center gap-2 px-5 py-3 rounded-xl bg-white/10 hover:bg-white/20 text-white
-                text-sm font-medium transition-all min-h-[48px]"
-            >
-              <Check size={18} />
-              Selesai
-            </button>
+              <button
+                type="button"
+                onClick={() => navigate('/photo', { replace: true })}
+                className="flex items-center justify-center gap-1 sm:gap-2 px-2 sm:px-5 py-2 sm:py-3 rounded-xl
+                  bg-white/10 hover:bg-white/20 text-white
+                  text-xs sm:text-sm font-medium transition-all active:scale-95 min-h-[38px] sm:min-h-[48px]"
+              >
+                <Check size={15} className="sm:w-[18px] sm:h-[18px] shrink-0" />
+                <span>Selesai</span>
+              </button>
+            </div>
           </div>
         </div>
       )}
