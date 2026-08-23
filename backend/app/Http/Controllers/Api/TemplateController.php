@@ -170,12 +170,17 @@ class TemplateController extends Controller
             return response()->json(['message' => 'File template tidak ditemukan untuk dianalisis.'], 404);
         }
 
+        $result = null;
         try {
-            $result = (new TemplateFrameDetector())->detect(
-                $localPath,
-                $template->canvas_width,
-                $template->canvas_height
-            );
+            if (function_exists('imagecreatefrompng') || function_exists('imagecreatefromjpeg')) {
+                $result = (new TemplateFrameDetector())->detect(
+                    $localPath,
+                    $template->canvas_width,
+                    $template->canvas_height
+                );
+            }
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('TemplateFrameDetector backend warning: ' . $e->getMessage());
         } finally {
             if ($isTemporary && file_exists($localPath)) {
                 @unlink($localPath);

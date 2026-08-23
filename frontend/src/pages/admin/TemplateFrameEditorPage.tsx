@@ -44,6 +44,7 @@ import {
   generateDefaultPolygon,
   type WorkTemplate,
 } from "@/utils/frameMask";
+import { detectFramesFromImage } from "@/utils/clientFrameDetector";
 import { loadImage } from "@/utils/templateOverlay";
 import { getStorageUrl } from "@/api/client";
 import type { CameraFrame, Template } from "@/types";
@@ -1422,14 +1423,38 @@ const TemplateFrameEditorPage: React.FC = () => {
     if (!template || detecting) return;
     setDetecting(true);
     try {
-      const detected = await templateApi.detectFrames(template.id);
+      let detected: CameraFrame[] = [];
+      let isTransparent = false;
+
+      // 1. Coba backend detector terlebih dahulu
+      try {
+        const backendDetected = await templateApi.detectFrames(template.id);
+        if (backendDetected && backendDetected.length > 0) {
+          detected = backendDetected;
+          isTransparent = detected.some((f) => f.source === "transparent");
+        }
+      } catch {
+        // Fallback ke client-side detector
+      }
+
+      // 2. Jika backend tidak berhasil (atau di serverless tanpa PHP GD), jalankan client-side detector via HTML5 Canvas
+      if (detected.length === 0 && templateImgRef.current) {
+        const clientResult = detectFramesFromImage(
+          templateImgRef.current,
+          template.canvas_width,
+          template.canvas_height
+        );
+        detected = clientResult.frames;
+        isTransparent = clientResult.method === "transparent";
+      }
+
       pushHistory(); // deteksi bisa di-undo (Ctrl+Z) bila hasilnya tidak cocok
       setFrames(detected);
       setSelectedId(null);
+
       if (detected.length === 0) {
         toast.error("Tidak ada area foto yang terdeteksi pada template ini.");
       } else {
-        const isTransparent = detected.some((f) => f.source === "transparent");
         const modeLabel = isTransparent ? " (Transparency Detection)" : " (Smart Clear)";
         toast.success(`Frames Detected: ${detected.length}${modeLabel}`);
       }
