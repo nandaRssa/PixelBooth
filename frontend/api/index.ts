@@ -9,10 +9,10 @@ import { photosRouter } from './routes/photos'
 import { settingsRouter } from './routes/settings'
 
 // ==========================================
-// PIXELBOOTH — Vercel Native Serverless API
+// PIXELBOOTH — Hono App (Vercel Native TypeScript)
 // ==========================================
 
-export const app = new Hono()
+const app = new Hono().basePath('/api')
 
 // Middleware
 app.use('*', logger())
@@ -23,14 +23,14 @@ app.use('*', cors({
 }))
 
 // Health Check
-app.get('/api/health', (c) => c.json({ status: 'ok', server: 'vercel-native-typescript', timestamp: new Date().toISOString() }))
+app.get('/health', (c) => c.json({ status: 'ok', server: 'vercel-native-typescript', timestamp: new Date().toISOString() }))
 
 // Mount Routers
-app.route('/api/templates', templatesRouter)
-app.route('/api/sessions', sessionsRouter)
-app.route('/api/folders', foldersRouter)
-app.route('/api/photos', photosRouter)
-app.route('/api/settings', settingsRouter)
+app.route('/templates', templatesRouter)
+app.route('/sessions', sessionsRouter)
+app.route('/folders', foldersRouter)
+app.route('/photos', photosRouter)
+app.route('/settings', settingsRouter)
 
 // Fallback 404
 app.notFound((c) => c.json({ message: 'Endpoint tidak ditemukan' }, 404))
@@ -41,12 +41,5 @@ app.onError((err, c) => {
   return c.json({ message: err.message || 'Internal Server Error' }, 500)
 })
 
-import { handle } from 'hono/vercel'
-
-export const GET = handle(app)
-export const POST = handle(app)
-export const PUT = handle(app)
-export const DELETE = handle(app)
-export const OPTIONS = handle(app)
-
-export default handle(app)
+export { app }
+export default app
