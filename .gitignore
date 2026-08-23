@@ -77,3 +77,5 @@ backend/storage/app/public/qr/
 .Trashes
 ehthumbs.db
 Thumbs.db
+
+cloudflared.exe
