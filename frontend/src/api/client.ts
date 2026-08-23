@@ -5,12 +5,7 @@ import axios from 'axios'
 // Fitur login dihapus — semua request tanpa token
 // ==========================================
 
-const defaultBaseUrl =
-  typeof window !== 'undefined' &&
-  window.location.hostname !== 'localhost' &&
-  window.location.hostname !== '127.0.0.1'
-    ? 'https://pixel-booth-backend-7xoh69k5n-nanda-raissas-projects.vercel.app/api'
-    : '/api'
+const defaultBaseUrl = '/api'
 
 const apiClient = axios.create({
   baseURL: import.meta.env.VITE_API_URL || defaultBaseUrl,
