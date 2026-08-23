@@ -1,59 +1,54 @@
-import type { IncomingMessage, ServerResponse } from 'node:http'
-import { app } from '../server/app'
+// PIXELBOOTH — Vercel Serverless Diagnostic Handler
+// Shows actual error details instead of generic FUNCTION_INVOCATION_FAILED
 
-// ==========================================
-// PIXELBOOTH — Single Vercel Serverless Function
-// All /api/* routes handled here (1 function = within Hobby plan limit)
-// ==========================================
+export default async function handler(req: any, res: any) {
+  res.setHeader('Access-Control-Allow-Origin', '*')
+  res.setHeader('Content-Type', 'application/json')
 
-async function nodeRequestToFetch(req: IncomingMessage): Promise<Request> {
-  const host = req.headers.host || 'localhost'
-  const url = `https://${host}${req.url}`
+  try {
+    // Dynamic import so errors are catchable
+    const { app } = await import('../server/app.js')
 
-  const headers = new Headers()
-  for (const [key, value] of Object.entries(req.headers)) {
-    if (value !== undefined) {
-      if (Array.isArray(value)) {
-        value.forEach((v) => headers.append(key, v))
-      } else {
-        headers.set(key, value)
+    const host = (req.headers && req.headers.host) || 'localhost'
+    const url = `https://${host}${req.url || '/'}`
+
+    const headers = new Headers()
+    if (req.headers) {
+      for (const [k, v] of Object.entries(req.headers as Record<string, any>)) {
+        if (v != null) Array.isArray(v) ? v.forEach(val => headers.append(k, val)) : headers.set(k, String(v))
       }
     }
-  }
 
-  let body: Buffer | undefined
-  if (req.method !== 'GET' && req.method !== 'HEAD') {
-    body = await new Promise<Buffer>((resolve, reject) => {
-      const chunks: Buffer[] = []
-      req.on('data', (chunk: Buffer) => chunks.push(chunk))
-      req.on('end', () => resolve(Buffer.concat(chunks)))
-      req.on('error', reject)
-    })
-  }
+    let body: Buffer | undefined
+    if (req.method !== 'GET' && req.method !== 'HEAD') {
+      body = await new Promise<Buffer>((resolve, reject) => {
+        const chunks: Buffer[] = []
+        req.on('data', (c: Buffer) => chunks.push(c))
+        req.on('end', () => resolve(Buffer.concat(chunks)))
+        req.on('error', reject)
+      })
+    }
 
-  return new Request(url, {
-    method: req.method || 'GET',
-    headers,
-    body: body && body.length > 0 ? body : undefined,
-  })
-}
-
-export default async function handler(req: IncomingMessage, res: ServerResponse) {
-  try {
-    const fetchRequest = await nodeRequestToFetch(req)
-    const fetchResponse = await app.fetch(fetchRequest)
-
-    res.statusCode = fetchResponse.status
-    fetchResponse.headers.forEach((value: string, key: string) => {
-      res.setHeader(key, value)
+    const fetchReq = new Request(url, {
+      method: req.method || 'GET',
+      headers,
+      body: body && body.length > 0 ? body : undefined,
     })
 
-    const body = await fetchResponse.arrayBuffer()
-    res.end(Buffer.from(body))
-  } catch (err) {
-    console.error('Vercel handler error:', err)
+    const fetchRes = await app.fetch(fetchReq)
+    res.statusCode = fetchRes.status
+    fetchRes.headers.forEach((v: string, k: string) => res.setHeader(k, v))
+    res.end(Buffer.from(await fetchRes.arrayBuffer()))
+
+  } catch (err: any) {
+    // Return detailed error for debugging
     res.statusCode = 500
-    res.setHeader('Content-Type', 'application/json')
-    res.end(JSON.stringify({ message: 'Internal Server Error' }))
+    res.end(JSON.stringify({
+      error: 'HANDLER_CRASH',
+      message: err?.message || String(err),
+      stack: err?.stack?.split('\n').slice(0, 8).join('\n'),
+      type: err?.constructor?.name,
+      code: err?.code,
+    }, null, 2))
   }
 }
