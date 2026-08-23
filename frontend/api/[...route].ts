@@ -1,9 +1,9 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import { app } from './index'
+import { app } from '../server/app'
 
 // ==========================================
-// PIXELBOOTH — Vercel Node.js Serverless Handler
-// Converts Node.js IncomingMessage ↔ Web Fetch API
+// PIXELBOOTH — Single Vercel Serverless Function
+// All /api/* routes handled here (1 function = within Hobby plan limit)
 // ==========================================
 
 async function nodeRequestToFetch(req: IncomingMessage): Promise<Request> {
@@ -21,7 +21,7 @@ async function nodeRequestToFetch(req: IncomingMessage): Promise<Request> {
     }
   }
 
-  let body: BodyInit | undefined
+  let body: Buffer | undefined
   if (req.method !== 'GET' && req.method !== 'HEAD') {
     body = await new Promise<Buffer>((resolve, reject) => {
       const chunks: Buffer[] = []
@@ -34,7 +34,7 @@ async function nodeRequestToFetch(req: IncomingMessage): Promise<Request> {
   return new Request(url, {
     method: req.method || 'GET',
     headers,
-    body: body && (body as Buffer).length > 0 ? body : undefined,
+    body: body && body.length > 0 ? body : undefined,
   })
 }
 
@@ -44,7 +44,6 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     const fetchResponse = await app.fetch(fetchRequest)
 
     res.statusCode = fetchResponse.status
-
     fetchResponse.headers.forEach((value: string, key: string) => {
       res.setHeader(key, value)
     })
