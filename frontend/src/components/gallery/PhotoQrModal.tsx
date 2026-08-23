@@ -1,10 +1,10 @@
 import React from 'react'
-import { Download, ExternalLink, Share2 } from 'lucide-react'
+import { Download, Share2 } from 'lucide-react'
+import { QRCodeSVG } from 'qrcode.react'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { toast } from '@/components/ui/Toast'
-import { downloadSvgAsPng } from '@/utils/downloadQr'
-import { getStorageUrl } from '@/api/client'
+import { downloadQrCode } from '@/utils/downloadQr'
 import type { Photo } from '@/types'
 
 // ==========================================
@@ -23,9 +23,9 @@ const PhotoQrModal: React.FC<PhotoQrModalProps> = ({ isOpen, onClose, photo }) =
   const photoUrl = `${window.location.origin}/photo/${photo.unique_token}`
 
   const handleDownloadQr = async () => {
-    if (!photo.qr_url) return
     try {
-      await downloadSvgAsPng(getStorageUrl(photo.qr_url), `qr-${photo.unique_token.slice(0, 8)}.png`)
+      await downloadQrCode('photo-qr-svg', photo.qr_url || '', `qr-photo-${photo.unique_token.slice(0, 8)}.png`)
+      toast.success('QR Code berhasil diunduh.')
     } catch {
       toast.error('Gagal mengunduh QR.')
     }
@@ -47,12 +47,15 @@ const PhotoQrModal: React.FC<PhotoQrModalProps> = ({ isOpen, onClose, photo }) =
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="QR Code Foto" size="md">
       <div className="flex flex-col items-center text-center">
-        <div className="w-80 max-w-full rounded-2xl p-4 overflow-hidden border border-pb-border shadow-xl bg-white mb-5">
-          {photo.qr_url ? (
-            <img src={getStorageUrl(photo.qr_url)} alt="QR Code foto" className="w-full h-auto" />
-          ) : (
-            <div className="w-full h-72 bg-pb-elevated" />
-          )}
+        <div className="w-72 max-w-full rounded-2xl p-5 overflow-hidden border border-pb-border shadow-xl bg-white mb-5 flex items-center justify-center">
+          <QRCodeSVG
+            id="photo-qr-svg"
+            value={photoUrl}
+            size={240}
+            level="H"
+            includeMargin={true}
+            className="w-full h-auto"
+          />
         </div>
 
         <p className="text-pb-text-muted text-sm leading-relaxed mb-5 max-w-sm">

@@ -40,7 +40,11 @@ class Template extends Model
         if (! $this->template_file) {
             return null;
         }
-        if (str_starts_with($this->template_file, 'http://') || str_starts_with($this->template_file, 'https://')) {
+        if (
+            str_starts_with($this->template_file, 'http://') ||
+            str_starts_with($this->template_file, 'https://') ||
+            str_starts_with($this->template_file, 'data:')
+        ) {
             return $this->template_file;
         }
         return url('api/storage/' . ltrim($this->template_file, '/'));
@@ -51,7 +55,11 @@ class Template extends Model
         if (! $this->preview_file) {
             return null;
         }
-        if (str_starts_with($this->preview_file, 'http://') || str_starts_with($this->preview_file, 'https://')) {
+        if (
+            str_starts_with($this->preview_file, 'http://') ||
+            str_starts_with($this->preview_file, 'https://') ||
+            str_starts_with($this->preview_file, 'data:')
+        ) {
             return $this->preview_file;
         }
         return url('api/storage/' . ltrim($this->preview_file, '/'));

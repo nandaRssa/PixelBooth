@@ -56,11 +56,19 @@ class TemplateController extends Controller
 
         $slug = Str::slug($request->name) . '-' . Str::random(6);
 
-        $templatePath = $request->file('template_file')->store("templates/{$slug}", 'public');
+        $templatePath = \App\Services\CloudStorageService::upload(
+            $request->file('template_file'),
+            'templates',
+            $slug . '-template'
+        );
         $previewPath = null;
 
         if ($request->hasFile('preview_file')) {
-            $previewPath = $request->file('preview_file')->store("templates/{$slug}/preview", 'public');
+            $previewPath = \App\Services\CloudStorageService::upload(
+                $request->file('preview_file'),
+                'templates',
+                $slug . '-preview'
+            );
         }
 
         $frameConfig = $this->sanitizeFrames(
