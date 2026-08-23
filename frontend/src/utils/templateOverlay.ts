@@ -96,3 +96,90 @@ export async function buildTemplateOverlay(
   const img = await loadImage(templateUrl)
   return buildOverlayCanvas(img, frames, canvasWidth, canvasHeight).toDataURL('image/png')
 }
+
+/**
+ * Render komposit final foto: gabungkan background, foto-foto capture sesuai slot,
+ * dan template design dengan mask lubang ke dalam satu Canvas beresolusi tinggi,
+ * lalu kembalikan sebagai base64 JPEG data URL.
+ */
+export async function renderFinalComposite(
+  templateUrl: string,
+  frames: CameraFrame[],
+  frameImages: (string | null | undefined)[],
+  canvasWidth: number,
+  canvasHeight: number
+): Promise<string> {
+  const canvas = document.createElement('canvas')
+  canvas.width = canvasWidth
+  canvas.height = canvasHeight
+  const ctx = canvas.getContext('2d')
+  if (!ctx) throw new Error('Canvas 2D context tidak tersedia')
+
+  // 1. Background gelap
+  ctx.fillStyle = '#121212'
+  ctx.fillRect(0, 0, canvasWidth, canvasHeight)
+
+  // 2. Gambar setiap foto capture ke posisinya masing-masing
+  for (let i = 0; i < frames.length; i++) {
+    const frame = frames[i]
+    const imgSource = frameImages[i]
+    if (!imgSource) continue
+
+    try {
+      const photoImg = await loadImage(imgSource)
+      ctx.save()
+
+      const cx = frame.x + frame.width / 2
+      const cy = frame.y + frame.height / 2
+
+      ctx.translate(cx, cy)
+      if (frame.rotation) {
+        ctx.rotate((frame.rotation * Math.PI) / 180)
+      }
+      ctx.scale(frame.flip_h ? -1 : 1, frame.flip_v ? -1 : 1)
+
+      // Hitung cover crop
+      const pw = photoImg.naturalWidth || photoImg.width
+      const ph = photoImg.naturalHeight || photoImg.height
+      const targetAspect = frame.width / frame.height
+      const photoAspect = pw / ph
+
+      let sx = 0, sy = 0, sw = pw, sh = ph
+      if (photoAspect > targetAspect) {
+        sw = ph * targetAspect
+        sx = (pw - sw) / 2
+      } else {
+        sh = pw / targetAspect
+        sy = (ph - sh) / 2
+      }
+
+      ctx.drawImage(
+        photoImg,
+        sx,
+        sy,
+        sw,
+        sh,
+        -frame.width / 2,
+        -frame.height / 2,
+        frame.width,
+        frame.height
+      )
+      ctx.restore()
+    } catch {
+      // Lewati jika salah satu capture gagal dimuat
+    }
+  }
+
+  // 3. Gambar template desain di atas foto
+  if (templateUrl) {
+    try {
+      const templateImg = await loadImage(templateUrl)
+      const overlayCanvas = buildOverlayCanvas(templateImg, frames, canvasWidth, canvasHeight)
+      ctx.drawImage(overlayCanvas, 0, 0, canvasWidth, canvasHeight)
+    } catch {
+      // Fallback
+    }
+  }
+
+  return canvas.toDataURL('image/jpeg', 0.95)
+}

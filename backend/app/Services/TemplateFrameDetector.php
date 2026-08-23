@@ -102,11 +102,13 @@ class TemplateFrameDetector
      */
     private function detectTransparentRegions(string $filePath, int $targetW, int $targetH): ?array
     {
-        $src = match (@getimagesize($filePath)[2] ?? null) {
-            IMAGETYPE_PNG => @imagecreatefrompng($filePath),
-            IMAGETYPE_WEBP => @imagecreatefromwebp($filePath),
-            default => null,
-        };
+        $type = @getimagesize($filePath)[2] ?? null;
+        $src = null;
+        if ($type === IMAGETYPE_PNG && function_exists('imagecreatefrompng')) {
+            $src = @imagecreatefrompng($filePath);
+        } elseif ($type === IMAGETYPE_WEBP && function_exists('imagecreatefromwebp')) {
+            $src = @imagecreatefromwebp($filePath);
+        }
 
         if (! $src) {
             return null;
@@ -1313,11 +1315,15 @@ class TemplateFrameDetector
 
     private function load(string $path, int $type)
     {
-        return match ($type) {
-            IMAGETYPE_JPEG => @imagecreatefromjpeg($path),
-            IMAGETYPE_PNG => @imagecreatefrompng($path),
-            IMAGETYPE_WEBP => @imagecreatefromwebp($path),
-            default => false,
-        };
+        if ($type === IMAGETYPE_JPEG && function_exists('imagecreatefromjpeg')) {
+            return @imagecreatefromjpeg($path);
+        }
+        if ($type === IMAGETYPE_PNG && function_exists('imagecreatefrompng')) {
+            return @imagecreatefrompng($path);
+        }
+        if ($type === IMAGETYPE_WEBP && function_exists('imagecreatefromwebp')) {
+            return @imagecreatefromwebp($path);
+        }
+        return false;
     }
 }

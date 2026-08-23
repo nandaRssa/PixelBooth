@@ -7,7 +7,7 @@ import { toast } from '@/components/ui/Toast'
 import { sessionApi } from '@/api/sessions'
 import { useFolders } from '@/hooks/useFolders'
 import { resolvePreviewSlots } from '@/utils/previewSlots'
-import { buildTemplateOverlay } from '@/utils/templateOverlay'
+import { buildTemplateOverlay, renderFinalComposite } from '@/utils/templateOverlay'
 import { getStorageUrl } from '@/api/client'
 import { downloadFile } from '@/utils/download'
 import type { PhotoSession } from '@/types'
@@ -302,16 +302,36 @@ const FullscreenSessionPage: React.FC = () => {
   useEffect(() => {
     if (!allDone || !session || completingRef.current) return
     completingRef.current = true
-    sessionApi
-      .complete(session.id)
-      .then((res) => {
+
+    const finishSession = async () => {
+      let finalImageBase64: string | undefined = undefined
+      try {
+        if (template?.template_url) {
+          finalImageBase64 = await renderFinalComposite(
+            template.template_url,
+            previewSlots,
+            frameImages,
+            template.canvas_width,
+            template.canvas_height
+          )
+        }
+      } catch (e) {
+        console.warn('Client render final composite fallback in fullscreen:', e)
+      }
+
+      try {
+        const res = await sessionApi.complete(session.id, {
+          final_image_base64: finalImageBase64,
+        })
         setResultPhoto(res.photo as { url?: string; qr_url?: string })
         toast.success('Sesi selesai! Foto tersimpan di galeri.')
-      })
-      .catch(() => {
+      } catch {
         toast.error('Gagal menyelesaikan sesi.')
-      })
-  }, [allDone, session])
+      }
+    }
+
+    void finishSession()
+  }, [allDone, session, template, previewSlots, frameImages])
 
   // ===== Ulangi frame tertentu =====
   const handleRetakeFrame = async (frameIndex: number) => {

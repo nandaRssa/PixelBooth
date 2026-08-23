@@ -84,6 +84,10 @@ class TemplateAnalyzerService
      */
     private function detectAlphaFrames(string $filePath, int $targetW, int $targetH): ?array
     {
+        if (! function_exists('imagecreatefrompng') || ! function_exists('imagecreatetruecolor')) {
+            return null;
+        }
+
         $src = @imagecreatefrompng($filePath);
         if (! $src) {
             return null;
@@ -1197,11 +1201,15 @@ class TemplateAnalyzerService
             return false;
         }
 
-        return match ($info[2]) {
-            IMAGETYPE_JPEG => @imagecreatefromjpeg($path),
-            IMAGETYPE_PNG => @imagecreatefrompng($path),
-            IMAGETYPE_WEBP => @imagecreatefromwebp($path),
-            default => false,
-        };
+        if ($info[2] === IMAGETYPE_JPEG && function_exists('imagecreatefromjpeg')) {
+            return @imagecreatefromjpeg($path);
+        }
+        if ($info[2] === IMAGETYPE_PNG && function_exists('imagecreatefrompng')) {
+            return @imagecreatefrompng($path);
+        }
+        if ($info[2] === IMAGETYPE_WEBP && function_exists('imagecreatefromwebp')) {
+            return @imagecreatefromwebp($path);
+        }
+        return false;
     }
 }

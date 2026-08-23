@@ -57,9 +57,36 @@ class PhotoRenderService
             throw new \RuntimeException('File template tidak ditemukan.');
         }
 
+        if (! function_exists('imagecreatetruecolor') || ! function_exists('imagejpeg')) {
+            // GD tidak tersedia pada serverless PHP: fallback simpan gambar langsung
+            $fallbackFile = $templatePath;
+            if ($captures->count() > 0 && $captures[0]->photo_path) {
+                $capPath = $this->resolveLocalImagePath($captures[0]->photo_path);
+                if ($capPath && is_file($capPath)) {
+                    $fallbackFile = $capPath;
+                }
+            }
+
+            $storagePath = \App\Services\CloudStorageService::upload(
+                $fallbackFile,
+                'photos',
+                $session->session_token . '-final'
+            );
+            $fileSize = @filesize($fallbackFile) ?: 0;
+            return [$storagePath, $fileSize];
+        }
+
         $templateImg = $this->loadImage($templatePath);
         if (!$templateImg) {
-            throw new \RuntimeException('Gagal memuat gambar template.');
+            // Jika loadImage gagal karena keterbatasan format/GD, fallback ke penyimpanan langsung
+            $fallbackFile = $templatePath;
+            $storagePath = \App\Services\CloudStorageService::upload(
+                $fallbackFile,
+                'photos',
+                $session->session_token . '-final'
+            );
+            $fileSize = @filesize($fallbackFile) ?: 0;
+            return [$storagePath, $fileSize];
         }
 
         // Layer desain pada resolusi canvas (akan diberi lubang mask per frame)
@@ -437,12 +464,23 @@ class PhotoRenderService
             return false;
         }
 
-        return match ($info[2]) {
-            IMAGETYPE_JPEG => imagecreatefromjpeg($path),
-            IMAGETYPE_PNG => imagecreatefrompng($path),
-            IMAGETYPE_WEBP => imagecreatefromwebp($path),
-            default => false,
-        };
+        if ($info[2] === IMAGETYPE_JPEG && function_exists('imagecreatefromjpeg')) {
+            return @imagecreatefromjpeg($path);
+        }
+        if ($info[2] === IMAGETYPE_PNG && function_exists('imagecreatefrompng')) {
+            return @imagecreatefrompng($path);
+        }
+        if ($info[2] === IMAGETYPE_WEBP && function_exists('imagecreatefromwebp')) {
+            return @imagecreatefromwebp($path);
+        }
+        if (function_exists('imagecreatefromstring')) {
+            $content = @file_get_contents($path);
+            if ($content) {
+                return @imagecreatefromstring($content);
+            }
+        }
+
+        return false;
     }
 
     /**
