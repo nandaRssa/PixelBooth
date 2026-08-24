@@ -36,8 +36,8 @@ foldersRouter.get('/:id', async (c) => {
     if (!folder) {
       return c.json({ message: 'Folder tidak ditemukan' }, 404)
     }
-    const frontendUrl = process.env.FRONTEND_URL || 'https://pixel-booth-spot-unsil.vercel.app'
-    const qrLink = `${frontendUrl}/folder/${folder.share_token}`
+    const frontendUrl = process.env.FRONTEND_URL || ''
+    const qrLink = frontendUrl ? `${frontendUrl}/folder/${folder.share_token}` : `/folder/${folder.share_token}`
     return c.json({
       data: {
         ...folder,
@@ -58,8 +58,8 @@ foldersRouter.post('/', async (c) => {
     const parentFolderId = json.parent_folder_id || null
     const shareToken = generateUUID()
 
-    const frontendUrl = process.env.FRONTEND_URL || 'https://pixel-booth-spot-unsil.vercel.app'
-    const qrLink = `${frontendUrl}/folder/${shareToken}`
+    const frontendUrl = process.env.FRONTEND_URL || ''
+    const qrLink = frontendUrl ? `${frontendUrl}/folder/${shareToken}` : `/folder/${shareToken}`
     const qrDataUrl = await generateQrDataUrl(qrLink)
     const qrPath = await saveMedia(qrDataUrl, 'qr', `folder-${shareToken}.png`)
 

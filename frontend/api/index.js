@@ -33989,7 +33989,8 @@ var db = {
       id: f.id,
       name: f.name,
       parent_folder_id: f.parent_folder_id,
-      share_token: f.share_token,
+      share_token: f.share_token || f.unique_token,
+      unique_token: f.unique_token || f.share_token,
       photos_count: photoCounts[String(f.id)] || 0,
       subfolders_count: subfolderCounts[String(f.id)] || 0,
       qr_url: f.qr_path,
@@ -34037,13 +34038,14 @@ var db = {
   async getFolderByToken(token) {
     const sdb = getSqlite();
     if (sdb) {
-      const f = sdb.prepare("SELECT * FROM folders WHERE share_token = ?").get(token);
+      const f = sdb.prepare("SELECT * FROM folders WHERE share_token = ? OR unique_token = ?").get(token, token);
       if (!f) return null;
       const photos2 = sdb.prepare("SELECT * FROM photos WHERE folder_id = ? ORDER BY id DESC").all(f.id);
       return {
         id: f.id,
         name: f.name,
-        share_token: f.share_token,
+        share_token: f.share_token || f.unique_token,
+        unique_token: f.unique_token || f.share_token,
         photos: (photos2 || []).map((p) => ({
           id: p.id,
           token: p.unique_token,
@@ -34054,13 +34056,18 @@ var db = {
         }))
       };
     }
-    const { data: folder } = await supabase.from("folders").select("*").eq("share_token", token).single();
+    let { data: folder } = await supabase.from("folders").select("*").eq("unique_token", token).maybeSingle();
+    if (!folder) {
+      const fallback = await supabase.from("folders").select("*").eq("share_token", token).maybeSingle();
+      folder = fallback.data;
+    }
     if (!folder) return null;
-    const { data: photos } = await supabase.from("photos").select("*").eq("folder_id", folder.id).order("created_at", { ascending: false });
+    const { data: photos } = await supabase.from("photos").select("*").eq("folder_id", folder.id).order("id", { ascending: false });
     return {
       id: folder.id,
       name: folder.name,
-      share_token: folder.share_token,
+      share_token: folder.share_token || folder.unique_token,
+      unique_token: folder.unique_token || folder.share_token,
       photos: (photos || []).map((p) => ({
         id: p.id,
         token: p.unique_token,
@@ -35649,8 +35656,8 @@ sessionsRouter.post("/:id/complete", async (c) => {
       const r = Math.random() * 16 | 0;
       return (c2 === "x" ? r : r & 3 | 8).toString(16);
     });
-    const frontendUrl = process.env.FRONTEND_URL || "https://pixel-booth-spot-unsil.vercel.app";
-    const photoViewUrl = `${frontendUrl}/photo/${uniqueToken}`;
+    const frontendUrl = process.env.FRONTEND_URL || "";
+    const photoViewUrl = frontendUrl ? `${frontendUrl}/photo/${uniqueToken}` : `/photo/${uniqueToken}`;
     let qrPath = `qr/photos/${uniqueToken}.png`;
     try {
       const qrDataUrl = await generateQrDataUrl(photoViewUrl);
@@ -35759,8 +35766,8 @@ foldersRouter.get("/:id", async (c) => {
     if (!folder) {
       return c.json({ message: "Folder tidak ditemukan" }, 404);
     }
-    const frontendUrl = process.env.FRONTEND_URL || "https://pixel-booth-spot-unsil.vercel.app";
-    const qrLink = `${frontendUrl}/folder/${folder.share_token}`;
+    const frontendUrl = process.env.FRONTEND_URL || "";
+    const qrLink = frontendUrl ? `${frontendUrl}/folder/${folder.share_token}` : `/folder/${folder.share_token}`;
     return c.json({
       data: {
         ...folder,
@@ -35778,8 +35785,8 @@ foldersRouter.post("/", async (c) => {
     const name = json2.name || "Folder Baru";
     const parentFolderId = json2.parent_folder_id || null;
     const shareToken = generateUUID3();
-    const frontendUrl = process.env.FRONTEND_URL || "https://pixel-booth-spot-unsil.vercel.app";
-    const qrLink = `${frontendUrl}/folder/${shareToken}`;
+    const frontendUrl = process.env.FRONTEND_URL || "";
+    const qrLink = frontendUrl ? `${frontendUrl}/folder/${shareToken}` : `/folder/${shareToken}`;
     const qrDataUrl = await generateQrDataUrl(qrLink);
     const qrPath = await saveMedia(qrDataUrl, "qr", `folder-${shareToken}.png`);
     const folder = await db.createFolder({
