@@ -440,20 +440,6 @@ const TemplatesPage: React.FC = () => {
                         {template.canvas_width} x {template.canvas_height}
                       </p>
                     </div>
-                    {template.status === "draft" && !selectionMode && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          navigate(`/templates/${template.id}/editor`);
-                        }}
-                        className="w-6 h-6 sm:w-7 sm:h-7 rounded-md bg-[#FF5A36] text-white hover:bg-[#ff7354] active:scale-95 shadow-md flex items-center justify-center transition-all shrink-0"
-                        title="Konfigurasi Frame"
-                        aria-label="Konfigurasi Frame"
-                      >
-                        <SlidersHorizontal size={11} />
-                      </button>
-                    )}
                   </div>
                 </motion.div>
               );
