@@ -4,6 +4,7 @@ import { supabase } from './supabase'
 
 // ==========================================
 // PIXELBOOTH — Universal DB Adapter (SQLite + Supabase)
+// Supports all Photobooth operations with 100% parity to Laravel
 // ==========================================
 
 let sqliteDb: any = null
@@ -29,7 +30,6 @@ function getSqlite() {
   }
   return sqliteDb
 }
-
 
 export const db = {
   isSupabaseConfigured(): boolean {
@@ -179,10 +179,10 @@ export const db = {
   },
 
   // --- Folders ---
-  async getFolders(parentId?: string | null) {
+  async getFolders(parentId?: string | number | null) {
     const sdb = getSqlite()
     if (sdb) {
-      const sql = parentId ? 'SELECT * FROM folders WHERE parent_folder_id = ?' : 'SELECT * FROM folders WHERE parent_folder_id IS NULL'
+      const sql = parentId ? 'SELECT * FROM folders WHERE parent_folder_id = ? ORDER BY id DESC' : 'SELECT * FROM folders WHERE parent_folder_id IS NULL ORDER BY id DESC'
       const rows = parentId ? sdb.prepare(sql).all(parentId) : sdb.prepare(sql).all()
       return rows.map((f: any) => {
         const photoCount = sdb.prepare('SELECT count(*) as c FROM photos WHERE folder_id = ?').get(f.id)?.c || 0
@@ -206,6 +206,141 @@ export const db = {
     else query = query.is('parent_folder_id', null)
     const { data } = await query
     return (data || []).map((f) => ({ ...f, photos_count: 0, subfolders_count: 0 }))
+  },
+
+  async getFolderById(id: number | string) {
+    const sdb = getSqlite()
+    if (sdb) {
+      const f = sdb.prepare('SELECT * FROM folders WHERE id = ?').get(id)
+      if (!f) return null
+      const subfolders = sdb.prepare('SELECT * FROM folders WHERE parent_folder_id = ?').all(id)
+      const photos = sdb.prepare('SELECT * FROM photos WHERE folder_id = ? ORDER BY id DESC').all(id)
+      return {
+        ...f,
+        subfolders: subfolders || [],
+        photos: (photos || []).map((p: any) => ({
+          id: p.id,
+          token: p.unique_token,
+          filename: p.filename,
+          photo_url: p.storage_path,
+          thumbnail_url: p.thumbnail_path || p.storage_path,
+          created_at: p.created_at,
+        })),
+      }
+    }
+
+    const { data: folder } = await supabase.from('folders').select('*').eq('id', id).single()
+    if (!folder) return null
+    const { data: subfolders } = await supabase.from('folders').select('*').eq('parent_folder_id', id)
+    const { data: photos } = await supabase.from('photos').select('*').eq('folder_id', id).order('created_at', { ascending: false })
+    return {
+      ...folder,
+      subfolders: subfolders || [],
+      photos: (photos || []).map((p) => ({
+        id: p.id,
+        token: p.unique_token,
+        filename: p.filename,
+        photo_url: p.storage_path,
+        thumbnail_url: p.thumbnail_path || p.storage_path,
+        created_at: p.created_at,
+      })),
+    }
+  },
+
+  async getFolderByToken(token: string) {
+    const sdb = getSqlite()
+    if (sdb) {
+      const f = sdb.prepare('SELECT * FROM folders WHERE share_token = ?').get(token)
+      if (!f) return null
+      const photos = sdb.prepare('SELECT * FROM photos WHERE folder_id = ? ORDER BY id DESC').all(f.id)
+      return {
+        id: f.id,
+        name: f.name,
+        share_token: f.share_token,
+        photos: (photos || []).map((p: any) => ({
+          id: p.id,
+          token: p.unique_token,
+          filename: p.filename,
+          photo_url: p.storage_path,
+          thumbnail_url: p.thumbnail_path || p.storage_path,
+          created_at: p.created_at,
+        })),
+      }
+    }
+
+    const { data: folder } = await supabase.from('folders').select('*').eq('share_token', token).single()
+    if (!folder) return null
+    const { data: photos } = await supabase.from('photos').select('*').eq('folder_id', folder.id).order('created_at', { ascending: false })
+    return {
+      id: folder.id,
+      name: folder.name,
+      share_token: folder.share_token,
+      photos: (photos || []).map((p) => ({
+        id: p.id,
+        token: p.unique_token,
+        filename: p.filename,
+        photo_url: p.storage_path,
+        thumbnail_url: p.thumbnail_path || p.storage_path,
+        created_at: p.created_at,
+      })),
+    }
+  },
+
+  async createFolder(payload: any) {
+    const sdb = getSqlite()
+    if (sdb) {
+      const stmt = sdb.prepare(`
+        INSERT INTO folders (name, parent_folder_id, share_token, qr_path, created_at, updated_at)
+        VALUES (?, ?, ?, ?, datetime('now'), datetime('now'))
+      `)
+      const info = stmt.run(payload.name, payload.parent_folder_id || null, payload.share_token, payload.qr_path || null)
+      return sdb.prepare('SELECT * FROM folders WHERE id = ?').get(info.lastInsertRowid)
+    }
+    const { data } = await supabase.from('folders').insert(payload).select().single()
+    return data
+  },
+
+  async updateFolder(id: number | string, payload: any) {
+    const sdb = getSqlite()
+    if (sdb) {
+      const sets: string[] = ["updated_at = datetime('now')"]
+      const values: any[] = []
+      if (payload.name) { sets.push('name = ?'); values.push(payload.name) }
+      if (payload.parent_folder_id !== undefined) { sets.push('parent_folder_id = ?'); values.push(payload.parent_folder_id) }
+      values.push(id)
+      sdb.prepare(`UPDATE folders SET ${sets.join(', ')} WHERE id = ?`).run(...values)
+      return sdb.prepare('SELECT * FROM folders WHERE id = ?').get(id)
+    }
+    const { data } = await supabase.from('folders').update(payload).eq('id', id).select().single()
+    return data
+  },
+
+  async deleteFolder(id: number | string) {
+    const sdb = getSqlite()
+    if (sdb) {
+      sdb.prepare('DELETE FROM photos WHERE folder_id = ?').run(id)
+      sdb.prepare('DELETE FROM folders WHERE id = ?').run(id)
+      return
+    }
+    await supabase.from('photos').delete().eq('folder_id', id)
+    await supabase.from('folders').delete().eq('id', id)
+  },
+
+  async bulkDeleteFolders(ids: number[]) {
+    for (const id of ids) {
+      await this.deleteFolder(id)
+    }
+  },
+
+  async bulkMoveFolders(ids: number[], parentFolderId: number | null) {
+    const sdb = getSqlite()
+    if (sdb) {
+      for (const id of ids) {
+        sdb.prepare('UPDATE folders SET parent_folder_id = ?, updated_at = datetime("now") WHERE id = ?').run(parentFolderId, id)
+      }
+      return
+    }
+    await supabase.from('folders').update({ parent_folder_id: parentFolderId }).in('id', ids)
   },
 
   // --- Sessions ---
@@ -256,7 +391,6 @@ export const db = {
   async updateSession(id: number | string, payload: any) {
     const sdb = getSqlite()
     if (sdb) {
-      // Map status values to match SQLite enum: active/complete/cancelled
       const statusMap: Record<string, string> = {
         ready: 'active', in_progress: 'active', completed: 'complete', cancelled: 'cancelled'
       }
@@ -279,10 +413,8 @@ export const db = {
   async createCapture(payload: any) {
     const sdb = getSqlite()
     if (sdb) {
-      // Mark previous captures for this frame as retaken
       sdb.prepare('UPDATE session_captures SET status = ? WHERE session_id = ? AND frame_number = ?')
         .run('retaken', payload.session_id, payload.frame_number)
-      // session_captures has: id, session_id, frame_number, photo_path, status, captured_at
       const stmt = sdb.prepare(`
         INSERT INTO session_captures (session_id, frame_number, photo_path, status, captured_at)
         VALUES (?, ?, ?, ?, datetime('now'))
@@ -296,15 +428,24 @@ export const db = {
     return data
   },
 
+  async resetCaptures(sessionId: number | string) {
+    const sdb = getSqlite()
+    if (sdb) {
+      sdb.prepare('UPDATE session_captures SET status = ? WHERE session_id = ?').run('retaken', sessionId)
+      return
+    }
+    await supabase.from('session_captures').update({ status: 'retaken' }).eq('session_id', sessionId)
+  },
+
   async createPhoto(payload: any) {
     const sdb = getSqlite()
     if (sdb) {
       const stmt = sdb.prepare(`
-        INSERT INTO photos (session_id, folder_id, filename, storage_path, thumbnail_path, unique_token, qr_path, is_final, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+        INSERT INTO photos (session_id, folder_id, filename, storage_path, thumbnail_path, unique_token, qr_path, is_final, is_temporary, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, datetime('now'), datetime('now'))
       `)
       const info = stmt.run(
-        payload.session_id, payload.folder_id || null,
+        payload.session_id || null, payload.folder_id || null,
         payload.filename, payload.storage_path,
         payload.thumbnail_path || payload.storage_path,
         payload.unique_token, payload.qr_path || null,
@@ -317,18 +458,21 @@ export const db = {
   },
 
   // --- Photos ---
-  async getPhotos(folderId?: string | null, page = 1, perPage = 20) {
+  async getPhotos(folderId?: string | number | null, page = 1, perPage = 20, uncategorized = false) {
     const sdb = getSqlite()
     if (sdb) {
       const offset = (page - 1) * perPage
       let rows: any[] = []
       let total = 0
-      if (folderId && folderId !== 'null') {
+      if (folderId && folderId !== 'null' && !uncategorized) {
         rows = sdb.prepare('SELECT * FROM photos WHERE folder_id = ? ORDER BY id DESC LIMIT ? OFFSET ?').all(folderId, perPage, offset)
         total = sdb.prepare('SELECT count(*) as c FROM photos WHERE folder_id = ?').get(folderId)?.c || 0
-      } else {
+      } else if (uncategorized) {
         rows = sdb.prepare('SELECT * FROM photos WHERE folder_id IS NULL ORDER BY id DESC LIMIT ? OFFSET ?').all(perPage, offset)
         total = sdb.prepare('SELECT count(*) as c FROM photos WHERE folder_id IS NULL').get()?.c || 0
+      } else {
+        rows = sdb.prepare('SELECT * FROM photos ORDER BY id DESC LIMIT ? OFFSET ?').all(perPage, offset)
+        total = sdb.prepare('SELECT count(*) as c FROM photos').get()?.c || 0
       }
       return {
         data: rows.map((p: any) => ({
@@ -348,8 +492,8 @@ export const db = {
     const from = (page - 1) * perPage
     const to = from + perPage - 1
     let query = supabase.from('photos').select('*', { count: 'exact' }).order('created_at', { ascending: false })
-    if (folderId && folderId !== 'null') query = query.eq('folder_id', folderId)
-    else query = query.is('folder_id', null)
+    if (folderId && folderId !== 'null' && !uncategorized) query = query.eq('folder_id', folderId)
+    else if (uncategorized) query = query.is('folder_id', null)
     const { data, count } = await query.range(from, to)
     return {
       data: (data || []).map((p) => ({
@@ -363,6 +507,84 @@ export const db = {
         created_at: p.created_at,
       })),
       meta: { current_page: page, per_page: perPage, total: count || 0, last_page: Math.ceil((count || 0) / perPage) },
+    }
+  },
+
+  async getPhotoByToken(token: string) {
+    const sdb = getSqlite()
+    if (sdb) {
+      const p = sdb.prepare('SELECT * FROM photos WHERE unique_token = ?').get(token)
+      if (!p) return null
+      return {
+        id: p.id,
+        token: p.unique_token,
+        filename: p.filename,
+        photo_url: p.storage_path,
+        thumbnail_url: p.thumbnail_path || p.storage_path,
+        folder_id: p.folder_id,
+        session_id: p.session_id,
+        qr_url: p.qr_path,
+        created_at: p.created_at,
+      }
+    }
+    const { data: p } = await supabase.from('photos').select('*').eq('unique_token', token).single()
+    if (!p) return null
+    return {
+      id: p.id,
+      token: p.unique_token,
+      filename: p.filename,
+      photo_url: p.storage_path,
+      thumbnail_url: p.thumbnail_path || p.storage_path,
+      folder_id: p.folder_id,
+      session_id: p.session_id,
+      qr_url: p.qr_path,
+      created_at: p.created_at,
+    }
+  },
+
+  async deletePhoto(id: number | string) {
+    const sdb = getSqlite()
+    if (sdb) {
+      sdb.prepare('DELETE FROM photos WHERE id = ?').run(id)
+      return
+    }
+    await supabase.from('photos').delete().eq('id', id)
+  },
+
+  async deletePhotoByToken(token: string) {
+    const sdb = getSqlite()
+    if (sdb) {
+      sdb.prepare('DELETE FROM photos WHERE unique_token = ?').run(token)
+      return
+    }
+    await supabase.from('photos').delete().eq('unique_token', token)
+  },
+
+  async bulkDeletePhotos(ids: number[]) {
+    for (const id of ids) {
+      await this.deletePhoto(id)
+    }
+  },
+
+  async bulkDeletePhotosByTokens(tokens: string[]) {
+    for (const token of tokens) {
+      await this.deletePhotoByToken(token)
+    }
+  },
+
+  async movePhoto(id: number | string, folderId: number | null) {
+    const sdb = getSqlite()
+    if (sdb) {
+      sdb.prepare('UPDATE photos SET folder_id = ?, updated_at = datetime("now") WHERE id = ?').run(folderId, id)
+      return sdb.prepare('SELECT * FROM photos WHERE id = ?').get(id)
+    }
+    const { data } = await supabase.from('photos').update({ folder_id: folderId }).eq('id', id).select().single()
+    return data
+  },
+
+  async bulkMovePhotos(ids: number[], folderId: number | null) {
+    for (const id of ids) {
+      await this.movePhoto(id, folderId)
     }
   },
 }

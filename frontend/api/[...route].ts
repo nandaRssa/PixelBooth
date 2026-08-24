@@ -1,12 +1,9 @@
-// ABSOLUTE ZERO DEPENDENCY TEST
-// No imports whatsoever — just a plain function
-export default function handler(req: any, res: any) {
-  res.setHeader('Content-Type', 'application/json')
-  res.statusCode = 200
-  res.end(JSON.stringify({
-    status: 'HANDLER_ALIVE',
-    method: req.method,
-    url: req.url,
-    ts: Date.now()
-  }))
+import { handle } from 'hono/vercel'
+import { app } from '../server/app'
+
+// Vercel Serverless Function entry point (single catch-all handler for all /api/* routes)
+export const config = {
+  runtime: 'nodejs',
 }
+
+export default handle(app)

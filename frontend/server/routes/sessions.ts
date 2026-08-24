@@ -30,12 +30,25 @@ function formatCapture(cap: any) {
     session_id: cap.session_id,
     frame_number: cap.frame_number,
     photo_url: cap.photo_url || cap.photo_path,
-    status: cap.status,
+    status: cap.status || 'approved',
     captured_at: cap.captured_at,
   }
 }
 
-// POST /api/sessions
+// Helper: assemble complete session payload
+async function getFullSessionPayload(sessionId: number | string) {
+  const result = await db.getSession(sessionId)
+  if (!result || !result.session) return null
+  const { session, template, captures, folder } = result
+  return {
+    ...session,
+    template: formatTemplate(template),
+    captures: (captures || []).map(formatCapture),
+    folder: folder ? { id: folder.id, name: folder.name, share_token: folder.share_token } : null,
+  }
+}
+
+// POST /api/sessions (Create Session)
 sessionsRouter.post('/', async (c) => {
   try {
     const json = await c.req.json().catch(() => ({}))
@@ -64,75 +77,72 @@ sessionsRouter.post('/', async (c) => {
     })
 
     if (!session) {
-      return c.json({ message: 'Session null setelah createSession' }, 500)
+      return c.json({ message: 'Gagal membuat sesi' }, 500)
     }
 
+    const fullSession = await getFullSessionPayload(session.id)
+
     return c.json({
-      message: 'Sesi foto berhasil dibuat',
-      data: {
-        ...session,
-        template: formatTemplate(template),
-        captures: [],
-      },
+      message: 'Sesi foto dimulai.',
+      data: fullSession,
     }, 201)
   } catch (err: any) {
     console.error('POST /sessions CRASH:', err)
     return c.json({
       message: err?.message || String(err) || 'Gagal membuat sesi',
-      error_type: err?.constructor?.name,
-      error_code: err?.code,
     }, 500)
   }
 })
 
-// GET /api/sessions/:id
+// GET /api/sessions/:id (Show Session)
 sessionsRouter.get('/:id', async (c) => {
   try {
     const id = c.req.param('id')
-    const result = await db.getSession(id)
+    const fullSession = await getFullSessionPayload(id)
 
-    if (!result) {
+    if (!fullSession) {
       return c.json({ message: 'Sesi tidak ditemukan' }, 404)
     }
 
-    const { session, template, captures, folder } = result
-
-    return c.json({
-      data: {
-        ...session,
-        template: formatTemplate(template),
-        captures: (captures || []).map(formatCapture),
-        folder: folder ? { id: folder.id, name: folder.name, share_token: folder.share_token } : null,
-      },
-    })
+    return c.json({ data: fullSession })
   } catch (err: any) {
     console.error('GET /sessions/:id error:', err)
     return c.json({ message: err?.message || 'Gagal mengambil sesi' }, 500)
   }
 })
 
-// POST /api/sessions/:id/capture
+// POST /api/sessions/:id/capture (Capture Frame)
 sessionsRouter.post('/:id/capture', async (c) => {
   try {
     const id = c.req.param('id')
-    let frameNumber = 1
+    const sessionData = await db.getSession(id)
+    if (!sessionData || !sessionData.session) {
+      return c.json({ message: 'Sesi tidak ditemukan' }, 404)
+    }
+
+    const currentSession = sessionData.session
+    const totalFrames = currentSession.total_frames || 1
+    const frameNumber = currentSession.current_frame || 1
+
     let imageBase64 = ''
 
-    // Try JSON first, then FormData
+    // Read payload (supports { image_base64 } or { image } or FormData)
     const contentType = c.req.header('content-type') || ''
     if (contentType.includes('multipart') || contentType.includes('form')) {
       const body = await c.req.parseBody().catch(() => ({}))
-      frameNumber = Number(body.frame_number || 1)
-      imageBase64 = (body.image || body.photo) as string
+      imageBase64 = (body.image_base64 || body.image || body.photo) as string
     } else {
       const json = await c.req.json().catch(() => ({}))
-      frameNumber = Number(json.frame_number || 1)
-      imageBase64 = json.image || json.photo || ''
+      imageBase64 = json.image_base64 || json.image || json.photo || ''
     }
 
     let photoUrl = ''
     if (imageBase64 && typeof imageBase64 === 'string') {
-      photoUrl = await uploadToCloudinary(imageBase64, 'captures', `session-${id}-frame-${frameNumber}-${Date.now()}`)
+      photoUrl = await uploadToCloudinary(
+        imageBase64,
+        'captures',
+        `session-${currentSession.session_token || id}-frame-${frameNumber}`
+      )
     }
 
     const capture = await db.createCapture({
@@ -142,20 +152,44 @@ sessionsRouter.post('/:id/capture', async (c) => {
       status: 'approved',
     })
 
-    // Update session current_frame
-    await db.updateSession(id, {
-      current_frame: frameNumber + 1,
-      status: 'in_progress',
-    })
+    // Advance to next uncaptured frame or calculate all_done
+    const allCaptures = (await db.getSession(id))?.captures || []
+    const approvedFrames = allCaptures
+      .filter((cap: any) => cap.status === 'approved' || cap.status === 'captured')
+      .map((cap: any) => cap.frame_number)
+
+    let nextFrame: number | null = null
+    for (let i = 1; i <= totalFrames; i++) {
+      if (!approvedFrames.includes(i)) {
+        nextFrame = i
+        break
+      }
+    }
+
+    let allDone = false
+    if (nextFrame === null) {
+      await db.updateSession(id, { current_frame: totalFrames, status: 'active' })
+      allDone = true
+    } else {
+      await db.updateSession(id, { current_frame: nextFrame, status: 'active' })
+      allDone = false
+    }
+
+    const fullSession = await getFullSessionPayload(id)
 
     return c.json({
-      message: 'Foto berhasil disimpan',
+      message: `Frame ${frameNumber} berhasil di-capture.`,
       data: {
-        id: capture?.id,
-        session_id: capture?.session_id,
-        frame_number: capture?.frame_number,
-        photo_url: capture?.photo_path || photoUrl,
-        status: capture?.status,
+        capture: {
+          id: capture?.id,
+          session_id: Number(id),
+          frame_number: frameNumber,
+          photo_path: photoUrl,
+          photo_url: photoUrl,
+          status: 'approved',
+        },
+        session: fullSession,
+        all_done: allDone,
       },
     })
   } catch (err: any) {
@@ -164,41 +198,82 @@ sessionsRouter.post('/:id/capture', async (c) => {
   }
 })
 
-// POST /api/sessions/:id/restart
+// POST /api/sessions/:id/retake (Retake Frame)
+sessionsRouter.post('/:id/retake', async (c) => {
+  try {
+    const id = c.req.param('id')
+    const json = await c.req.json().catch(() => ({}))
+    const frameNumber = Number(json.frame_number || 1)
+
+    await db.updateSession(id, {
+      current_frame: frameNumber,
+      status: 'active',
+    })
+
+    const fullSession = await getFullSessionPayload(id)
+    return c.json({
+      message: `Kamera kembali ke frame ${frameNumber} untuk pengambilan ulang.`,
+      data: fullSession,
+    })
+  } catch (err: any) {
+    return c.json({ message: err?.message || 'Gagal memulai retake' }, 500)
+  }
+})
+
+// POST /api/sessions/:id/restart (Restart Session from frame 1)
 sessionsRouter.post('/:id/restart', async (c) => {
   try {
     const id = c.req.param('id')
-    await db.updateSession(id, { current_frame: 1, status: 'ready' })
-    return c.json({ message: 'Sesi foto berhasil diulang dari awal' })
+    await db.resetCaptures(id)
+    await db.updateSession(id, { current_frame: 1, status: 'active' })
+
+    const fullSession = await getFullSessionPayload(id)
+    return c.json({
+      message: 'Sesi diulangi dari awal (Frame 1).',
+      data: fullSession,
+    })
   } catch (err: any) {
     return c.json({ message: err?.message || 'Gagal mengulang sesi' }, 500)
   }
 })
 
-// POST /api/sessions/:id/complete
+// POST /api/sessions/:id/complete (Complete Session & Final Photo)
 sessionsRouter.post('/:id/complete', async (c) => {
   try {
     const id = c.req.param('id')
     const json = await c.req.json().catch(() => ({}))
     const finalImageBase64 = json.final_image_base64
 
-    let finalUrl = ''
-    if (finalImageBase64) {
-      finalUrl = await uploadToCloudinary(finalImageBase64, 'photos', `final-session-${id}-${Date.now()}`)
+    const sessionData = await db.getSession(id)
+    if (!sessionData || !sessionData.session) {
+      return c.json({ message: 'Sesi tidak ditemukan' }, 404)
     }
 
-    const sessionData = await db.getSession(id)
-    const session = sessionData?.session
+    const currentSession = sessionData.session
+
+    let finalUrl = ''
+    if (finalImageBase64) {
+      finalUrl = await uploadToCloudinary(
+        finalImageBase64,
+        'photos',
+        `${currentSession.session_token || id}-final`
+      )
+    }
 
     const uniqueToken = randomUUID()
     const frontendUrl = process.env.FRONTEND_URL || 'https://pixel-booth-spot-unsil.vercel.app'
     const photoViewUrl = `${frontendUrl}/photo/${uniqueToken}`
     const qrDataUrl = await generateQrDataUrl(photoViewUrl)
 
+    const folderName = sessionData.folder?.name || ''
+    const templateName = sessionData.template?.name || ''
+    const scopeName = (folderName || templateName || 'Photo').replace(/[^A-Za-z0-9]/g, '') || 'Photo'
+    const formattedFilename = `PixelBooth-${scopeName}-${Date.now()}.jpg`
+
     const photo = await db.createPhoto({
       session_id: Number(id),
-      folder_id: (session as any)?.folder_id || null,
-      filename: `Photo-${Date.now()}.jpg`,
+      folder_id: currentSession.folder_id || null,
+      filename: formattedFilename,
       storage_path: finalUrl,
       thumbnail_path: finalUrl,
       unique_token: uniqueToken,
@@ -207,16 +282,23 @@ sessionsRouter.post('/:id/complete', async (c) => {
     })
 
     await db.updateSession(id, {
-      status: 'completed',
+      status: 'complete',
       completed_at: new Date().toISOString(),
     })
 
+    const fullSession = await getFullSessionPayload(id)
+
     return c.json({
-      message: 'Sesi foto selesai',
+      message: 'Sesi selesai. Foto berhasil disimpan.',
       data: {
+        session: fullSession,
         photo: {
           id: photo?.id,
-          photo_url: (photo as any)?.storage_path || finalUrl,
+          session_id: Number(id),
+          folder_id: currentSession.folder_id,
+          filename: formattedFilename,
+          photo_url: finalUrl,
+          thumbnail_url: finalUrl,
           unique_token: uniqueToken,
           qr_url: qrDataUrl,
           qr_link: photoViewUrl,
@@ -229,14 +311,33 @@ sessionsRouter.post('/:id/complete', async (c) => {
   }
 })
 
-// POST /api/sessions/:id/folder
-sessionsRouter.post('/:id/folder', async (c) => {
+// POST /api/sessions/:id/cancel (Cancel Session)
+sessionsRouter.post('/:id/cancel', async (c) => {
   try {
     const id = c.req.param('id')
-    const { folder_id } = await c.req.json().catch(() => ({ folder_id: null }))
-    await db.updateSession(id, { folder_id })
-    return c.json({ message: 'Folder tujuan sesi berhasil diubah' })
+    await db.updateSession(id, { status: 'cancelled' })
+    return c.json({ message: 'Sesi dibatalkan dan file temporary telah dihapus.' })
+  } catch (err: any) {
+    return c.json({ message: err?.message || 'Gagal membatalkan sesi' }, 500)
+  }
+})
+
+// POST /api/sessions/:id/set-folder & /folder (Set Folder)
+async function handleSetFolder(c: any) {
+  try {
+    const id = c.req.param('id')
+    const json = await c.req.json().catch(() => ({}))
+    const folderId = json.folder_id !== undefined ? json.folder_id : null
+    await db.updateSession(id, { folder_id: folderId })
+    const fullSession = await getFullSessionPayload(id)
+    return c.json({
+      message: 'Folder tujuan berhasil diatur.',
+      data: fullSession,
+    })
   } catch (err: any) {
     return c.json({ message: err?.message || 'Gagal mengubah folder' }, 500)
   }
-})
+}
+
+sessionsRouter.post('/:id/set-folder', handleSetFolder)
+sessionsRouter.post('/:id/folder', handleSetFolder)

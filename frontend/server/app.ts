@@ -1,7 +1,6 @@
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { logger } from 'hono/logger'
-import { serveStatic } from '@hono/node-server/serve-static'
 import path from 'path'
 import fs from 'fs'
 
@@ -10,9 +9,12 @@ import { sessionsRouter } from './routes/sessions'
 import { foldersRouter } from './routes/folders'
 import { photosRouter } from './routes/photos'
 import { settingsRouter } from './routes/settings'
+import { hardwareRouter } from './routes/hardware'
+import { customerRouter } from './routes/customer'
 
 // ==========================================
 // PIXELBOOTH — Hono App (Vercel Native TypeScript)
+// 100% Contract & Algorithm Parity with Laravel
 // ==========================================
 
 const app = new Hono().basePath('/api')
@@ -28,8 +30,7 @@ app.use('*', cors({
 // Health Check
 app.get('/health', (c) => c.json({ status: 'ok', server: 'vercel-native-typescript', timestamp: new Date().toISOString() }))
 
-// Static Storage Files — serve Laravel storage files locally
-// e.g. GET /api/storage/templates/image.png → ../backend/storage/app/public/templates/image.png
+// Static Storage Files — serve local image assets when testing locally
 app.get('/storage/*', async (c) => {
   const filePath = c.req.path.replace('/api/storage/', '')
   const candidates = [
@@ -51,19 +52,21 @@ app.get('/storage/*', async (c) => {
   return c.json({ message: 'File tidak ditemukan' }, 404)
 })
 
-// Mount Routers
+// Mount All Domain Routers
 app.route('/templates', templatesRouter)
 app.route('/sessions', sessionsRouter)
 app.route('/folders', foldersRouter)
 app.route('/photos', photosRouter)
 app.route('/settings', settingsRouter)
+app.route('/hardware', hardwareRouter)
+app.route('/public', customerRouter)
 
 // Fallback 404
 app.notFound((c) => c.json({ message: 'Endpoint tidak ditemukan' }, 404))
 
 // Global Error Handler
 app.onError((err, c) => {
-  console.error('API Error:', err)
+  console.error('API Global Error:', err)
   return c.json({ message: err.message || 'Internal Server Error' }, 500)
 })
 
