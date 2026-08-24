@@ -213,13 +213,13 @@ export const db = {
     const sdb = getSqlite()
     if (sdb) {
       const stmt = sdb.prepare(`
-        INSERT INTO photo_sessions (template_id, folder_id, session_token, total_frames, current_frame, status, started_at, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'), datetime('now'))
+        INSERT INTO photo_sessions (template_id, folder_id, session_token, total_frames, current_frame, status, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
       `)
       const info = stmt.run(
         payload.template_id, payload.folder_id || null,
         payload.session_token, payload.total_frames || 1,
-        payload.current_frame || 1, payload.status || 'ready',
+        payload.current_frame || 1, 'active',
       )
       return sdb.prepare('SELECT * FROM photo_sessions WHERE id = ?').get(info.lastInsertRowid)
     }
@@ -256,9 +256,15 @@ export const db = {
   async updateSession(id: number | string, payload: any) {
     const sdb = getSqlite()
     if (sdb) {
+      // Map status values to match SQLite enum: active/complete/cancelled
+      const statusMap: Record<string, string> = {
+        ready: 'active', in_progress: 'active', completed: 'complete', cancelled: 'cancelled'
+      }
       const sets: string[] = ["updated_at = datetime('now')"]
       const values: any[] = []
-      if (payload.status !== undefined) { sets.push('status = ?'); values.push(payload.status) }
+      if (payload.status !== undefined) {
+        sets.push('status = ?'); values.push(statusMap[payload.status] || payload.status)
+      }
       if (payload.current_frame !== undefined) { sets.push('current_frame = ?'); values.push(payload.current_frame) }
       if (payload.folder_id !== undefined) { sets.push('folder_id = ?'); values.push(payload.folder_id) }
       if (payload.completed_at !== undefined) { sets.push('completed_at = ?'); values.push(payload.completed_at) }
@@ -276,9 +282,10 @@ export const db = {
       // Mark previous captures for this frame as retaken
       sdb.prepare('UPDATE session_captures SET status = ? WHERE session_id = ? AND frame_number = ?')
         .run('retaken', payload.session_id, payload.frame_number)
+      // session_captures has: id, session_id, frame_number, photo_path, status, captured_at
       const stmt = sdb.prepare(`
-        INSERT INTO session_captures (session_id, frame_number, photo_path, status, captured_at, created_at, updated_at)
-        VALUES (?, ?, ?, ?, datetime('now'), datetime('now'), datetime('now'))
+        INSERT INTO session_captures (session_id, frame_number, photo_path, status, captured_at)
+        VALUES (?, ?, ?, ?, datetime('now'))
       `)
       const info = stmt.run(payload.session_id, payload.frame_number, payload.photo_path, payload.status || 'approved')
       return sdb.prepare('SELECT * FROM session_captures WHERE id = ?').get(info.lastInsertRowid)
