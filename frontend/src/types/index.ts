@@ -119,7 +119,10 @@ export interface Folder {
   qr_path: string | null
   qr_url: string | null
   google_drive_id: string | null
+  photos_count?: number
   photo_count?: number
+  subfolders_count?: number
+  subfolder_count?: number
   children?: Folder[]
   created_at: string
   updated_at: string
