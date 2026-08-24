@@ -253,11 +253,25 @@ sessionsRouter.post('/:id/complete', async (c) => {
 
     let finalUrl = ''
     if (finalImageBase64) {
-      finalUrl = await saveMedia(
-        finalImageBase64,
-        'photos',
-        `${currentSession.session_token || id}-final`
-      )
+      try {
+        finalUrl = await saveMedia(
+          finalImageBase64,
+          'photos',
+          `${currentSession.session_token || id}-final`
+        )
+      } catch (err) {
+        console.error('saveMedia finalImage error:', err)
+      }
+    }
+
+    // Fallback: If composite image is missing or failed, use the latest valid capture from this session
+    if (!finalUrl) {
+      const captures = await db.getCaptures(id)
+      if (captures && captures.length > 0) {
+        const validCaptures = captures.filter((c: any) => c.status !== 'retaken')
+        const chosen = validCaptures[validCaptures.length - 1] || captures[captures.length - 1]
+        finalUrl = chosen.photo_url || chosen.photo_path || ''
+      }
     }
 
     const uniqueToken = randomUUID()
