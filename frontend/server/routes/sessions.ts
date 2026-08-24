@@ -1,5 +1,4 @@
 import { Hono } from 'hono'
-import { randomUUID } from 'crypto'
 import { db } from '../lib/db'
 import { saveMedia } from '../lib/storage'
 import { generateQrDataUrl } from '../lib/qrcode'
@@ -274,11 +273,25 @@ sessionsRouter.post('/:id/complete', async (c) => {
       }
     }
 
-    const uniqueToken = randomUUID()
+    const uniqueToken = (typeof globalThis !== 'undefined' && globalThis.crypto && typeof globalThis.crypto.randomUUID === 'function')
+      ? globalThis.crypto.randomUUID()
+      : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+          const r = Math.random() * 16 | 0
+          return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16)
+        })
+
     const frontendUrl = process.env.FRONTEND_URL || 'https://pixel-booth-spot-unsil.vercel.app'
     const photoViewUrl = `${frontendUrl}/photo/${uniqueToken}`
-    const qrDataUrl = await generateQrDataUrl(photoViewUrl)
-    const qrPath = await saveMedia(qrDataUrl, 'qr', `${uniqueToken}.png`)
+    let qrPath = `qr/photos/${uniqueToken}.png`
+    try {
+      const qrDataUrl = await generateQrDataUrl(photoViewUrl)
+      const uploadedQr = await saveMedia(qrDataUrl, 'qr', `${uniqueToken}.png`)
+      if (uploadedQr && !uploadedQr.startsWith('data:') && uploadedQr.length <= 255) {
+        qrPath = uploadedQr
+      }
+    } catch (e) {
+      console.warn('QR upload skipped:', e)
+    }
 
     const folderName = sessionData.folder?.name || ''
     const templateName = sessionData.template?.name || ''

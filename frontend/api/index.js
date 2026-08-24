@@ -35392,9 +35392,6 @@ templatesRouter.post("/bulk-delete", async (c) => {
   return c.json({ message: `${ids.length} template berhasil dihapus` });
 });
 
-// server/routes/sessions.ts
-import { randomUUID } from "crypto";
-
 // server/lib/qrcode.ts
 var import_qrcode = __toESM(require_lib(), 1);
 async function generateQrSvg(url) {
@@ -35632,11 +35629,22 @@ sessionsRouter.post("/:id/complete", async (c) => {
         finalUrl = chosen.photo_url || chosen.photo_path || "";
       }
     }
-    const uniqueToken = randomUUID();
+    const uniqueToken = typeof globalThis !== "undefined" && globalThis.crypto && typeof globalThis.crypto.randomUUID === "function" ? globalThis.crypto.randomUUID() : "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c2) => {
+      const r = Math.random() * 16 | 0;
+      return (c2 === "x" ? r : r & 3 | 8).toString(16);
+    });
     const frontendUrl = process.env.FRONTEND_URL || "https://pixel-booth-spot-unsil.vercel.app";
     const photoViewUrl = `${frontendUrl}/photo/${uniqueToken}`;
-    const qrDataUrl = await generateQrDataUrl(photoViewUrl);
-    const qrPath = await saveMedia(qrDataUrl, "qr", `${uniqueToken}.png`);
+    let qrPath = `qr/photos/${uniqueToken}.png`;
+    try {
+      const qrDataUrl = await generateQrDataUrl(photoViewUrl);
+      const uploadedQr = await saveMedia(qrDataUrl, "qr", `${uniqueToken}.png`);
+      if (uploadedQr && !uploadedQr.startsWith("data:") && uploadedQr.length <= 255) {
+        qrPath = uploadedQr;
+      }
+    } catch (e) {
+      console.warn("QR upload skipped:", e);
+    }
     const folderName = sessionData.folder?.name || "";
     const templateName = sessionData.template?.name || "";
     const scopeName = (folderName || templateName || "Photo").replace(/[^A-Za-z0-9]/g, "") || "Photo";
