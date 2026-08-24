@@ -105,15 +105,6 @@ templatesRouter.post('/', async (c) => {
     if (!finalCanvasWidth || isNaN(finalCanvasWidth)) finalCanvasWidth = 1200
     if (!finalCanvasHeight || isNaN(finalCanvasHeight)) finalCanvasHeight = 1800
 
-    // Auto-detect frames on upload if no explicit configuration provided
-    if (frameConfig.length === 0 && fileBuffer) {
-      const detected = detectFramesFromBuffer(fileBuffer, finalCanvasWidth, finalCanvasHeight)
-      if (detected && detected.frame_configuration.length > 0) {
-        frameConfig = detected.frame_configuration
-        frameCount = detected.frame_count
-      }
-    }
-
     const slug = `${name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${Math.random().toString(36).slice(2, 7)}`
 
     const template = await db.createTemplate({
@@ -121,14 +112,14 @@ templatesRouter.post('/', async (c) => {
       slug,
       template_file: fileUrl,
       preview_file: fileUrl,
-      frame_count: frameCount || frameConfig.length || 1,
+      frame_count: frameConfig.length || frameCount || 1,
       canvas_width: finalCanvasWidth,
       canvas_height: finalCanvasHeight,
-      status,
+      status: 'draft',
       frame_configuration: frameConfig,
     })
 
-    return c.json({ message: 'Template berhasil diunggah', data: template }, 201)
+    return c.json({ message: 'Template berhasil diunggah. Atur posisi kamera pada Frame Editor.', data: template }, 201)
   } catch (err: any) {
     return c.json({ message: err?.message || 'Gagal mengunggah template' }, 500)
   }
