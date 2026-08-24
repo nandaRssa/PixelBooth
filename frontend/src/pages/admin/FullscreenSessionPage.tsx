@@ -327,7 +327,12 @@ const FullscreenSessionPage: React.FC = () => {
         const res = await sessionApi.complete(session.id, {
           final_image_base64: finalImageBase64,
         })
-        setResultPhoto(res.photo as { url?: string; qr_url?: string })
+        const photoData = (res.photo || {}) as any
+        setResultPhoto({
+          url: photoData.url || photoData.photo_url || photoData.storage_path,
+          qr_url: photoData.qr_url || photoData.qr_path,
+          filename: photoData.filename || 'pixelbooth-photo.jpg',
+        })
         toast.success('Sesi selesai! Foto tersimpan di galeri.')
       } catch {
         toast.error('Gagal menyelesaikan sesi.')

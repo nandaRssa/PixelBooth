@@ -352,10 +352,25 @@ const PhotoCapturePage: React.FC = () => {
     captureFnRef.current = doCapture
   })
 
+  const completingRef = useRef(false)
+
+  // Auto-complete saat semua frame selesai (mode default)
+  useEffect(() => {
+    if (!allDone || !session || completingRef.current) return
+    completingRef.current = true
+
+    const timer = setTimeout(() => {
+      void handleComplete()
+    }, 400)
+
+    return () => clearTimeout(timer)
+  }, [allDone, session, template, previewSlots, frameImages])
+
   // ===== Retake frame tertentu =====
   const handleRetakeFrame = async (frameIndex: number) => {
     if (!session || phase === 'countdown' || isCapturing) return
     try {
+      completingRef.current = false
       delete localCapturesRef.current[frameIndex + 1]
       const updated = await sessionApi.retake(session.id, frameIndex + 1)
       setSession(updated)
@@ -376,6 +391,7 @@ const PhotoCapturePage: React.FC = () => {
   const handleRestartSession = async () => {
     if (!session || phase === 'countdown' || isCapturing) return
     try {
+      completingRef.current = false
       localCapturesRef.current = {}
       const updated = await sessionApi.restart(session.id)
       setSession(updated)
@@ -415,7 +431,11 @@ const PhotoCapturePage: React.FC = () => {
       const result = await sessionApi.complete(session.id, {
         final_image_base64: finalImageBase64,
       })
-      setResultPhoto(result.photo as { url?: string; qr_url?: string })
+      const photoData = (result.photo || {}) as any
+      setResultPhoto({
+        url: photoData.url || photoData.photo_url || photoData.storage_path,
+        qr_url: photoData.qr_url || photoData.qr_path,
+      })
       toast.success('Sesi selesai. Foto tersimpan di galeri.')
     } catch (err: unknown) {
       const error = err as { response?: { data?: { message?: string } } }
