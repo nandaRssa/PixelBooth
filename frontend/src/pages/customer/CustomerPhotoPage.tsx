@@ -109,11 +109,11 @@ const CustomerPhotoPage: React.FC = () => {
         </div>
 
         {/* Photo */}
-        <div className="bg-pb-surface border border-pb-border rounded-2xl overflow-hidden mb-4">
+        <div className="bg-pb-surface border border-pb-border rounded-2xl p-2 sm:p-3 overflow-hidden mb-4 flex items-center justify-center shadow-lg">
           <img
             src={getStorageUrl(photo.url)}
             alt="Hasil foto photobooth"
-            className="w-full aspect-[3/4] object-cover"
+            className="w-auto max-w-full max-h-[60vh] object-contain rounded-xl block mx-auto shadow-sm"
           />
         </div>
 

@@ -91,9 +91,23 @@ templatesRouter.post('/', async (c) => {
       fileBuffer = await getImageBuffer(fileUrl)
     }
 
+    // Preserve exact original natural dimensions from the uploaded template file
+    let finalCanvasWidth = parseInt((body.canvas_width as string) || '0')
+    let finalCanvasHeight = parseInt((body.canvas_height as string) || '0')
+
+    if (fileBuffer) {
+      const decoded = decodeImage(fileBuffer)
+      if (decoded && decoded.width > 0 && decoded.height > 0) {
+        finalCanvasWidth = decoded.width
+        finalCanvasHeight = decoded.height
+      }
+    }
+    if (!finalCanvasWidth || isNaN(finalCanvasWidth)) finalCanvasWidth = 1200
+    if (!finalCanvasHeight || isNaN(finalCanvasHeight)) finalCanvasHeight = 1800
+
     // Auto-detect frames on upload if no explicit configuration provided
     if (frameConfig.length === 0 && fileBuffer) {
-      const detected = detectFramesFromBuffer(fileBuffer, canvasWidth, canvasHeight)
+      const detected = detectFramesFromBuffer(fileBuffer, finalCanvasWidth, finalCanvasHeight)
       if (detected && detected.frame_configuration.length > 0) {
         frameConfig = detected.frame_configuration
         frameCount = detected.frame_count
@@ -108,8 +122,8 @@ templatesRouter.post('/', async (c) => {
       template_file: fileUrl,
       preview_file: fileUrl,
       frame_count: frameCount || frameConfig.length || 1,
-      canvas_width: canvasWidth,
-      canvas_height: canvasHeight,
+      canvas_width: finalCanvasWidth,
+      canvas_height: finalCanvasHeight,
       status,
       frame_configuration: frameConfig,
     })

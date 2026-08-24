@@ -662,18 +662,18 @@ const PhotoCapturePage: React.FC = () => {
                 </p>
               </div>
 
-              <div className="bg-white p-5 rounded-2xl border border-pb-border shadow-2xl w-full max-w-[320px] sm:max-w-[380px]">
+              <div className="bg-white p-4 sm:p-5 rounded-2xl border border-pb-border shadow-xl flex items-center justify-center">
                 <img
                   src={getStorageUrl(resultPhoto.qr_url)}
                   alt="QR Code Foto"
-                  className="w-full h-auto object-contain rounded-lg"
+                  className="w-48 h-48 sm:w-60 sm:h-60 max-w-full aspect-square object-contain rounded-lg block"
                 />
               </div>
 
               <button
                 type="button"
                 onClick={() => setShowQrModal(false)}
-                className="w-full max-w-xs py-3 rounded-xl bg-pb-surface-hover text-pb-text text-sm font-semibold hover:bg-pb-border transition-colors mt-1"
+                className="w-full max-w-xs py-2.5 sm:py-3 rounded-xl bg-pb-surface-hover text-pb-text text-sm font-semibold hover:bg-pb-border transition-colors mt-1 cursor-pointer"
               >
                 Tutup
               </button>

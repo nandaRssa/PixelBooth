@@ -81,8 +81,24 @@ const TemplatesPage: React.FC = () => {
     kind: "template" | "preview",
   ) => {
     const file = e.target.files?.[0] ?? null;
-    if (kind === "template") setTemplateFile(file);
-    else setPreviewFile(file);
+    if (kind === "template") {
+      setTemplateFile(file);
+      if (file) {
+        const url = URL.createObjectURL(file);
+        const img = new Image();
+        img.onload = () => {
+          setForm((prev) => ({
+            ...prev,
+            canvas_width: String(img.naturalWidth || img.width),
+            canvas_height: String(img.naturalHeight || img.height),
+          }));
+          URL.revokeObjectURL(url);
+        };
+        img.src = url;
+      }
+    } else {
+      setPreviewFile(file);
+    }
   };
 
   const setField = (field: keyof UploadForm, value: string) => {
