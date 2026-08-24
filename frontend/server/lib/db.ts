@@ -280,9 +280,11 @@ export const db = {
     const { data: folder } = await supabase.from('folders').select('*').eq('id', id).single()
     if (!folder) return null
     const { data: subfolders } = await supabase.from('folders').select('*').eq('parent_folder_id', id)
-    const { data: photos } = await supabase.from('photos').select('*').eq('folder_id', id).order('created_at', { ascending: false })
+    const { data: photos } = await supabase.from('photos').select('*').eq('folder_id', id).order('id', { ascending: false })
     return {
       ...folder,
+      share_token: folder.unique_token,
+      unique_token: folder.unique_token,
       subfolders: subfolders || [],
       photos: (photos || []).map((p) => ({
         id: p.id,
@@ -342,16 +344,44 @@ export const db = {
 
   async createFolder(payload: any) {
     const sdb = getSqlite()
+    const validUuid = payload.unique_token || payload.share_token || generateUUID()
+
+    let safeQrPath = payload.qr_path || null
+    if (typeof safeQrPath === 'string' && (safeQrPath.startsWith('data:') || safeQrPath.length > 255)) {
+      safeQrPath = `qr/folders/${validUuid}.png`
+    }
+
+    const safePayload: Record<string, any> = {
+      name: (payload.name || 'Folder Baru').slice(0, 255),
+      parent_folder_id: payload.parent_folder_id ? Number(payload.parent_folder_id) : null,
+      unique_token: validUuid,
+      qr_path: safeQrPath ? String(safeQrPath).slice(0, 255) : null,
+    }
+
     if (sdb) {
       const stmt = sdb.prepare(`
         INSERT INTO folders (name, parent_folder_id, share_token, qr_path, created_at, updated_at)
         VALUES (?, ?, ?, ?, datetime('now'), datetime('now'))
       `)
-      const info = stmt.run(payload.name, payload.parent_folder_id || null, payload.share_token, payload.qr_path || null)
-      return sdb.prepare('SELECT * FROM folders WHERE id = ?').get(info.lastInsertRowid)
+      const info = stmt.run(safePayload.name, safePayload.parent_folder_id, validUuid, safePayload.qr_path)
+      const created: any = sdb.prepare('SELECT * FROM folders WHERE id = ?').get(info.lastInsertRowid)
+      return {
+        ...created,
+        share_token: created.share_token || validUuid,
+        unique_token: created.unique_token || validUuid,
+      }
     }
-    const { data } = await supabase.from('folders').insert(payload).select().single()
-    return data
+
+    const { data, error } = await supabase.from('folders').insert(safePayload).select().single()
+    if (error) {
+      console.error('Supabase createFolder error:', JSON.stringify(error))
+      throw new Error('Folder insert failed: ' + (error.message || JSON.stringify(error)))
+    }
+    return {
+      ...data,
+      share_token: data.unique_token,
+      unique_token: data.unique_token,
+    }
   },
 
   async updateFolder(id: number | string, payload: any) {
@@ -365,8 +395,21 @@ export const db = {
       sdb.prepare(`UPDATE folders SET ${sets.join(', ')} WHERE id = ?`).run(...values)
       return sdb.prepare('SELECT * FROM folders WHERE id = ?').get(id)
     }
-    const { data } = await supabase.from('folders').update(payload).eq('id', id).select().single()
-    return data
+
+    const updateData: Record<string, any> = {}
+    if (payload.name !== undefined) updateData.name = String(payload.name).slice(0, 255)
+    if (payload.parent_folder_id !== undefined) updateData.parent_folder_id = payload.parent_folder_id ? Number(payload.parent_folder_id) : null
+
+    const { data, error } = await supabase.from('folders').update(updateData).eq('id', id).select().single()
+    if (error) {
+      console.error('Supabase updateFolder error:', error)
+      throw new Error('Folder update failed: ' + error.message)
+    }
+    return {
+      ...data,
+      share_token: data.unique_token,
+      unique_token: data.unique_token,
+    }
   },
 
   async deleteFolder(id: number | string) {

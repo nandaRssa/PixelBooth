@@ -34021,9 +34021,11 @@ var db = {
     const { data: folder } = await supabase.from("folders").select("*").eq("id", id).single();
     if (!folder) return null;
     const { data: subfolders } = await supabase.from("folders").select("*").eq("parent_folder_id", id);
-    const { data: photos } = await supabase.from("photos").select("*").eq("folder_id", id).order("created_at", { ascending: false });
+    const { data: photos } = await supabase.from("photos").select("*").eq("folder_id", id).order("id", { ascending: false });
     return {
       ...folder,
+      share_token: folder.unique_token,
+      unique_token: folder.unique_token,
       subfolders: subfolders || [],
       photos: (photos || []).map((p) => ({
         id: p.id,
@@ -34080,16 +34082,40 @@ var db = {
   },
   async createFolder(payload) {
     const sdb = getSqlite();
+    const validUuid = payload.unique_token || payload.share_token || generateUUID();
+    let safeQrPath = payload.qr_path || null;
+    if (typeof safeQrPath === "string" && (safeQrPath.startsWith("data:") || safeQrPath.length > 255)) {
+      safeQrPath = `qr/folders/${validUuid}.png`;
+    }
+    const safePayload = {
+      name: (payload.name || "Folder Baru").slice(0, 255),
+      parent_folder_id: payload.parent_folder_id ? Number(payload.parent_folder_id) : null,
+      unique_token: validUuid,
+      qr_path: safeQrPath ? String(safeQrPath).slice(0, 255) : null
+    };
     if (sdb) {
       const stmt = sdb.prepare(`
         INSERT INTO folders (name, parent_folder_id, share_token, qr_path, created_at, updated_at)
         VALUES (?, ?, ?, ?, datetime('now'), datetime('now'))
       `);
-      const info = stmt.run(payload.name, payload.parent_folder_id || null, payload.share_token, payload.qr_path || null);
-      return sdb.prepare("SELECT * FROM folders WHERE id = ?").get(info.lastInsertRowid);
+      const info = stmt.run(safePayload.name, safePayload.parent_folder_id, validUuid, safePayload.qr_path);
+      const created = sdb.prepare("SELECT * FROM folders WHERE id = ?").get(info.lastInsertRowid);
+      return {
+        ...created,
+        share_token: created.share_token || validUuid,
+        unique_token: created.unique_token || validUuid
+      };
     }
-    const { data } = await supabase.from("folders").insert(payload).select().single();
-    return data;
+    const { data, error } = await supabase.from("folders").insert(safePayload).select().single();
+    if (error) {
+      console.error("Supabase createFolder error:", JSON.stringify(error));
+      throw new Error("Folder insert failed: " + (error.message || JSON.stringify(error)));
+    }
+    return {
+      ...data,
+      share_token: data.unique_token,
+      unique_token: data.unique_token
+    };
   },
   async updateFolder(id, payload) {
     const sdb = getSqlite();
@@ -34108,8 +34134,19 @@ var db = {
       sdb.prepare(`UPDATE folders SET ${sets.join(", ")} WHERE id = ?`).run(...values);
       return sdb.prepare("SELECT * FROM folders WHERE id = ?").get(id);
     }
-    const { data } = await supabase.from("folders").update(payload).eq("id", id).select().single();
-    return data;
+    const updateData = {};
+    if (payload.name !== void 0) updateData.name = String(payload.name).slice(0, 255);
+    if (payload.parent_folder_id !== void 0) updateData.parent_folder_id = payload.parent_folder_id ? Number(payload.parent_folder_id) : null;
+    const { data, error } = await supabase.from("folders").update(updateData).eq("id", id).select().single();
+    if (error) {
+      console.error("Supabase updateFolder error:", error);
+      throw new Error("Folder update failed: " + error.message);
+    }
+    return {
+      ...data,
+      share_token: data.unique_token,
+      unique_token: data.unique_token
+    };
   },
   async deleteFolder(id) {
     const sdb = getSqlite();
@@ -35787,11 +35824,21 @@ foldersRouter.post("/", async (c) => {
     const shareToken = generateUUID3();
     const frontendUrl = process.env.FRONTEND_URL || "";
     const qrLink = frontendUrl ? `${frontendUrl}/folder/${shareToken}` : `/folder/${shareToken}`;
-    const qrDataUrl = await generateQrDataUrl(qrLink);
-    const qrPath = await saveMedia(qrDataUrl, "qr", `folder-${shareToken}.png`);
+    let qrPath = `qr/folders/${shareToken}.png`;
+    let qrDataUrl = null;
+    try {
+      qrDataUrl = await generateQrDataUrl(qrLink);
+      const uploadedQr = await saveMedia(qrDataUrl, "qr", `folder-${shareToken}.png`);
+      if (uploadedQr && !uploadedQr.startsWith("data:") && uploadedQr.length <= 255) {
+        qrPath = uploadedQr;
+      }
+    } catch (e) {
+      console.warn("Folder QR upload skipped:", e);
+    }
     const folder = await db.createFolder({
       name,
       parent_folder_id: parentFolderId,
+      unique_token: shareToken,
       share_token: shareToken,
       qr_path: qrPath
     });
@@ -35801,10 +35848,11 @@ foldersRouter.post("/", async (c) => {
         id: folder?.id,
         name: folder?.name || name,
         parent_folder_id: parentFolderId,
-        share_token: shareToken,
+        unique_token: folder?.unique_token || shareToken,
+        share_token: folder?.share_token || shareToken,
         photos_count: 0,
         subfolders_count: 0,
-        qr_url: qrDataUrl,
+        qr_url: qrDataUrl || qrPath,
         qr_link: qrLink
       }
     }, 201);

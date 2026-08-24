@@ -93,9 +93,9 @@ const PhotoCard: React.FC<PhotoCardProps> = ({
         </div>
       )}
 
-      {/* Overlay aksi (hanya di mode normal) */}
+      {/* Overlay aksi (Hanya tampil di Desktop lg: ke atas saat hover). Di Mobile & iPad, card bersih dan tap langsung membuka preview modal */}
       {!selectionMode && (
-        <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-col justify-end p-1.5 sm:p-2.5">
+        <div className="hidden lg:flex absolute inset-0 bg-gradient-to-t from-black/95 via-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex-col justify-end p-1.5 sm:p-2.5 pointer-events-none group-hover:pointer-events-auto">
           <div className="flex items-center justify-between gap-1 w-full">
             <button
               type="button"
@@ -105,7 +105,7 @@ const PhotoCard: React.FC<PhotoCardProps> = ({
               }}
               className="flex-1 min-w-0 flex items-center justify-center gap-1 py-1 sm:py-1.5 px-1.5 sm:px-2 rounded-lg
                 bg-black/80 backdrop-blur-md text-white border border-white/20
-                text-[10px] sm:text-xs font-semibold hover:bg-black hover:text-cyan-300 active:scale-95 transition-all shadow-md"
+                text-[10px] sm:text-xs font-semibold hover:bg-black hover:text-cyan-300 active:scale-95 transition-all shadow-md cursor-pointer"
               title="Lihat Foto"
               aria-label="Lihat Foto"
             >
@@ -120,7 +120,7 @@ const PhotoCard: React.FC<PhotoCardProps> = ({
               }}
               className="flex-1 min-w-0 flex items-center justify-center gap-1 py-1 sm:py-1.5 px-1.5 sm:px-2 rounded-lg
                 bg-black/80 backdrop-blur-md text-white border border-white/20
-                text-[10px] sm:text-xs font-semibold hover:bg-black hover:text-amber-300 active:scale-95 transition-all shadow-md"
+                text-[10px] sm:text-xs font-semibold hover:bg-black hover:text-amber-300 active:scale-95 transition-all shadow-md cursor-pointer"
               title="Pindahkan Foto"
               aria-label="Pindahkan Foto"
             >
@@ -134,7 +134,7 @@ const PhotoCard: React.FC<PhotoCardProps> = ({
                 onDelete(photo)
               }}
               className="w-6 h-6 sm:w-8 sm:h-8 rounded-lg bg-black/80 backdrop-blur-md text-red-400 border border-white/20
-                hover:bg-red-600 hover:text-white active:scale-95 transition-all shadow-md flex items-center justify-center shrink-0"
+                hover:bg-red-600 hover:text-white active:scale-95 transition-all shadow-md flex items-center justify-center shrink-0 cursor-pointer"
               title="Hapus Foto"
               aria-label="Hapus Foto"
             >
