@@ -34424,16 +34424,23 @@ import path2 from "path";
 import fs2 from "fs";
 
 // server/lib/cloudinary.ts
-import crypto2 from "crypto";
 var cloudName = process.env.CLOUDINARY_CLOUD_NAME || "tdzyw4dr";
 var apiKey = process.env.CLOUDINARY_API_KEY || "324635339443627";
 var apiSecret = process.env.CLOUDINARY_API_SECRET || "sqzKzF5p5BfDxCyJUNQplamsZwA";
+async function getSha1Hex(str) {
+  if (typeof globalThis !== "undefined" && globalThis.crypto?.subtle) {
+    const buffer = new TextEncoder().encode(str);
+    const hash = await globalThis.crypto.subtle.digest("SHA-1", buffer);
+    return Array.from(new Uint8Array(hash)).map((b) => b.toString(16).padStart(2, "0")).join("");
+  }
+  return "";
+}
 async function uploadToCloudinary(fileData, folder = "photos", filename) {
   try {
     const timestamp = Math.round(Date.now() / 1e3);
     const publicId = filename ? `pixelbooth/${folder}/${filename}` : `pixelbooth/${folder}/${Date.now()}`;
     const paramsToSign = `folder=pixelbooth/${folder}&public_id=${publicId}&timestamp=${timestamp}`;
-    const signature = crypto2.createHash("sha1").update(paramsToSign + apiSecret).digest("hex");
+    const signature = await getSha1Hex(paramsToSign + apiSecret);
     const formData = new FormData();
     if (typeof fileData === "string") {
       formData.append("file", fileData);
