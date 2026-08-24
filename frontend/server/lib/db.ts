@@ -204,37 +204,42 @@ export const db = {
     let query = supabase.from('folders').select('*').order('created_at', { ascending: false })
     if (parentId) query = query.eq('parent_folder_id', parentId)
     else query = query.is('parent_folder_id', null)
-    const { data } = await query
-    if (!data || data.length === 0) return []
+    const { data: folders } = await query
+    if (!folders || folders.length === 0) return []
 
-    // Calculate real photo count and subfolder count per folder
-    const foldersWithCounts = await Promise.all(
-      data.map(async (f) => {
-        const { count: photoCount } = await supabase
-          .from('photos')
-          .select('*', { count: 'exact', head: true })
-          .eq('folder_id', f.id)
+    // Fetch photo counts and subfolder counts in single fast parallel queries
+    const [{ data: allPhotos }, { data: allSubfolders }] = await Promise.all([
+      supabase.from('photos').select('id, folder_id'),
+      supabase.from('folders').select('id, parent_folder_id'),
+    ])
 
-        const { count: subfolderCount } = await supabase
-          .from('folders')
-          .select('*', { count: 'exact', head: true })
-          .eq('parent_folder_id', f.id)
+    const photoCounts: Record<string, number> = {}
+    for (const p of allPhotos || []) {
+      if (p.folder_id != null) {
+        const k = String(p.folder_id)
+        photoCounts[k] = (photoCounts[k] || 0) + 1
+      }
+    }
 
-        return {
-          id: f.id,
-          name: f.name,
-          parent_folder_id: f.parent_folder_id,
-          share_token: f.share_token,
-          photos_count: photoCount ?? 0,
-          subfolders_count: subfolderCount ?? 0,
-          qr_url: f.qr_path,
-          created_at: f.created_at,
-          updated_at: f.updated_at,
-        }
-      })
-    )
+    const subfolderCounts: Record<string, number> = {}
+    for (const s of allSubfolders || []) {
+      if (s.parent_folder_id != null) {
+        const k = String(s.parent_folder_id)
+        subfolderCounts[k] = (subfolderCounts[k] || 0) + 1
+      }
+    }
 
-    return foldersWithCounts
+    return folders.map((f) => ({
+      id: f.id,
+      name: f.name,
+      parent_folder_id: f.parent_folder_id,
+      share_token: f.share_token,
+      photos_count: photoCounts[String(f.id)] || 0,
+      subfolders_count: subfolderCounts[String(f.id)] || 0,
+      qr_url: f.qr_path,
+      created_at: f.created_at,
+      updated_at: f.updated_at,
+    }))
   },
 
   async getFolderById(id: number | string) {
