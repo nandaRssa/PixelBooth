@@ -52,41 +52,68 @@ const PhotoQrModal: React.FC<PhotoQrModalProps> = ({ isOpen, onClose, photo }) =
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="QR Code Foto" size="sm">
       <div className="flex flex-col items-center text-center">
-        {/* Clean Square QR Box (Sesuai Ukuran Asli QR) */}
-        <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-pb-border shadow-xl mb-3.5 flex items-center justify-center">
-          <QRCodeCanvas
-            id="photo-qr-canvas"
-            value={photoUrl}
-            size={240}
-            level="H"
-            bgColor="#FFFFFF"
-            fgColor="#000000"
-            includeMargin={false}
-            className="w-40 h-40 sm:w-48 sm:h-48 aspect-square block"
-          />
+        {/* ===== CARD DESIGN SESUAI MOCKUP (COMPACT & BALANCED) ===== */}
+        <div className="w-[260px] sm:w-[280px] max-w-full rounded-2xl overflow-hidden shadow-2xl border border-pb-border bg-white mb-3.5 transition-transform hover:scale-[1.01]">
+          {/* Header Hitam */}
+          <div className="bg-[#141416] px-3 pt-3 pb-2.5 text-center select-none">
+            <p className="text-zinc-400 text-[8px] font-bold tracking-[0.3em] uppercase">
+              F O T O
+            </p>
+            <h3 className="text-white text-sm sm:text-base font-black tracking-[0.2em] uppercase leading-tight mt-0.5">
+              P I X E L B O O T H
+            </h3>
+            <p className="text-zinc-400 text-[7px] font-medium tracking-[0.2em] uppercase mt-0.5">
+              P H O T O B O O T H
+            </p>
+          </div>
+
+          {/* Body Putih dengan QR */}
+          <div className="px-3 pt-3 pb-2.5 bg-white flex flex-col items-center justify-center">
+            <div className="w-full flex items-center justify-center mb-1.5">
+              <QRCodeCanvas
+                id="photo-qr-canvas"
+                value={photoUrl}
+                size={240}
+                level="H"
+                bgColor="#FFFFFF"
+                fgColor="#000000"
+                includeMargin={false}
+                className="w-36 h-36 sm:w-40 sm:h-40 aspect-square block"
+              />
+            </div>
+
+            {/* Garis Pembatas Halus */}
+            <div className="w-16 h-[1px] bg-zinc-200 my-1.5" />
+
+            {/* Keterangan Bawah */}
+            <p className="text-zinc-600 text-[10px] font-medium leading-tight text-center max-w-[210px]">
+              Scan untuk melihat foto Anda
+            </p>
+            <p className="text-zinc-400 text-[7px] font-bold tracking-[0.2em] uppercase text-center mt-1">
+              P I X E L B O O T H
+            </p>
+          </div>
         </div>
 
-        <p className="text-pb-text-secondary text-xs mb-4 max-w-xs leading-relaxed">
-          Scan QR ini untuk melihat atau mengunduh foto Anda.
-        </p>
-
         {/* Tombol Aksi */}
-        <div className="w-full flex gap-2">
+        <div className="w-[260px] sm:w-[280px] max-w-full grid grid-cols-2 gap-2">
           <Button
             variant="secondary"
             fullWidth
+            size="sm"
             onClick={handleShare}
-            leftIcon={<Share2 size={15} />}
+            leftIcon={<Share2 size={14} />}
           >
             Bagikan
           </Button>
           <Button
             variant="primary"
             fullWidth
+            size="sm"
             onClick={handleDownloadQr}
-            leftIcon={<Download size={15} />}
+            leftIcon={<Download size={14} />}
           >
-            Unduh QR
+            Unduh Desain
           </Button>
         </div>
       </div>
