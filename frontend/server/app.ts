@@ -17,7 +17,7 @@ import { customerRouter } from './routes/customer'
 // 100% Contract & Algorithm Parity with Laravel
 // ==========================================
 
-const app = new Hono().basePath('/api')
+const app = new Hono()
 
 // Middleware
 app.use('*', logger())
@@ -27,12 +27,15 @@ app.use('*', cors({
   allowHeaders: ['Content-Type', 'Authorization', 'Accept', 'X-Requested-With'],
 }))
 
+// Sub-router containing all endpoints
+const api = new Hono()
+
 // Health Check
-app.get('/health', (c) => c.json({ status: 'ok', server: 'vercel-native-typescript', timestamp: new Date().toISOString() }))
+api.get('/health', (c) => c.json({ status: 'ok', server: 'vercel-native-typescript', timestamp: new Date().toISOString() }))
 
 // Static Storage Files — serve local image assets when testing locally
-app.get('/storage/*', async (c) => {
-  const filePath = c.req.path.replace('/api/storage/', '')
+api.get('/storage/*', async (c) => {
+  const filePath = c.req.path.replace(/^\/api\/storage\//, '').replace(/^\/storage\//, '')
   const candidates = [
     path.resolve(process.cwd(), '../backend/storage/app/public', filePath),
     path.resolve(process.cwd(), '../backend/public/storage', filePath),
@@ -53,13 +56,17 @@ app.get('/storage/*', async (c) => {
 })
 
 // Mount All Domain Routers
-app.route('/templates', templatesRouter)
-app.route('/sessions', sessionsRouter)
-app.route('/folders', foldersRouter)
-app.route('/photos', photosRouter)
-app.route('/settings', settingsRouter)
-app.route('/hardware', hardwareRouter)
-app.route('/public', customerRouter)
+api.route('/templates', templatesRouter)
+api.route('/sessions', sessionsRouter)
+api.route('/folders', foldersRouter)
+api.route('/photos', photosRouter)
+api.route('/settings', settingsRouter)
+api.route('/hardware', hardwareRouter)
+api.route('/public', customerRouter)
+
+// Mount on BOTH /api and / so it works seamlessly on local dev (with /api prefix) and Vercel serverless
+app.route('/api', api)
+app.route('/', api)
 
 // Fallback 404
 app.notFound((c) => c.json({ message: 'Endpoint tidak ditemukan' }, 404))
