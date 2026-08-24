@@ -101,26 +101,27 @@ const FolderQrModal: React.FC<FolderQrModalProps> = ({ isOpen, onClose, folder }
           </div>
         </div>
 
-        {/* Tombol Aksi */}
-        <div className="w-[260px] sm:w-[280px] max-w-full grid grid-cols-2 gap-2">
-          <Button
-            variant="secondary"
-            fullWidth
-            size="sm"
+        {/* Tombol Aksi: Bagikan & Unduh Desain (Icon-only on Mobile & iPad, Icon+Text on Desktop) */}
+        <div className="w-[260px] sm:w-[280px] max-w-full grid grid-cols-2 gap-2.5">
+          <button
+            type="button"
+            title="Bagikan Link Folder"
             onClick={handleShare}
-            leftIcon={<Share2 size={14} />}
+            className="h-10 sm:h-11 w-full rounded-xl bg-pb-surface-hover hover:bg-pb-border text-pb-text border border-pb-border flex items-center justify-center gap-2 text-xs sm:text-sm font-semibold transition-all active:scale-95 cursor-pointer shadow-xs"
           >
-            Bagikan
-          </Button>
-          <Button
-            variant="primary"
-            fullWidth
-            size="sm"
+            <Share2 size={16} className="shrink-0 text-pb-text-secondary" />
+            <span className="hidden md:inline">Bagikan</span>
+          </button>
+
+          <button
+            type="button"
+            title="Unduh Desain Kartu QR"
             onClick={handleDownloadQr}
-            leftIcon={<Download size={14} />}
+            className="h-10 sm:h-11 w-full rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white flex items-center justify-center gap-2 text-xs sm:text-sm font-semibold transition-all active:scale-95 cursor-pointer shadow-xs"
           >
-            Unduh Desain
-          </Button>
+            <Download size={16} className="shrink-0" />
+            <span className="hidden md:inline">Unduh Desain</span>
+          </button>
         </div>
       </div>
     </Modal>

@@ -931,12 +931,11 @@ const FullscreenSessionPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Action Buttons: Bagikan & Unduh Desain */}
-            <div className="w-[250px] sm:w-[270px] max-w-full grid grid-cols-2 gap-2 mb-2">
-              <Button
-                variant="secondary"
-                fullWidth
-                size="sm"
+            {/* Action Buttons: Bagikan & Unduh Desain (Icon-only on Mobile & iPad, Icon+Text on Desktop) */}
+            <div className="w-[250px] sm:w-[270px] max-w-full grid grid-cols-2 gap-2.5 mb-2">
+              <button
+                type="button"
+                title="Bagikan Link Foto"
                 onClick={async () => {
                   const link = resultPhoto.qr_link || `${window.location.origin}/photo/${resultPhoto.unique_token || ''}`
                   if (navigator.share) {
@@ -950,14 +949,15 @@ const FullscreenSessionPage: React.FC = () => {
                     toast.success('Link foto disalin ke clipboard.')
                   }
                 }}
-                leftIcon={<Share2 size={14} />}
+                className="h-10 sm:h-11 w-full rounded-xl bg-pb-surface-hover hover:bg-pb-border text-pb-text border border-pb-border flex items-center justify-center gap-2 text-xs sm:text-sm font-semibold transition-all active:scale-95 cursor-pointer shadow-xs"
               >
-                Bagikan
-              </Button>
-              <Button
-                variant="primary"
-                fullWidth
-                size="sm"
+                <Share2 size={16} className="shrink-0 text-pb-text-secondary" />
+                <span className="hidden md:inline">Bagikan</span>
+              </button>
+
+              <button
+                type="button"
+                title="Unduh Desain Kartu QR"
                 onClick={async () => {
                   try {
                     await downloadQrCardPng({
@@ -971,16 +971,17 @@ const FullscreenSessionPage: React.FC = () => {
                     toast.error('Gagal mengunduh desain QR.')
                   }
                 }}
-                leftIcon={<Download size={14} />}
+                className="h-10 sm:h-11 w-full rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white flex items-center justify-center gap-2 text-xs sm:text-sm font-semibold transition-all active:scale-95 cursor-pointer shadow-xs"
               >
-                Unduh Desain
-              </Button>
+                <Download size={16} className="shrink-0" />
+                <span className="hidden md:inline">Unduh Desain</span>
+              </button>
             </div>
 
             <button
               type="button"
               onClick={() => setShowQrModal(false)}
-              className="w-[250px] sm:w-[270px] max-w-full py-2 rounded-xl bg-pb-surface-hover text-pb-text-secondary text-xs font-semibold hover:text-pb-text transition-colors cursor-pointer"
+              className="w-[250px] sm:w-[270px] max-w-full py-2.5 rounded-xl bg-pb-surface-hover text-pb-text-secondary text-xs font-semibold hover:text-pb-text transition-colors cursor-pointer"
             >
               Tutup
             </button>
