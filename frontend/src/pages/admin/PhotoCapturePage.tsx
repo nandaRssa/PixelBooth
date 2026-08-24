@@ -12,10 +12,13 @@ import {
   ImageIcon,
   QrCode,
   RotateCcw,
+  Share2,
   Video,
   VideoOff,
   X,
 } from 'lucide-react'
+import { QRCodeCanvas } from 'qrcode.react'
+import { downloadQrCardPng } from '@/utils/downloadQr'
 import { Button } from '@/components/ui/Button'
 import { Spinner, CameraStatusBadge } from '@/components/ui/StatusBadge'
 import { toast } from '@/components/ui/Toast'
@@ -52,7 +55,14 @@ const PhotoCapturePage: React.FC = () => {
   const [countdown, setCountdown] = useState<number | null>(null)
   const [isCapturing, setIsCapturing] = useState(false)
   const [allDone, setAllDone] = useState(false)
-  const [resultPhoto, setResultPhoto] = useState<{ url?: string; qr_url?: string } | null>(null)
+  const [resultPhoto, setResultPhoto] = useState<{
+    id?: number
+    url?: string
+    qr_url?: string
+    qr_link?: string
+    unique_token?: string
+    filename?: string
+  } | null>(null)
   const [showQrModal, setShowQrModal] = useState(false)
   const [showRetakeOptions, setShowRetakeOptions] = useState(false)
 
@@ -430,9 +440,15 @@ const PhotoCapturePage: React.FC = () => {
         final_image_base64: finalImageBase64,
       })
       const photoData = (result.photo || {}) as any
+      const uniqueToken = photoData.unique_token || session.session_token || String(session.id)
+      const qrLink = photoData.qr_link || `${window.location.origin}/photo/${uniqueToken}`
       setResultPhoto({
+        id: photoData.id,
         url: photoData.url || photoData.photo_url || photoData.storage_path,
         qr_url: photoData.qr_url || photoData.qr_path,
+        qr_link: qrLink,
+        unique_token: uniqueToken,
+        filename: photoData.filename,
       })
       toast.success('Sesi selesai. Foto tersimpan di galeri.')
     } catch (err: unknown) {
@@ -638,40 +654,116 @@ const PhotoCapturePage: React.FC = () => {
         </div>
 
         {/* Modal QR Code */}
-        {showQrModal && resultPhoto.qr_url && (
-          <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-            <div className="bg-pb-surface border border-pb-border rounded-3xl p-8 max-w-md sm:max-w-lg w-full text-center flex flex-col items-center gap-5 relative shadow-2xl animate-in zoom-in-95">
+        {showQrModal && resultPhoto && (
+          <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3.5 sm:p-4 animate-in fade-in">
+            <div className="bg-pb-surface border border-pb-border rounded-3xl p-5 sm:p-7 max-w-sm sm:max-w-md w-full text-center flex flex-col items-center relative shadow-2xl animate-in zoom-in-95">
               <button
                 type="button"
                 onClick={() => setShowQrModal(false)}
-                className="absolute top-5 right-5 text-pb-text-muted hover:text-pb-text transition-colors p-1 rounded-lg hover:bg-pb-surface-hover"
+                className="absolute top-4 right-4 text-pb-text-muted hover:text-pb-text transition-colors p-1.5 rounded-xl hover:bg-pb-surface-hover"
               >
-                <X size={22} />
+                <X size={20} />
               </button>
 
-              <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 mt-1">
-                <QrCode size={30} />
-              </div>
-
-              <div>
-                <h3 className="text-pb-text font-bold text-xl sm:text-2xl">Scan QR Code Foto</h3>
-                <p className="text-pb-text-secondary text-sm mt-1.5 max-w-sm">
-                  Arahkan kamera smartphone ke QR ini untuk langsung mengunduh foto fotobooth.
+              {/* Header Title */}
+              <div className="mb-3.5">
+                <h3 className="text-pb-text font-bold text-lg sm:text-xl">QR Code Foto</h3>
+                <p className="text-pb-text-secondary text-xs mt-1">
+                  Scan untuk melihat dan mengunduh foto Anda
                 </p>
               </div>
 
-              <div className="bg-white p-4 sm:p-5 rounded-2xl border border-pb-border shadow-xl flex items-center justify-center">
-                <img
-                  src={getStorageUrl(resultPhoto.qr_url)}
-                  alt="QR Code Foto"
-                  className="w-48 h-48 sm:w-60 sm:h-60 max-w-full aspect-square object-contain rounded-lg block"
-                />
+              {/* Event Card Mockup (Compact & Balanced) */}
+              <div className="w-[250px] sm:w-[270px] max-w-full rounded-2xl overflow-hidden shadow-2xl border border-pb-border bg-white mb-3.5 transition-transform hover:scale-[1.01]">
+                {/* Header Hitam */}
+                <div className="bg-[#141416] px-3 pt-3 pb-2 text-center select-none">
+                  <p className="text-zinc-400 text-[8px] font-bold tracking-[0.3em] uppercase">
+                    F O T O
+                  </p>
+                  <h4 className="text-white text-sm sm:text-base font-black tracking-[0.2em] uppercase leading-tight mt-0.5">
+                    P I X E L B O O T H
+                  </h4>
+                  <p className="text-zinc-400 text-[7px] font-medium tracking-[0.2em] uppercase mt-0.5">
+                    P H O T O B O O T H
+                  </p>
+                </div>
+
+                {/* Body Putih dengan QR Canvas */}
+                <div className="px-3 pt-3 pb-2.5 bg-white flex flex-col items-center justify-center">
+                  <div className="w-full flex items-center justify-center mb-1.5">
+                    <QRCodeCanvas
+                      id="capture-session-qr-canvas"
+                      value={resultPhoto.qr_link || `${window.location.origin}/photo/${resultPhoto.unique_token || ''}`}
+                      size={240}
+                      level="H"
+                      bgColor="#FFFFFF"
+                      fgColor="#000000"
+                      includeMargin={false}
+                      className="w-36 h-36 sm:w-40 sm:h-40 aspect-square block"
+                    />
+                  </div>
+
+                  <div className="w-16 h-[1px] bg-zinc-200 my-1.5" />
+
+                  <p className="text-zinc-600 text-[10px] font-medium leading-tight text-center max-w-[210px]">
+                    Scan untuk melihat foto Anda
+                  </p>
+                  <p className="text-zinc-400 text-[7px] font-bold tracking-[0.2em] uppercase text-center mt-1">
+                    P I X E L B O O T H
+                  </p>
+                </div>
+              </div>
+
+              {/* Action Buttons: Bagikan & Unduh Desain */}
+              <div className="w-[250px] sm:w-[270px] max-w-full grid grid-cols-2 gap-2 mb-2">
+                <Button
+                  variant="secondary"
+                  fullWidth
+                  size="sm"
+                  onClick={async () => {
+                    const link = resultPhoto.qr_link || `${window.location.origin}/photo/${resultPhoto.unique_token || ''}`
+                    if (navigator.share) {
+                      try {
+                        await navigator.share({ title: 'Foto PixelBooth', url: link })
+                      } catch {
+                        // User cancelled
+                      }
+                    } else {
+                      await navigator.clipboard?.writeText(link)
+                      toast.success('Link foto disalin ke clipboard.')
+                    }
+                  }}
+                  leftIcon={<Share2 size={14} />}
+                >
+                  Bagikan
+                </Button>
+                <Button
+                  variant="primary"
+                  fullWidth
+                  size="sm"
+                  onClick={async () => {
+                    try {
+                      await downloadQrCardPng({
+                        type: 'FOTO',
+                        canvasId: 'capture-session-qr-canvas',
+                        caption: 'Scan untuk melihat foto Anda',
+                        filename: `QR-Foto-${(resultPhoto.unique_token || 'card').slice(0, 8)}.png`,
+                      })
+                      toast.success('Desain QR Card berhasil diunduh.')
+                    } catch {
+                      toast.error('Gagal mengunduh desain QR.')
+                    }
+                  }}
+                  leftIcon={<Download size={14} />}
+                >
+                  Unduh Desain
+                </Button>
               </div>
 
               <button
                 type="button"
                 onClick={() => setShowQrModal(false)}
-                className="w-full max-w-xs py-2.5 sm:py-3 rounded-xl bg-pb-surface-hover text-pb-text text-sm font-semibold hover:bg-pb-border transition-colors mt-1 cursor-pointer"
+                className="w-[250px] sm:w-[270px] max-w-full py-2 rounded-xl bg-pb-surface-hover text-pb-text-secondary text-xs font-semibold hover:text-pb-text transition-colors cursor-pointer"
               >
                 Tutup
               </button>
