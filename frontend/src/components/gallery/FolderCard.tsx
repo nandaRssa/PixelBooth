@@ -29,8 +29,8 @@ const FolderCard: React.FC<FolderCardProps> = ({
   isSelected = false,
   onToggleSelect,
 }) => {
-  const subfolderCount = folder.children?.length ?? 0
-  const photoCount = folder.photo_count ?? 0
+  const subfolderCount = folder.subfolders_count ?? folder.subfolder_count ?? folder.children?.length ?? 0
+  const photoCount = folder.photos_count ?? folder.photo_count ?? 0
 
   const handleClick = () => {
     if (selectionMode) {
