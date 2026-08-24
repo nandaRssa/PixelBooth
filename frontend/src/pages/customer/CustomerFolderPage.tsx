@@ -114,11 +114,12 @@ const CustomerFolderPage: React.FC = () => {
 
   // ===== Handlers Unduh =====
   const handleDownloadSingle = async (photo: CustomerFolderPhoto) => {
-    if (!photo?.url || !folder) return
+    const downloadUrl = photo?.photo_url || photo?.url
+    if (!downloadUrl || !folder) return
     const scopeName = folder.name ? folder.name.replace(/[^A-Za-z0-9]/g, '_') : 'Photo'
     const index = folder.photos.findIndex((p) => p.token === photo.token) + 1
     const filename = `PixelBooth-${scopeName}-${index || 1}.jpg`
-    await downloadFile(photo.url, filename)
+    await downloadFile(downloadUrl, filename)
   }
 
   const handleDownloadSelected = async () => {
@@ -128,10 +129,12 @@ const CustomerFolderPage: React.FC = () => {
     try {
       for (let i = 0; i < targets.length; i++) {
         const photo = targets[i]
+        const downloadUrl = photo?.photo_url || photo?.url
+        if (!downloadUrl) continue
         const scopeName = folder.name ? folder.name.replace(/[^A-Za-z0-9]/g, '_') : 'Photo'
         const index = folder.photos.findIndex((p) => p.token === photo.token) + 1
         const filename = `PixelBooth-${scopeName}-${index || i + 1}.jpg`
-        await downloadFile(photo.url, filename)
+        await downloadFile(downloadUrl, filename)
         // Jeda 250ms agar browser memproses download multi-file tanpa diblokir
         if (i < targets.length - 1) {
           await new Promise((resolve) => setTimeout(resolve, 250))
@@ -319,7 +322,7 @@ const CustomerFolderPage: React.FC = () => {
                   }}
                 >
                   <img
-                    src={getStorageUrl(photo.thumbnail_url ?? photo.url)}
+                    src={getStorageUrl(photo.thumbnail_url || photo.photo_url || photo.url || '')}
                     alt={`Foto ${index + 1}`}
                     loading="lazy"
                     className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
@@ -402,7 +405,7 @@ const CustomerFolderPage: React.FC = () => {
 
                 <div className="bg-black/50 border border-pb-border rounded-xl overflow-hidden flex items-center justify-center max-h-[65vh]">
                   <img
-                    src={getStorageUrl(preview.url)}
+                    src={getStorageUrl(preview.photo_url || preview.url || '')}
                     alt="Foto galeri"
                     className="max-w-full max-h-[65vh] object-contain rounded-lg"
                   />

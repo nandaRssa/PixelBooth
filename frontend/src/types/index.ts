@@ -193,19 +193,21 @@ export interface QrCode {
 
 // ===== CUSTOMER / PUBLIC =====
 export interface CustomerPhoto {
-  id: string
+  id: string | number
   filename?: string
-  url: string
+  url?: string
+  photo_url?: string
   thumbnail_url: string | null
   qr_url: string | null
-  folder: { name: string; token: string } | null
+  folder?: { name: string; token: string } | null
   created_at: string
 }
 
 export interface CustomerFolderPhoto {
   token: string
   filename?: string
-  url: string
+  url?: string
+  photo_url?: string
   thumbnail_url: string | null
   qr_url: string | null
   created_at: string

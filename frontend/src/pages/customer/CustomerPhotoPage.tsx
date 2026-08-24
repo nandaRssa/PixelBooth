@@ -47,10 +47,11 @@ const CustomerPhotoPage: React.FC = () => {
   const pageUrl = typeof window !== 'undefined' ? window.location.href : ''
 
   const handleDownload = async () => {
-    if (!photo?.url) return
+    const downloadUrl = photo?.photo_url || photo?.url
+    if (!downloadUrl) return
     setIsDownloading(true)
     try {
-      await downloadFile(photo.url, photo.filename || `PixelBooth-${token ? token.slice(0, 8) : 'photo'}.jpg`)
+      await downloadFile(downloadUrl, photo.filename || `PixelBooth-${token ? token.slice(0, 8) : 'photo'}.jpg`)
     } finally {
       setIsDownloading(false)
     }
@@ -111,7 +112,7 @@ const CustomerPhotoPage: React.FC = () => {
         {/* Photo */}
         <div className="bg-pb-surface border border-pb-border rounded-2xl p-2 sm:p-3 overflow-hidden mb-4 flex items-center justify-center shadow-lg">
           <img
-            src={getStorageUrl(photo.url)}
+            src={getStorageUrl(photo.photo_url || photo.url)}
             alt="Hasil foto photobooth"
             className="w-auto max-w-full max-h-[60vh] object-contain rounded-xl block mx-auto shadow-sm"
           />

@@ -291,8 +291,8 @@ sessionsRouter.post('/:id/complete', async (c) => {
           return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16)
         })
 
-    const frontendUrl = process.env.FRONTEND_URL || 'https://pixel-booth-spot-unsil.vercel.app'
-    const photoViewUrl = `${frontendUrl}/photo/${uniqueToken}`
+    const frontendUrl = process.env.FRONTEND_URL || ''
+    const photoViewUrl = frontendUrl ? `${frontendUrl}/photo/${uniqueToken}` : `/photo/${uniqueToken}`
     let qrPath = `qr/photos/${uniqueToken}.png`
     try {
       const qrDataUrl = await generateQrDataUrl(photoViewUrl)

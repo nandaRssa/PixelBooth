@@ -246,7 +246,8 @@ export const db = {
       id: f.id,
       name: f.name,
       parent_folder_id: f.parent_folder_id,
-      share_token: f.share_token,
+      share_token: f.share_token || f.unique_token,
+      unique_token: f.unique_token || f.share_token,
       photos_count: photoCounts[String(f.id)] || 0,
       subfolders_count: subfolderCounts[String(f.id)] || 0,
       qr_url: f.qr_path,
@@ -297,13 +298,14 @@ export const db = {
   async getFolderByToken(token: string) {
     const sdb = getSqlite()
     if (sdb) {
-      const f = sdb.prepare('SELECT * FROM folders WHERE share_token = ?').get(token)
+      const f = sdb.prepare('SELECT * FROM folders WHERE share_token = ? OR unique_token = ?').get(token, token)
       if (!f) return null
       const photos = sdb.prepare('SELECT * FROM photos WHERE folder_id = ? ORDER BY id DESC').all(f.id)
       return {
         id: f.id,
         name: f.name,
-        share_token: f.share_token,
+        share_token: f.share_token || f.unique_token,
+        unique_token: f.unique_token || f.share_token,
         photos: (photos || []).map((p: any) => ({
           id: p.id,
           token: p.unique_token,
@@ -315,13 +317,18 @@ export const db = {
       }
     }
 
-    const { data: folder } = await supabase.from('folders').select('*').eq('share_token', token).single()
+    let { data: folder } = await supabase.from('folders').select('*').eq('unique_token', token).maybeSingle()
+    if (!folder) {
+      const fallback = await supabase.from('folders').select('*').eq('share_token', token).maybeSingle()
+      folder = fallback.data
+    }
     if (!folder) return null
-    const { data: photos } = await supabase.from('photos').select('*').eq('folder_id', folder.id).order('created_at', { ascending: false })
+    const { data: photos } = await supabase.from('photos').select('*').eq('folder_id', folder.id).order('id', { ascending: false })
     return {
       id: folder.id,
       name: folder.name,
-      share_token: folder.share_token,
+      share_token: folder.share_token || folder.unique_token,
+      unique_token: folder.unique_token || folder.share_token,
       photos: (photos || []).map((p) => ({
         id: p.id,
         token: p.unique_token,
