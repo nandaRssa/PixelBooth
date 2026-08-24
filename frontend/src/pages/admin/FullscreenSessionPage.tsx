@@ -346,6 +346,8 @@ const FullscreenSessionPage: React.FC = () => {
           unique_token: uniqueToken,
           filename: photoData.filename,
         })
+        queryClient.invalidateQueries({ queryKey: ['folders'] })
+        queryClient.invalidateQueries({ queryKey: ['photos'] })
         toast.success('Sesi selesai. Foto tersimpan di galeri.')
       } catch {
         toast.error('Gagal menyelesaikan sesi.')
