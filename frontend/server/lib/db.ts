@@ -471,6 +471,15 @@ export const db = {
     await supabase.from('session_captures').update({ status: 'retaken' }).eq('session_id', sessionId)
   },
 
+  async getCaptures(sessionId: number | string) {
+    const sdb = getSqlite()
+    if (sdb) {
+      return sdb.prepare('SELECT * FROM session_captures WHERE session_id = ? ORDER BY frame_number ASC').all(sessionId)
+    }
+    const { data } = await supabase.from('session_captures').select('*').eq('session_id', sessionId).order('frame_number', { ascending: true })
+    return data || []
+  },
+
   async createPhoto(payload: any) {
     const sdb = getSqlite()
     if (sdb) {

@@ -266,7 +266,7 @@ sessionsRouter.post('/:id/complete', async (c) => {
 
     // Fallback: If composite image is missing or failed, use the latest valid capture from this session
     if (!finalUrl) {
-      const captures = await db.getCaptures(id)
+      const captures = sessionData.captures || []
       if (captures && captures.length > 0) {
         const validCaptures = captures.filter((c: any) => c.status !== 'retaken')
         const chosen = validCaptures[validCaptures.length - 1] || captures[captures.length - 1]
