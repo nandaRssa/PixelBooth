@@ -35327,16 +35327,20 @@ import { randomUUID } from "crypto";
 
 // server/lib/qrcode.ts
 var import_qrcode = __toESM(require_lib(), 1);
-async function generateQrDataUrl(url) {
-  return await import_qrcode.default.toDataURL(url, {
+async function generateQrSvg(url) {
+  return await import_qrcode.default.toString(url, {
+    type: "svg",
     errorCorrectionLevel: "H",
     margin: 2,
-    scale: 8,
     color: {
       dark: "#141416",
       light: "#FFFFFF"
     }
   });
+}
+async function generateQrDataUrl(url) {
+  const svg = await generateQrSvg(url);
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
 }
 
 // server/routes/sessions.ts
