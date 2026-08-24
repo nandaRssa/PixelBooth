@@ -316,12 +316,10 @@ const PhotoCapturePage: React.FC = () => {
       const ctx = canvas.getContext('2d')
       if (!ctx) throw new Error('Canvas tidak tersedia')
 
-      // Mirror untuk selfie + peningkatan kecerahan (frame webcam sering gelap)
-      ctx.filter = 'brightness(1.45) contrast(1.1) saturate(1.1)'
+      // Mirror untuk selfie dengan tone natural kamera
       ctx.translate(canvas.width, 0)
       ctx.scale(-1, 1)
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
-      ctx.filter = 'none'
 
       const base64 = canvas.toDataURL('image/jpeg', 0.85)
       const currentFrameNum = session.current_frame || 1
@@ -774,7 +772,6 @@ const PhotoCapturePage: React.FC = () => {
               autoPlay
               className="absolute inset-0 w-full h-full object-cover -scale-x-100"
               style={{
-                filter: 'brightness(1.45) contrast(1.1) saturate(1.1)',
                 opacity: previewSlots.length === 0 ? 1 : 0,
               }}
             />
@@ -792,7 +789,6 @@ const PhotoCapturePage: React.FC = () => {
                         autoPlay
                         className="w-full h-full object-cover"
                         style={{
-                          filter: 'brightness(1.45) contrast(1.1) saturate(1.1)',
                           transform: videoTransform(slot),
                         }}
                       />
