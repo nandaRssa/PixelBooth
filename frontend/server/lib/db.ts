@@ -1,5 +1,6 @@
 import path from 'path'
 import fs from 'fs'
+import { createRequire } from 'module'
 import { supabase } from './supabase'
 
 // ==========================================
@@ -15,9 +16,8 @@ function getSqlite() {
 
   if (!sqliteDb && typeof window === 'undefined') {
     try {
-      // Dynamic require to avoid Vercel crash on native binary
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const Database = require('better-sqlite3')
+      const req = createRequire(import.meta.url)
+      const Database = req('better-sqlite3')
       const p1 = path.resolve(process.cwd(), '../backend/database/database.sqlite')
       const p2 = path.resolve(process.cwd(), 'database/database.sqlite')
       const targetPath = fs.existsSync(p1) ? p1 : fs.existsSync(p2) ? p2 : null
