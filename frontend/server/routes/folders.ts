@@ -1,4 +1,5 @@
 import { Hono } from 'hono'
+import { randomUUID } from 'crypto'
 import { supabase } from '../lib/supabase'
 import { generateQrDataUrl } from '../lib/qrcode'
 
@@ -45,9 +46,9 @@ foldersRouter.post('/', async (c) => {
   const json = await c.req.json().catch(() => ({}))
   const name = json.name || 'Folder Baru'
   const parentFolderId = json.parent_folder_id || null
-  const shareToken = Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 10)
+  const shareToken = randomUUID()
 
-  const frontendUrl = process.env.FRONTEND_URL || 'https://pixel-booth-spot.vercel.app'
+  const frontendUrl = process.env.FRONTEND_URL || 'https://pixel-booth-spot-unsil.vercel.app'
   const qrLink = `${frontendUrl}/folder/${shareToken}`
   const qrDataUrl = await generateQrDataUrl(qrLink)
 
