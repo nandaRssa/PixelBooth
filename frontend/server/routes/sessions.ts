@@ -1,4 +1,5 @@
 import { Hono } from 'hono'
+import { randomUUID } from 'crypto'
 import { db } from '../lib/db'
 import { uploadToCloudinary } from '../lib/cloudinary'
 import { generateQrDataUrl } from '../lib/qrcode'
@@ -41,12 +42,16 @@ sessionsRouter.post('/', async (c) => {
     const templateId = json.template_id
     const folderId = json.folder_id || null
 
-    const template = await db.getTemplateById(templateId)
-    if (!template) {
-      return c.json({ message: 'Template tidak ditemukan' }, 404)
+    if (!templateId) {
+      return c.json({ message: 'template_id wajib diisi' }, 400)
     }
 
-    const sessionToken = Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 10)
+    const template = await db.getTemplateById(templateId)
+    if (!template) {
+      return c.json({ message: `Template id ${templateId} tidak ditemukan` }, 404)
+    }
+
+    const sessionToken = randomUUID()
     const totalFrames = template.frame_count || 1
 
     const session = await db.createSession({
@@ -55,11 +60,11 @@ sessionsRouter.post('/', async (c) => {
       session_token: sessionToken,
       total_frames: totalFrames,
       current_frame: 1,
-      status: 'ready',
+      status: 'active',
     })
 
     if (!session) {
-      return c.json({ message: 'Gagal membuat sesi' }, 500)
+      return c.json({ message: 'Session null setelah createSession' }, 500)
     }
 
     return c.json({
@@ -71,8 +76,12 @@ sessionsRouter.post('/', async (c) => {
       },
     }, 201)
   } catch (err: any) {
-    console.error('POST /sessions error:', err)
-    return c.json({ message: err?.message || 'Gagal membuat sesi' }, 500)
+    console.error('POST /sessions CRASH:', err)
+    return c.json({
+      message: err?.message || String(err) || 'Gagal membuat sesi',
+      error_type: err?.constructor?.name,
+      error_code: err?.code,
+    }, 500)
   }
 })
 
@@ -181,7 +190,7 @@ sessionsRouter.post('/:id/complete', async (c) => {
     const sessionData = await db.getSession(id)
     const session = sessionData?.session
 
-    const uniqueToken = Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 10)
+    const uniqueToken = randomUUID()
     const frontendUrl = process.env.FRONTEND_URL || 'https://pixel-booth-spot-unsil.vercel.app'
     const photoViewUrl = `${frontendUrl}/photo/${uniqueToken}`
     const qrDataUrl = await generateQrDataUrl(photoViewUrl)
