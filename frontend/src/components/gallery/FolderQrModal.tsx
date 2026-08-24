@@ -50,49 +50,49 @@ const FolderQrModal: React.FC<FolderQrModalProps> = ({ isOpen, onClose, folder }
   }
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="QR Code Folder" size="md">
+    <Modal isOpen={isOpen} onClose={onClose} title="QR Code Folder" size="sm">
       <div className="flex flex-col items-center text-center">
         {/* Nama Folder Pill */}
-        <div className="flex items-center gap-2 text-pb-text-secondary text-xs font-medium px-3 py-1 rounded-full bg-pb-elevated border border-pb-border mb-4">
-          <FolderIcon size={14} className="text-[#FF5A36]" />
-          <span className="truncate max-w-[240px] text-pb-text">{folder.name}</span>
+        <div className="inline-flex items-center gap-2 text-pb-text-secondary text-xs font-medium px-3 py-1 rounded-full bg-pb-elevated border border-pb-border mb-3.5 max-w-full">
+          <FolderIcon size={14} className="text-[#FF5A36] shrink-0" />
+          <span className="truncate max-w-[200px] text-pb-text font-semibold">{folder.name}</span>
         </div>
 
         {/* ===== CARD DESIGN SESUAI MOCKUP ===== */}
-        <div className="w-[300px] max-w-full rounded-3xl overflow-hidden shadow-2xl border border-pb-border bg-white mb-5 transition-transform hover:scale-[1.01]">
+        <div className="w-[280px] sm:w-[300px] max-w-full rounded-2xl overflow-hidden shadow-xl border border-pb-border bg-white mb-4">
           {/* Header Hitam */}
-          <div className="bg-[#141416] px-4 pt-5 pb-4 text-center select-none">
-            <p className="text-zinc-400 text-[11px] font-semibold tracking-[0.35em] uppercase mb-1">
+          <div className="bg-[#141416] px-4 py-3.5 text-center select-none">
+            <p className="text-zinc-400 text-[10px] font-semibold tracking-[0.3em] uppercase mb-0.5">
               F O L D E R
             </p>
-            <h3 className="text-white text-lg font-black tracking-[0.22em] uppercase leading-tight">
+            <h3 className="text-white text-base font-black tracking-[0.2em] uppercase leading-tight">
               P I X E L B O O T H
             </h3>
-            <p className="text-zinc-400 text-[9px] font-medium tracking-[0.25em] uppercase mt-1">
+            <p className="text-zinc-400 text-[8px] font-medium tracking-[0.2em] uppercase mt-0.5">
               P H O T O B O O T H
             </p>
           </div>
 
           {/* Body Putih dengan QR */}
-          <div className="p-5 pt-6 pb-5 bg-white flex flex-col items-center">
-            <div className="w-full flex items-center justify-center mb-4">
+          <div className="p-4 sm:p-5 bg-white flex flex-col items-center justify-center">
+            <div className="w-full flex items-center justify-center mb-3">
               <QRCodeCanvas
                 id="folder-qr-canvas"
                 value={folderUrl}
-                size={300}
+                size={260}
                 level="H"
                 bgColor="#FFFFFF"
                 fgColor="#000000"
                 includeMargin={false}
-                className="w-48 h-48 sm:w-56 sm:h-56 aspect-square max-w-full block"
+                className="w-44 h-44 sm:w-48 sm:h-48 aspect-square max-w-full block"
               />
             </div>
 
             {/* Garis Pembatas Halus */}
-            <div className="w-32 h-[1px] bg-zinc-200 mb-3" />
+            <div className="w-24 h-[1px] bg-zinc-200 mb-2.5" />
 
             {/* Keterangan Bawah */}
-            <p className="text-zinc-600 text-[11px] font-normal leading-relaxed text-center mb-1">
+            <p className="text-zinc-700 text-xs font-medium leading-snug text-center mb-1 max-w-[220px]">
               Scan untuk melihat galeri folder Anda
             </p>
             <p className="text-zinc-400 text-[8px] font-semibold tracking-[0.25em] uppercase text-center">
@@ -102,7 +102,7 @@ const FolderQrModal: React.FC<FolderQrModalProps> = ({ isOpen, onClose, folder }
         </div>
 
         {/* Tombol Aksi */}
-        <div className="w-full flex flex-col gap-2">
+        <div className="w-[280px] sm:w-[300px] max-w-full flex flex-col gap-2">
           <Button
             variant="primary"
             fullWidth
