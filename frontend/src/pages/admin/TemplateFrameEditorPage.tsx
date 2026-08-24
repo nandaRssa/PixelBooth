@@ -1924,14 +1924,14 @@ const TemplateFrameEditorPage: React.FC = () => {
             <h3 className="text-pb-text text-sm font-semibold mb-2">
               Camera Frames ({frames.length})
             </h3>
-            <div className="grid grid-cols-2 gap-1.5 mb-2">
+            <div className="grid grid-cols-3 gap-1.5 mb-2">
               <Button
                 variant="outline"
                 size="sm"
                 fullWidth
                 onClick={undo}
                 disabled={historyRef.current.length === 0}
-                leftIcon={<Undo2 size={13} />}
+                leftIcon={<Undo2 size={14} />}
               >
                 Undo
               </Button>
@@ -1941,61 +1941,20 @@ const TemplateFrameEditorPage: React.FC = () => {
                 fullWidth
                 onClick={redo}
                 disabled={redoRef.current.length === 0}
-                leftIcon={<Redo2 size={13} />}
+                leftIcon={<Redo2 size={14} />}
               >
                 Redo
               </Button>
-            </div>
-
-            {/* Tombol Tambah Frame Manual Sesuai Bentuk */}
-            <div className="grid grid-cols-3 gap-1.5 mb-2">
               <Button
-                variant="primary"
+                variant="outline"
                 size="sm"
                 fullWidth
                 onClick={addFrame}
-                leftIcon={<Square size={13} />}
-                className="px-1 text-[11px] font-semibold justify-center"
+                leftIcon={<Plus size={14} />}
               >
-                + Kotak
-              </Button>
-              <Button
-                variant="secondary"
-                size="sm"
-                fullWidth
-                onClick={addCircleFrame}
-                leftIcon={<Circle size={13} />}
-                className="px-1 text-[11px] font-semibold justify-center"
-              >
-                + Oval
-              </Button>
-              <Button
-                variant="secondary"
-                size="sm"
-                fullWidth
-                onClick={addPolygonFrame}
-                leftIcon={<Spline size={13} />}
-                className="px-1 text-[11px] font-semibold justify-center"
-              >
-                + Poligon
+                Add
               </Button>
             </div>
-
-            {frames.length > 0 && (
-              <div className="mb-2">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  fullWidth
-                  onClick={clearAllFrames}
-                  leftIcon={<Trash2 size={13} className="text-red-400" />}
-                  className="text-red-400 hover:text-red-300 hover:bg-red-500/10 text-xs justify-center py-1 h-7"
-                >
-                  Kosongkan Semua Frame
-                </Button>
-              </div>
-            )}
-
             <p className="text-[10px] text-pb-text-muted mb-2 leading-relaxed">
               Ctrl+Z undo · Ctrl+Y redo · Ctrl+C copy · Ctrl+V paste · Ctrl+D
               duplikat · Backspace hapus
