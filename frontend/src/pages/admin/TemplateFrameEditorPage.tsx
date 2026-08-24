@@ -1322,6 +1322,8 @@ const TemplateFrameEditorPage: React.FC = () => {
     const nf = normalizeFrame({
       id: newId,
       order: frames.length,
+      shape: "rectangle",
+      source: "manual",
       x: (template.canvas_width - w) / 2 + offset,
       y: (template.canvas_height - h) / 2 + offset,
       width: w,
@@ -1332,6 +1334,63 @@ const TemplateFrameEditorPage: React.FC = () => {
     setFrames((prev) => [...prev, nf]);
     setSelectedId(newId);
     setMode("select");
+  };
+
+  const addCircleFrame = () => {
+    if (!template) return;
+    pushHistory();
+    const newId = Math.max(0, ...frames.map((f) => f.id)) + 1;
+    const size = Math.min(template.canvas_width * 0.38, template.canvas_height * 0.28);
+    const offset = frames.length * 24;
+    const nf = normalizeFrame({
+      id: newId,
+      order: frames.length,
+      shape: "ellipse",
+      source: "manual",
+      x: (template.canvas_width - size) / 2 + offset,
+      y: (template.canvas_height - size) / 2 + offset,
+      width: size,
+      height: size,
+      rotation: 0,
+      ...DEFAULT_CLEAR,
+    });
+    setFrames((prev) => [...prev, nf]);
+    setSelectedId(newId);
+    setMode("select");
+  };
+
+  const addPolygonFrame = () => {
+    if (!template) return;
+    pushHistory();
+    const newId = Math.max(0, ...frames.map((f) => f.id)) + 1;
+    const w = template.canvas_width * 0.45;
+    const h = template.canvas_height * 0.32;
+    const offset = frames.length * 24;
+    const pts = generateDefaultPolygon(w, h, 8);
+    const nf = normalizeFrame({
+      id: newId,
+      order: frames.length,
+      shape: "polygon",
+      source: "manual",
+      polygon_points: pts,
+      x: (template.canvas_width - w) / 2 + offset,
+      y: (template.canvas_height - h) / 2 + offset,
+      width: w,
+      height: h,
+      rotation: 0,
+      ...DEFAULT_CLEAR,
+    });
+    setFrames((prev) => [...prev, nf]);
+    setSelectedId(newId);
+    setMode("select");
+  };
+
+  const clearAllFrames = () => {
+    if (frames.length === 0) return;
+    pushHistory();
+    setFrames([]);
+    setSelectedId(null);
+    toast.info("Semua frame dibersihkan.");
   };
 
   const duplicateFrame = () => {
@@ -1865,14 +1924,14 @@ const TemplateFrameEditorPage: React.FC = () => {
             <h3 className="text-pb-text text-sm font-semibold mb-2">
               Camera Frames ({frames.length})
             </h3>
-            <div className="grid grid-cols-3 gap-1.5 mb-2">
+            <div className="grid grid-cols-2 gap-1.5 mb-2">
               <Button
                 variant="outline"
                 size="sm"
                 fullWidth
                 onClick={undo}
                 disabled={historyRef.current.length === 0}
-                leftIcon={<Undo2 size={14} />}
+                leftIcon={<Undo2 size={13} />}
               >
                 Undo
               </Button>
@@ -1882,20 +1941,61 @@ const TemplateFrameEditorPage: React.FC = () => {
                 fullWidth
                 onClick={redo}
                 disabled={redoRef.current.length === 0}
-                leftIcon={<Redo2 size={14} />}
+                leftIcon={<Redo2 size={13} />}
               >
                 Redo
               </Button>
+            </div>
+
+            {/* Tombol Tambah Frame Manual Sesuai Bentuk */}
+            <div className="grid grid-cols-3 gap-1.5 mb-2">
               <Button
-                variant="outline"
+                variant="primary"
                 size="sm"
                 fullWidth
                 onClick={addFrame}
-                leftIcon={<Plus size={14} />}
+                leftIcon={<Square size={13} />}
+                className="px-1 text-[11px] font-semibold justify-center"
               >
-                Add
+                + Kotak
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                fullWidth
+                onClick={addCircleFrame}
+                leftIcon={<Circle size={13} />}
+                className="px-1 text-[11px] font-semibold justify-center"
+              >
+                + Oval
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                fullWidth
+                onClick={addPolygonFrame}
+                leftIcon={<Spline size={13} />}
+                className="px-1 text-[11px] font-semibold justify-center"
+              >
+                + Poligon
               </Button>
             </div>
+
+            {frames.length > 0 && (
+              <div className="mb-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  fullWidth
+                  onClick={clearAllFrames}
+                  leftIcon={<Trash2 size={13} className="text-red-400" />}
+                  className="text-red-400 hover:text-red-300 hover:bg-red-500/10 text-xs justify-center py-1 h-7"
+                >
+                  Kosongkan Semua Frame
+                </Button>
+              </div>
+            )}
+
             <p className="text-[10px] text-pb-text-muted mb-2 leading-relaxed">
               Ctrl+Z undo · Ctrl+Y redo · Ctrl+C copy · Ctrl+V paste · Ctrl+D
               duplikat · Backspace hapus
