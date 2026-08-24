@@ -60,12 +60,22 @@ foldersRouter.post('/', async (c) => {
 
     const frontendUrl = process.env.FRONTEND_URL || ''
     const qrLink = frontendUrl ? `${frontendUrl}/folder/${shareToken}` : `/folder/${shareToken}`
-    const qrDataUrl = await generateQrDataUrl(qrLink)
-    const qrPath = await saveMedia(qrDataUrl, 'qr', `folder-${shareToken}.png`)
+    let qrPath = `qr/folders/${shareToken}.png`
+    let qrDataUrl: string | null = null
+    try {
+      qrDataUrl = await generateQrDataUrl(qrLink)
+      const uploadedQr = await saveMedia(qrDataUrl, 'qr', `folder-${shareToken}.png`)
+      if (uploadedQr && !uploadedQr.startsWith('data:') && uploadedQr.length <= 255) {
+        qrPath = uploadedQr
+      }
+    } catch (e) {
+      console.warn('Folder QR upload skipped:', e)
+    }
 
     const folder = await db.createFolder({
       name,
       parent_folder_id: parentFolderId,
+      unique_token: shareToken,
       share_token: shareToken,
       qr_path: qrPath,
     })
@@ -76,10 +86,11 @@ foldersRouter.post('/', async (c) => {
         id: folder?.id,
         name: folder?.name || name,
         parent_folder_id: parentFolderId,
-        share_token: shareToken,
+        unique_token: folder?.unique_token || shareToken,
+        share_token: folder?.share_token || shareToken,
         photos_count: 0,
         subfolders_count: 0,
-        qr_url: qrDataUrl,
+        qr_url: qrDataUrl || qrPath,
         qr_link: qrLink,
       },
     }, 201)
