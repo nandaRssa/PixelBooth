@@ -3,6 +3,19 @@ import fs from 'fs'
 import { createRequire } from 'module'
 import { supabase } from './supabase'
 
+// Cross-env safe UUID — works in Cloudflare Workers (globalThis.crypto) and Node.js
+function generateUUID(): string {
+  if (typeof globalThis !== 'undefined' && globalThis.crypto && typeof globalThis.crypto.randomUUID === 'function') {
+    return globalThis.crypto.randomUUID()
+  }
+  // Fallback for older Node.js environments
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = Math.random() * 16 | 0
+    const v = c === 'x' ? r : (r & 0x3 | 0x8)
+    return v.toString(16)
+  })
+}
+
 // ==========================================
 // PIXELBOOTH — Universal DB Adapter (SQLite + Supabase)
 // Supports all Photobooth operations with 100% parity to Laravel
@@ -482,13 +495,14 @@ export const db = {
 
   async createPhoto(payload: any) {
     const sdb = getSqlite()
+
+    // Use cross-env safe UUID generator (works in Cloudflare Workers and Node.js)
     const validUuid = payload.unique_token && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(payload.unique_token)
       ? payload.unique_token
-      : crypto.randomUUID()
-    payload.unique_token = validUuid
+      : generateUUID()
 
-    const now = new Date().toISOString()
-    const safePayload = {
+    // Build safe payload — omit created_at/updated_at to let DB defaults handle them
+    const safePayload: Record<string, any> = {
       session_id: payload.session_id ? Number(payload.session_id) : null,
       folder_id: payload.folder_id ? Number(payload.folder_id) : null,
       filename: payload.filename || `PixelBooth-Photo-${Date.now()}.jpg`,
@@ -498,8 +512,6 @@ export const db = {
       qr_path: payload.qr_path || null,
       is_final: payload.is_final !== undefined ? Boolean(payload.is_final) : true,
       is_temporary: false,
-      created_at: payload.created_at || now,
-      updated_at: payload.updated_at || now,
     }
 
     if (sdb) {
@@ -519,9 +531,10 @@ export const db = {
 
     const { data, error } = await supabase.from('photos').insert(safePayload).select().single()
     if (error) {
-      console.error('Supabase createPhoto error:', error)
+      console.error('Supabase createPhoto error:', JSON.stringify(error))
+      throw new Error('Photo insert failed: ' + (error.message || JSON.stringify(error)))
     }
-    return data || safePayload
+    return data
   },
 
   // --- Photos ---

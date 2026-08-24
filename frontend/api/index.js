@@ -33763,6 +33763,16 @@ var supabase = createClient(supabaseUrl, supabaseKey, {
 });
 
 // server/lib/db.ts
+function generateUUID() {
+  if (typeof globalThis !== "undefined" && globalThis.crypto && typeof globalThis.crypto.randomUUID === "function") {
+    return globalThis.crypto.randomUUID();
+  }
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = Math.random() * 16 | 0;
+    const v = c === "x" ? r : r & 3 | 8;
+    return v.toString(16);
+  });
+}
 var sqliteDb = null;
 function getSqlite() {
   if (process.env.VERCEL || process.env.VERCEL_ENV) return null;
@@ -34224,9 +34234,7 @@ var db = {
   },
   async createPhoto(payload) {
     const sdb = getSqlite();
-    const validUuid = payload.unique_token && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(payload.unique_token) ? payload.unique_token : crypto.randomUUID();
-    payload.unique_token = validUuid;
-    const now = (/* @__PURE__ */ new Date()).toISOString();
+    const validUuid = payload.unique_token && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(payload.unique_token) ? payload.unique_token : generateUUID();
     const safePayload = {
       session_id: payload.session_id ? Number(payload.session_id) : null,
       folder_id: payload.folder_id ? Number(payload.folder_id) : null,
@@ -34236,9 +34244,7 @@ var db = {
       unique_token: validUuid,
       qr_path: payload.qr_path || null,
       is_final: payload.is_final !== void 0 ? Boolean(payload.is_final) : true,
-      is_temporary: false,
-      created_at: payload.created_at || now,
-      updated_at: payload.updated_at || now
+      is_temporary: false
     };
     if (sdb) {
       const stmt = sdb.prepare(`
@@ -34259,9 +34265,10 @@ var db = {
     }
     const { data, error } = await supabase.from("photos").insert(safePayload).select().single();
     if (error) {
-      console.error("Supabase createPhoto error:", error);
+      console.error("Supabase createPhoto error:", JSON.stringify(error));
+      throw new Error("Photo insert failed: " + (error.message || JSON.stringify(error)));
     }
-    return data || safePayload;
+    return data;
   },
   // --- Photos ---
   async getPhotos(folderId, page = 1, perPage = 20, uncategorized = false) {
