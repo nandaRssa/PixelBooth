@@ -1,8 +1,18 @@
 import { Hono } from 'hono'
-import { randomUUID } from 'crypto'
 import { db } from '../lib/db'
 import { saveMedia } from '../lib/storage'
 import { generateQrDataUrl } from '../lib/qrcode'
+
+// Cross-env safe UUID
+function generateUUID(): string {
+  if (typeof globalThis !== 'undefined' && globalThis.crypto && typeof globalThis.crypto.randomUUID === 'function') {
+    return globalThis.crypto.randomUUID()
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = Math.random() * 16 | 0
+    return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16)
+  })
+}
 
 export const foldersRouter = new Hono()
 
@@ -46,7 +56,7 @@ foldersRouter.post('/', async (c) => {
     const json = await c.req.json().catch(() => ({}))
     const name = json.name || 'Folder Baru'
     const parentFolderId = json.parent_folder_id || null
-    const shareToken = randomUUID()
+    const shareToken = generateUUID()
 
     const frontendUrl = process.env.FRONTEND_URL || 'https://pixel-booth-spot-unsil.vercel.app'
     const qrLink = `${frontendUrl}/folder/${shareToken}`

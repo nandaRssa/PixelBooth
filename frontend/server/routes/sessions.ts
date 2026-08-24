@@ -47,6 +47,17 @@ async function getFullSessionPayload(sessionId: number | string) {
   }
 }
 
+// Cross-env safe UUID
+function generateUUID(): string {
+  if (typeof globalThis !== 'undefined' && globalThis.crypto && typeof globalThis.crypto.randomUUID === 'function') {
+    return globalThis.crypto.randomUUID()
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = Math.random() * 16 | 0
+    return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16)
+  })
+}
+
 // POST /api/sessions (Create Session)
 sessionsRouter.post('/', async (c) => {
   try {
@@ -63,7 +74,7 @@ sessionsRouter.post('/', async (c) => {
       return c.json({ message: `Template id ${templateId} tidak ditemukan` }, 404)
     }
 
-    const sessionToken = randomUUID()
+    const sessionToken = generateUUID()
     const totalFrames = template.frame_count || 1
 
     const session = await db.createSession({

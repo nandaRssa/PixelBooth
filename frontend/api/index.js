@@ -35453,6 +35453,15 @@ async function getFullSessionPayload(sessionId) {
     folder: folder ? { id: folder.id, name: folder.name, share_token: folder.share_token } : null
   };
 }
+function generateUUID2() {
+  if (typeof globalThis !== "undefined" && globalThis.crypto && typeof globalThis.crypto.randomUUID === "function") {
+    return globalThis.crypto.randomUUID();
+  }
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = Math.random() * 16 | 0;
+    return (c === "x" ? r : r & 3 | 8).toString(16);
+  });
+}
 sessionsRouter.post("/", async (c) => {
   try {
     const json2 = await c.req.json().catch(() => ({}));
@@ -35465,7 +35474,7 @@ sessionsRouter.post("/", async (c) => {
     if (!template) {
       return c.json({ message: `Template id ${templateId} tidak ditemukan` }, 404);
     }
-    const sessionToken = randomUUID();
+    const sessionToken = generateUUID2();
     const totalFrames = template.frame_count || 1;
     const session = await db.createSession({
       template_id: template.id,
@@ -35723,7 +35732,15 @@ sessionsRouter.post("/:id/set-folder", handleSetFolder);
 sessionsRouter.post("/:id/folder", handleSetFolder);
 
 // server/routes/folders.ts
-import { randomUUID as randomUUID2 } from "crypto";
+function generateUUID3() {
+  if (typeof globalThis !== "undefined" && globalThis.crypto && typeof globalThis.crypto.randomUUID === "function") {
+    return globalThis.crypto.randomUUID();
+  }
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = Math.random() * 16 | 0;
+    return (c === "x" ? r : r & 3 | 8).toString(16);
+  });
+}
 var foldersRouter = new Hono2();
 foldersRouter.get("/", async (c) => {
   try {
@@ -35760,7 +35777,7 @@ foldersRouter.post("/", async (c) => {
     const json2 = await c.req.json().catch(() => ({}));
     const name = json2.name || "Folder Baru";
     const parentFolderId = json2.parent_folder_id || null;
-    const shareToken = randomUUID2();
+    const shareToken = generateUUID3();
     const frontendUrl = process.env.FRONTEND_URL || "https://pixel-booth-spot-unsil.vercel.app";
     const qrLink = `${frontendUrl}/folder/${shareToken}`;
     const qrDataUrl = await generateQrDataUrl(qrLink);
