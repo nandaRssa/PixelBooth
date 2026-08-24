@@ -7,6 +7,7 @@
     "dev": "vite",
     "api": "tsx server/dev.ts",
     "build": "tsc -b && vite build && esbuild api/index.ts --bundle --platform=node --format=esm --outfile=api/index.js --external:better-sqlite3",
+    "deploy": "npm run build && wrangler deploy",
     "lint": "oxlint",
     "preview": "vite preview"
   },
