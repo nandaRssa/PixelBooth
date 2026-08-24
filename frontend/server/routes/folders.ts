@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 import { randomUUID } from 'crypto'
 import { db } from '../lib/db'
+import { saveMedia } from '../lib/storage'
 import { generateQrDataUrl } from '../lib/qrcode'
 
 export const foldersRouter = new Hono()
@@ -50,12 +51,13 @@ foldersRouter.post('/', async (c) => {
     const frontendUrl = process.env.FRONTEND_URL || 'https://pixel-booth-spot-unsil.vercel.app'
     const qrLink = `${frontendUrl}/folder/${shareToken}`
     const qrDataUrl = await generateQrDataUrl(qrLink)
+    const qrPath = await saveMedia(qrDataUrl, 'qr', `folder-${shareToken}.svg`)
 
     const folder = await db.createFolder({
       name,
       parent_folder_id: parentFolderId,
       share_token: shareToken,
-      qr_path: qrDataUrl,
+      qr_path: qrPath,
     })
 
     return c.json({

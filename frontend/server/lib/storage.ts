@@ -10,7 +10,7 @@ import { uploadToCloudinary } from './cloudinary'
 
 export async function saveMedia(
   fileData: Buffer | string,
-  folder: 'templates' | 'sessions' | 'photos' | 'captures',
+  folder: 'templates' | 'sessions' | 'photos' | 'captures' | 'qr',
   filename: string
 ): Promise<string> {
   // If running on Vercel or cloud environment without writable disk, use Cloudinary
@@ -22,17 +22,24 @@ export async function saveMedia(
   try {
     let buffer: Buffer
     if (typeof fileData === 'string') {
-      if (fileData.startsWith('data:')) {
-        const base64Data = fileData.replace(/^data:image\/\w+;base64,/, '')
-        buffer = Buffer.from(base64Data, 'base64')
+      if (fileData.includes(';base64,')) {
+        const b64 = fileData.split(';base64,')[1]
+        buffer = Buffer.from(b64, 'base64')
+      } else if (fileData.startsWith('data:')) {
+        const b64 = fileData.split(',')[1]
+        buffer = Buffer.from(b64, 'base64')
       } else {
-        buffer = Buffer.from(fileData)
+        try {
+          buffer = Buffer.from(fileData, 'base64')
+        } catch {
+          buffer = Buffer.from(fileData)
+        }
       }
     } else {
       buffer = fileData
     }
 
-    const safeFilename = filename.endsWith('.jpg') || filename.endsWith('.png') || filename.endsWith('.webp')
+    const safeFilename = filename.endsWith('.jpg') || filename.endsWith('.png') || filename.endsWith('.webp') || filename.endsWith('.svg')
       ? filename
       : `${filename}.jpg`
 
