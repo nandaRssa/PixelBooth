@@ -482,22 +482,46 @@ export const db = {
 
   async createPhoto(payload: any) {
     const sdb = getSqlite()
+    const validUuid = payload.unique_token && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(payload.unique_token)
+      ? payload.unique_token
+      : crypto.randomUUID()
+    payload.unique_token = validUuid
+
+    const now = new Date().toISOString()
+    const safePayload = {
+      session_id: payload.session_id ? Number(payload.session_id) : null,
+      folder_id: payload.folder_id ? Number(payload.folder_id) : null,
+      filename: payload.filename || `PixelBooth-Photo-${Date.now()}.jpg`,
+      storage_path: payload.storage_path || '',
+      thumbnail_path: payload.thumbnail_path || payload.storage_path || '',
+      unique_token: validUuid,
+      qr_path: payload.qr_path || null,
+      is_final: payload.is_final !== undefined ? Boolean(payload.is_final) : true,
+      is_temporary: false,
+      created_at: payload.created_at || now,
+      updated_at: payload.updated_at || now,
+    }
+
     if (sdb) {
       const stmt = sdb.prepare(`
         INSERT INTO photos (session_id, folder_id, filename, storage_path, thumbnail_path, unique_token, qr_path, is_final, is_temporary, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, datetime('now'), datetime('now'))
       `)
       const info = stmt.run(
-        payload.session_id || null, payload.folder_id || null,
-        payload.filename, payload.storage_path,
-        payload.thumbnail_path || payload.storage_path,
-        payload.unique_token, payload.qr_path || null,
-        payload.is_final ? 1 : 0,
+        safePayload.session_id, safePayload.folder_id,
+        safePayload.filename, safePayload.storage_path,
+        safePayload.thumbnail_path,
+        safePayload.unique_token, safePayload.qr_path,
+        safePayload.is_final ? 1 : 0,
       )
       return sdb.prepare('SELECT * FROM photos WHERE id = ?').get(info.lastInsertRowid)
     }
-    const { data } = await supabase.from('photos').insert(payload).select().single()
-    return data
+
+    const { data, error } = await supabase.from('photos').insert(safePayload).select().single()
+    if (error) {
+      console.error('Supabase createPhoto error:', error)
+    }
+    return data || safePayload
   },
 
   // --- Photos ---
@@ -544,7 +568,7 @@ export const db = {
 
     const from = (page - 1) * perPage
     const to = from + perPage - 1
-    let query = supabase.from('photos').select('*', { count: 'exact' }).order('created_at', { ascending: false })
+    let query = supabase.from('photos').select('*', { count: 'exact' }).order('id', { ascending: false })
     if (folderId && folderId !== 'null' && !uncategorized) query = query.eq('folder_id', folderId)
     else if (uncategorized) query = query.is('folder_id', null)
     const { data, count } = await query.range(from, to)
