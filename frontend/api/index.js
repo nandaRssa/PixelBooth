@@ -34235,14 +34235,18 @@ var db = {
   async createPhoto(payload) {
     const sdb = getSqlite();
     const validUuid = payload.unique_token && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(payload.unique_token) ? payload.unique_token : generateUUID();
+    let safeQrPath = payload.qr_path || null;
+    if (typeof safeQrPath === "string" && (safeQrPath.startsWith("data:") || safeQrPath.length > 255)) {
+      safeQrPath = `qr/photos/${validUuid}.png`;
+    }
     const safePayload = {
       session_id: payload.session_id ? Number(payload.session_id) : null,
       folder_id: payload.folder_id ? Number(payload.folder_id) : null,
-      filename: payload.filename || `PixelBooth-Photo-${Date.now()}.jpg`,
-      storage_path: payload.storage_path || "",
-      thumbnail_path: payload.thumbnail_path || payload.storage_path || "",
+      filename: (payload.filename || `PixelBooth-Photo-${Date.now()}.jpg`).slice(0, 255),
+      storage_path: (payload.storage_path || "").slice(0, 255),
+      thumbnail_path: (payload.thumbnail_path || payload.storage_path || "").slice(0, 255),
       unique_token: validUuid,
-      qr_path: payload.qr_path || null,
+      qr_path: safeQrPath ? String(safeQrPath).slice(0, 255) : null,
       is_final: payload.is_final !== void 0 ? Boolean(payload.is_final) : true,
       is_temporary: false
     };
