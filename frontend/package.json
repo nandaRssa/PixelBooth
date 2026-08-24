@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "api": "tsx server/dev.ts",
-    "build": "tsc -b && vite build",
+    "build": "tsc -b && vite build && esbuild api/index.ts --bundle --platform=node --format=esm --outfile=api/index.js --external:better-sqlite3",
     "lint": "oxlint",
     "preview": "vite preview"
   },
@@ -43,6 +43,7 @@
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.4",
+    "esbuild": "^0.28.2",
     "oxlint": "^1.75.0",
     "tailwindcss": "^4.3.3",
     "tsx": "^4.23.12",
