@@ -100,21 +100,23 @@ const PhotoQrModal: React.FC<PhotoQrModalProps> = ({ isOpen, onClose, photo }) =
           <button
             type="button"
             title="Bagikan Link Foto"
+            aria-label="Bagikan"
             onClick={handleShare}
-            className="h-10 sm:h-11 w-full rounded-xl bg-pb-surface-hover hover:bg-pb-border text-pb-text border border-pb-border flex items-center justify-center gap-2 text-xs sm:text-sm font-semibold transition-all active:scale-95 cursor-pointer shadow-xs"
+            className="h-11 w-full rounded-xl bg-pb-surface-hover hover:bg-pb-border text-pb-text border border-pb-border flex items-center justify-center gap-2 text-xs font-semibold transition-all active:scale-95 cursor-pointer shadow-xs whitespace-nowrap"
           >
-            <Share2 size={16} className="shrink-0 text-pb-text-secondary" />
-            <span className="hidden md:inline">Bagikan</span>
+            <Share2 size={18} className="shrink-0 text-pb-text-secondary" />
+            <span className="hidden lg:inline">Bagikan</span>
           </button>
 
           <button
             type="button"
             title="Unduh Desain Kartu QR"
+            aria-label="Unduh Desain"
             onClick={handleDownloadQr}
-            className="h-10 sm:h-11 w-full rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white flex items-center justify-center gap-2 text-xs sm:text-sm font-semibold transition-all active:scale-95 cursor-pointer shadow-xs"
+            className="h-11 w-full rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white flex items-center justify-center gap-2 text-xs font-semibold transition-all active:scale-95 cursor-pointer shadow-xs whitespace-nowrap"
           >
-            <Download size={16} className="shrink-0" />
-            <span className="hidden md:inline">Unduh Desain</span>
+            <Download size={18} className="shrink-0 text-white" />
+            <span className="hidden lg:inline">Unduh Desain</span>
           </button>
         </div>
       </div>
