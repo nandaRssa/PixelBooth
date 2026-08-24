@@ -1,7 +1,6 @@
-import crypto from 'crypto'
-
 // ==========================================
 // PIXELBOOTH — Cloudinary Client (TypeScript)
+// Compatible with Node.js & Cloudflare Workers (Web Crypto)
 // ==========================================
 
 const cloudName = process.env.CLOUDINARY_CLOUD_NAME || 'tdzyw4dr'
@@ -13,6 +12,17 @@ export interface UploadResult {
   public_id: string
   bytes: number
   format: string
+}
+
+async function getSha1Hex(str: string): Promise<string> {
+  if (typeof globalThis !== 'undefined' && globalThis.crypto?.subtle) {
+    const buffer = new TextEncoder().encode(str)
+    const hash = await globalThis.crypto.subtle.digest('SHA-1', buffer)
+    return Array.from(new Uint8Array(hash))
+      .map((b) => b.toString(16).padStart(2, '0'))
+      .join('')
+  }
+  return ''
 }
 
 /**
@@ -28,7 +38,7 @@ export async function uploadToCloudinary(
     const publicId = filename ? `pixelbooth/${folder}/${filename}` : `pixelbooth/${folder}/${Date.now()}`
 
     const paramsToSign = `folder=pixelbooth/${folder}&public_id=${publicId}&timestamp=${timestamp}`
-    const signature = crypto.createHash('sha1').update(paramsToSign + apiSecret).digest('hex')
+    const signature = await getSha1Hex(paramsToSign + apiSecret)
 
     const formData = new FormData()
     if (typeof fileData === 'string') {
