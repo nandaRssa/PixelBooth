@@ -3,7 +3,7 @@ import fs from 'fs'
 import path from 'path'
 import { db } from '../lib/db'
 import { saveMedia } from '../lib/storage'
-import { detectFramesFromBuffer } from '../lib/frameDetector'
+import { detectFramesFromBuffer, decodeImage } from '../lib/frameDetector'
 
 export const templatesRouter = new Hono()
 

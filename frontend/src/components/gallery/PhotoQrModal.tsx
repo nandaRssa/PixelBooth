@@ -78,7 +78,7 @@ const PhotoQrModal: React.FC<PhotoQrModalProps> = ({ isOpen, onClose, photo }) =
                 bgColor="#FFFFFF"
                 fgColor="#000000"
                 includeMargin={false}
-                className="w-full h-auto max-w-[220px]"
+                className="w-48 h-48 sm:w-56 sm:h-56 aspect-square max-w-full block"
               />
             </div>
 

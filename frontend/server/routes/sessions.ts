@@ -264,7 +264,7 @@ sessionsRouter.post('/:id/complete', async (c) => {
     const frontendUrl = process.env.FRONTEND_URL || 'https://pixel-booth-spot-unsil.vercel.app'
     const photoViewUrl = `${frontendUrl}/photo/${uniqueToken}`
     const qrDataUrl = await generateQrDataUrl(photoViewUrl)
-    const qrPath = await saveMedia(qrDataUrl, 'qr', `${uniqueToken}.svg`)
+    const qrPath = await saveMedia(qrDataUrl, 'qr', `${uniqueToken}.png`)
 
     const folderName = sessionData.folder?.name || ''
     const templateName = sessionData.template?.name || ''

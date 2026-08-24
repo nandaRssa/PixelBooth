@@ -51,7 +51,7 @@ foldersRouter.post('/', async (c) => {
     const frontendUrl = process.env.FRONTEND_URL || 'https://pixel-booth-spot-unsil.vercel.app'
     const qrLink = `${frontendUrl}/folder/${shareToken}`
     const qrDataUrl = await generateQrDataUrl(qrLink)
-    const qrPath = await saveMedia(qrDataUrl, 'qr', `folder-${shareToken}.svg`)
+    const qrPath = await saveMedia(qrDataUrl, 'qr', `folder-${shareToken}.png`)
 
     const folder = await db.createFolder({
       name,
