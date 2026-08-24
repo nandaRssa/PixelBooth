@@ -71,14 +71,16 @@ const FullscreenSessionPage: React.FC = () => {
     return Math.min(Math.max((session?.current_frame ?? 1) - 1, 0), totalFrames - 1)
   }, [session?.current_frame, totalFrames])
 
-  // Foto hasil tiap frame dari server
+  const localCapturesRef = useRef<Record<number, string>>({})
+
+  // Foto hasil tiap frame (prioritaskan cache base64 lokal untuk render instan)
   const frameImages = useMemo(() => {
     const arr: (string | null)[] = Array(totalFrames).fill(null)
     for (const cap of session?.captures ?? []) {
       if (cap.status === 'retaken') continue
       const idx = cap.frame_number - 1
       if (idx >= 0 && idx < totalFrames) {
-        arr[idx] = cap.photo_url
+        arr[idx] = localCapturesRef.current[cap.frame_number] || cap.photo_url
       }
     }
     return arr
@@ -276,6 +278,8 @@ const FullscreenSessionPage: React.FC = () => {
       ctx.filter = 'none'
 
       const base64 = canvas.toDataURL('image/jpeg', 0.85)
+      const currentFrameNum = session.current_frame || 1
+      localCapturesRef.current[currentFrameNum] = base64
 
       const result = await sessionApi.capture(session.id, base64)
       setSession(result.session)
@@ -338,6 +342,7 @@ const FullscreenSessionPage: React.FC = () => {
     if (!session || phase === 'countdown' || isCapturing || isRetaking) return
     setIsRetaking(true)
     try {
+      delete localCapturesRef.current[frameIndex + 1]
       const updated = await sessionApi.retake(session.id, frameIndex + 1)
       setSession(updated)
       setAllDone(false)
@@ -360,6 +365,7 @@ const FullscreenSessionPage: React.FC = () => {
     if (!session || phase === 'countdown' || isCapturing || isRetaking) return
     setIsRetaking(true)
     try {
+      localCapturesRef.current = {}
       const updated = await sessionApi.restart(session.id)
       setSession(updated)
       setAllDone(false)

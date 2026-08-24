@@ -90,14 +90,16 @@ const PhotoCapturePage: React.FC = () => {
 
   const activeSlot = previewSlots[activeFrameIndex] ?? null
 
-  // Foto hasil tiap frame (dari capture terbaru yang disetujui server)
+  const localCapturesRef = useRef<Record<number, string>>({})
+
+  // Foto hasil tiap frame (prioritaskan cache base64 lokal untuk render instan)
   const frameImages = useMemo(() => {
     const arr: (string | null)[] = Array(totalFrames).fill(null)
     for (const cap of session?.captures ?? []) {
       if (cap.status === 'retaken') continue
       const idx = cap.frame_number - 1
       if (idx >= 0 && idx < totalFrames) {
-        arr[idx] = cap.photo_url
+        arr[idx] = localCapturesRef.current[cap.frame_number] || cap.photo_url
       }
     }
     return arr
@@ -322,6 +324,8 @@ const PhotoCapturePage: React.FC = () => {
       ctx.filter = 'none'
 
       const base64 = canvas.toDataURL('image/jpeg', 0.85)
+      const currentFrameNum = session.current_frame || 1
+      localCapturesRef.current[currentFrameNum] = base64
 
       const result = await sessionApi.capture(session.id, base64)
       setSession(result.session)
@@ -352,6 +356,7 @@ const PhotoCapturePage: React.FC = () => {
   const handleRetakeFrame = async (frameIndex: number) => {
     if (!session || phase === 'countdown' || isCapturing) return
     try {
+      delete localCapturesRef.current[frameIndex + 1]
       const updated = await sessionApi.retake(session.id, frameIndex + 1)
       setSession(updated)
       setAllDone(false)
@@ -371,6 +376,7 @@ const PhotoCapturePage: React.FC = () => {
   const handleRestartSession = async () => {
     if (!session || phase === 'countdown' || isCapturing) return
     try {
+      localCapturesRef.current = {}
       const updated = await sessionApi.restart(session.id)
       setSession(updated)
       setAllDone(false)
