@@ -13,8 +13,17 @@ export async function saveMedia(
   folder: 'templates' | 'sessions' | 'photos' | 'captures' | 'qr',
   filename: string
 ): Promise<string> {
-  // If running on Vercel or cloud environment without writable disk, use Cloudinary
-  if (process.env.VERCEL || process.env.VERCEL_ENV) {
+  // If running on Cloudflare, Vercel, or cloud environment without writable disk, use Cloudinary
+  const isCloud = Boolean(
+    process.env.VERCEL ||
+    process.env.VERCEL_ENV ||
+    process.env.CF_PAGES ||
+    process.env.CLOUDFLARE_WORKER ||
+    process.env.NODE_ENV === 'production' ||
+    typeof (globalThis as any).WebSocketPair !== 'undefined'
+  )
+
+  if (isCloud) {
     return uploadToCloudinary(fileData, folder, filename)
   }
 

@@ -205,7 +205,36 @@ export const db = {
     if (parentId) query = query.eq('parent_folder_id', parentId)
     else query = query.is('parent_folder_id', null)
     const { data } = await query
-    return (data || []).map((f) => ({ ...f, photos_count: 0, subfolders_count: 0 }))
+    if (!data || data.length === 0) return []
+
+    // Calculate real photo count and subfolder count per folder
+    const foldersWithCounts = await Promise.all(
+      data.map(async (f) => {
+        const { count: photoCount } = await supabase
+          .from('photos')
+          .select('*', { count: 'exact', head: true })
+          .eq('folder_id', f.id)
+
+        const { count: subfolderCount } = await supabase
+          .from('folders')
+          .select('*', { count: 'exact', head: true })
+          .eq('parent_folder_id', f.id)
+
+        return {
+          id: f.id,
+          name: f.name,
+          parent_folder_id: f.parent_folder_id,
+          share_token: f.share_token,
+          photos_count: photoCount ?? 0,
+          subfolders_count: subfolderCount ?? 0,
+          qr_url: f.qr_path,
+          created_at: f.created_at,
+          updated_at: f.updated_at,
+        }
+      })
+    )
+
+    return foldersWithCounts
   },
 
   async getFolderById(id: number | string) {
