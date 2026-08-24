@@ -477,15 +477,25 @@ export const db = {
       return {
         data: rows.map((p: any) => ({
           id: p.id,
-          token: p.unique_token,
-          filename: p.filename,
-          photo_url: p.storage_path,
-          thumbnail_url: p.thumbnail_path || p.storage_path,
-          folder_id: p.folder_id,
           session_id: p.session_id,
+          folder_id: p.folder_id,
+          filename: p.filename,
+          storage_path: p.storage_path,
+          url: p.storage_path,
+          photo_url: p.storage_path,
+          thumbnail_path: p.thumbnail_path || p.storage_path,
+          thumbnail_url: p.thumbnail_path || p.storage_path,
+          unique_token: p.unique_token,
+          qr_path: p.qr_path,
+          qr_url: p.qr_path,
+          is_final: Boolean(p.is_final),
           created_at: p.created_at,
+          updated_at: p.updated_at,
         })),
-        meta: { current_page: page, per_page: perPage, total, last_page: Math.ceil(total / perPage) },
+        current_page: page,
+        last_page: Math.max(1, Math.ceil(total / perPage)),
+        per_page: perPage,
+        total,
       }
     }
 
@@ -495,18 +505,29 @@ export const db = {
     if (folderId && folderId !== 'null' && !uncategorized) query = query.eq('folder_id', folderId)
     else if (uncategorized) query = query.is('folder_id', null)
     const { data, count } = await query.range(from, to)
+    const total = count || 0
     return {
       data: (data || []).map((p) => ({
         id: p.id,
-        token: p.unique_token,
-        filename: p.filename,
-        photo_url: p.storage_path,
-        thumbnail_url: p.thumbnail_path || p.storage_path,
-        folder_id: p.folder_id,
         session_id: p.session_id,
+        folder_id: p.folder_id,
+        filename: p.filename,
+        storage_path: p.storage_path,
+        url: p.storage_path,
+        photo_url: p.storage_path,
+        thumbnail_path: p.thumbnail_path || p.storage_path,
+        thumbnail_url: p.thumbnail_path || p.storage_path,
+        unique_token: p.unique_token,
+        qr_path: p.qr_path,
+        qr_url: p.qr_path,
+        is_final: Boolean(p.is_final),
         created_at: p.created_at,
+        updated_at: p.updated_at,
       })),
-      meta: { current_page: page, per_page: perPage, total: count || 0, last_page: Math.ceil((count || 0) / perPage) },
+      current_page: page,
+      last_page: Math.max(1, Math.ceil(total / perPage)),
+      per_page: perPage,
+      total,
     }
   },
 

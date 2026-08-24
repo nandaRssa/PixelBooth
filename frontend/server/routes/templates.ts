@@ -2,7 +2,7 @@ import { Hono } from 'hono'
 import fs from 'fs'
 import path from 'path'
 import { db } from '../lib/db'
-import { uploadToCloudinary } from '../lib/cloudinary'
+import { saveMedia } from '../lib/storage'
 import { detectFramesFromBuffer } from '../lib/frameDetector'
 
 export const templatesRouter = new Hono()
@@ -85,7 +85,7 @@ templatesRouter.post('/', async (c) => {
 
     if (file && typeof file !== 'string') {
       fileBuffer = Buffer.from(await file.arrayBuffer())
-      fileUrl = await uploadToCloudinary(fileBuffer, 'templates', `${Date.now()}-${(file as any).name || 'template.png'}`)
+      fileUrl = await saveMedia(fileBuffer, 'templates', `${Date.now()}-${(file as any).name || 'template.png'}`)
     } else if (typeof file === 'string' && file.length > 0) {
       fileUrl = file
       fileBuffer = await getImageBuffer(fileUrl)

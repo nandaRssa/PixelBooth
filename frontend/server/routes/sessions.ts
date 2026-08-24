@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { randomUUID } from 'crypto'
 import { db } from '../lib/db'
-import { uploadToCloudinary } from '../lib/cloudinary'
+import { saveMedia } from '../lib/storage'
 import { generateQrDataUrl } from '../lib/qrcode'
 
 export const sessionsRouter = new Hono()
@@ -138,7 +138,7 @@ sessionsRouter.post('/:id/capture', async (c) => {
 
     let photoUrl = ''
     if (imageBase64 && typeof imageBase64 === 'string') {
-      photoUrl = await uploadToCloudinary(
+      photoUrl = await saveMedia(
         imageBase64,
         'captures',
         `session-${currentSession.session_token || id}-frame-${frameNumber}`
@@ -253,7 +253,7 @@ sessionsRouter.post('/:id/complete', async (c) => {
 
     let finalUrl = ''
     if (finalImageBase64) {
-      finalUrl = await uploadToCloudinary(
+      finalUrl = await saveMedia(
         finalImageBase64,
         'photos',
         `${currentSession.session_token || id}-final`
