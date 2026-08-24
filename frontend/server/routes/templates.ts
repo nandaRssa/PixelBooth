@@ -1,8 +1,50 @@
 import { Hono } from 'hono'
+import fs from 'fs'
+import path from 'path'
 import { db } from '../lib/db'
 import { uploadToCloudinary } from '../lib/cloudinary'
+import { detectFramesFromBuffer } from '../lib/frameDetector'
 
 export const templatesRouter = new Hono()
+
+// Helper: load image buffer from URL or local storage path
+async function getImageBuffer(fileUrlOrPath: string): Promise<Buffer | null> {
+  if (!fileUrlOrPath) return null
+
+  // 1. Data URI
+  if (fileUrlOrPath.startsWith('data:')) {
+    const base64Part = fileUrlOrPath.split(',')[1] || fileUrlOrPath
+    return Buffer.from(base64Part, 'base64')
+  }
+
+  // 2. Remote HTTP / HTTPS (Cloudinary / Supabase Storage)
+  if (fileUrlOrPath.startsWith('http://') || fileUrlOrPath.startsWith('https://')) {
+    try {
+      const res = await fetch(fileUrlOrPath)
+      if (!res.ok) return null
+      return Buffer.from(await res.arrayBuffer())
+    } catch (e) {
+      console.warn('Failed to fetch remote template image:', e)
+      return null
+    }
+  }
+
+  // 3. Local relative path (Laravel storage)
+  const clean = fileUrlOrPath.replace(/^\/+/, '').replace(/^storage\//, '').replace(/^api\/storage\//, '')
+  const candidates = [
+    path.resolve(process.cwd(), '../backend/storage/app/public', clean),
+    path.resolve(process.cwd(), '../backend/public/storage', clean),
+    path.resolve(process.cwd(), 'storage/app/public', clean),
+  ]
+
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate)) {
+      return fs.readFileSync(candidate)
+    }
+  }
+
+  return null
+}
 
 // GET /api/templates
 templatesRouter.get('/', async (c) => {
@@ -29,7 +71,7 @@ templatesRouter.post('/', async (c) => {
     const status = (body.status as string) || 'active'
     const canvasWidth = parseInt((body.canvas_width as string) || '1200')
     const canvasHeight = parseInt((body.canvas_height as string) || '1800')
-    const frameCount = parseInt((body.frame_count as string) || '1')
+    let frameCount = parseInt((body.frame_count as string) || '1')
     let frameConfig: any[] = []
     if (body.frame_configuration) {
       try { frameConfig = JSON.parse(body.frame_configuration as string) } catch {}
@@ -39,11 +81,23 @@ templatesRouter.post('/', async (c) => {
     const file = (body.template_file || body.file) as File | string
 
     let fileUrl = ''
+    let fileBuffer: Buffer | null = null
+
     if (file && typeof file !== 'string') {
-      const buffer = Buffer.from(await file.arrayBuffer())
-      fileUrl = await uploadToCloudinary(buffer, 'templates', `${Date.now()}-${(file as any).name || 'template.png'}`)
+      fileBuffer = Buffer.from(await file.arrayBuffer())
+      fileUrl = await uploadToCloudinary(fileBuffer, 'templates', `${Date.now()}-${(file as any).name || 'template.png'}`)
     } else if (typeof file === 'string' && file.length > 0) {
       fileUrl = file
+      fileBuffer = await getImageBuffer(fileUrl)
+    }
+
+    // Auto-detect frames on upload if no explicit configuration provided
+    if (frameConfig.length === 0 && fileBuffer) {
+      const detected = detectFramesFromBuffer(fileBuffer, canvasWidth, canvasHeight)
+      if (detected && detected.frame_configuration.length > 0) {
+        frameConfig = detected.frame_configuration
+        frameCount = detected.frame_count
+      }
     }
 
     const slug = `${name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${Math.random().toString(36).slice(2, 7)}`
@@ -53,7 +107,7 @@ templatesRouter.post('/', async (c) => {
       slug,
       template_file: fileUrl,
       preview_file: fileUrl,
-      frame_count: frameCount,
+      frame_count: frameCount || frameConfig.length || 1,
       canvas_width: canvasWidth,
       canvas_height: canvasHeight,
       status,
@@ -63,6 +117,47 @@ templatesRouter.post('/', async (c) => {
     return c.json({ message: 'Template berhasil diunggah', data: template }, 201)
   } catch (err: any) {
     return c.json({ message: err?.message || 'Gagal mengunggah template' }, 500)
+  }
+})
+
+// POST /api/templates/:id/detect-frames (Intelligent Frame Detection)
+templatesRouter.post('/:id/detect-frames', async (c) => {
+  try {
+    const id = c.req.param('id')
+    const template = await db.getTemplateById(id)
+    if (!template) {
+      return c.json({ message: 'Template tidak ditemukan' }, 404)
+    }
+
+    const fileUrl = template.template_url || (template as any).template_file
+    const buffer = await getImageBuffer(fileUrl)
+    if (!buffer) {
+      return c.json({ message: 'File template tidak ditemukan untuk dianalisis.' }, 404)
+    }
+
+    const result = detectFramesFromBuffer(buffer, template.canvas_width, template.canvas_height)
+
+    const method = result?.detection_method || 'smart_clear'
+    const frames = result?.frame_configuration || []
+    const methodLabel = method === 'transparent' ? ' (Transparency Detection)' : ' (Smart Clear)'
+
+    return c.json({
+      message: frames.length > 0
+        ? `Frames Detected: ${frames.length} bingkai${methodLabel}.`
+        : 'Tidak ada area foto yang terdeteksi pada template ini.',
+      data: {
+        detection_method: method,
+        frame_count: frames.length,
+        frames: frames.map((f, i) => ({
+          ...f,
+          id: i + 1,
+          order: i,
+        })),
+      },
+    })
+  } catch (err: any) {
+    console.error('detect-frames error:', err)
+    return c.json({ message: err?.message || 'Gagal menjalankan deteksi frame' }, 500)
   }
 })
 
