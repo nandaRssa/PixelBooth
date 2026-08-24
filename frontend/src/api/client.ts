@@ -5,12 +5,7 @@ import axios from 'axios'
 // Fitur login dihapus — semua request tanpa token
 // ==========================================
 
-const defaultBaseUrl =
-  typeof window !== 'undefined' &&
-  window.location.hostname !== 'localhost' &&
-  window.location.hostname !== '127.0.0.1'
-    ? 'https://pixel-booth-backend-7xoh69k5n-nanda-raissas-projects.vercel.app/api'
-    : '/api'
+const defaultBaseUrl = '/api'
 
 const apiClient = axios.create({
   baseURL: import.meta.env.VITE_API_URL || defaultBaseUrl,
@@ -31,29 +26,48 @@ export function getStorageUrl(path?: string | null): string {
     return path
   }
 
-  // 1. Strip localhost / 127.0.0.1 domain from backend responses & force HTTPS
-  let cleanPath = path
-    .replace(/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?\/?/i, '')
-    .replace(/^http:\/\//i, 'https://')
-
-  // 2. Route raw /storage/ through /api/storage/ for guaranteed CORS
-  if (!cleanPath.includes('/api/storage/') && !cleanPath.startsWith('api/storage/')) {
-    cleanPath = cleanPath.replace(/(^|\/)storage\//i, '$1api/storage/')
+  // Jika sudah merupakan URL lengkap cloud (misal Cloudinary), kembalikan langsung
+  if (
+    path.startsWith('https://res.cloudinary.com') ||
+    path.startsWith('https://') && !path.includes('localhost') && !path.includes('127.0.0.1')
+  ) {
+    return path
   }
 
-  // 3. Deduplicate any duplicate /api/api/
-  cleanPath = cleanPath.replace(/\/api\/api\//g, '/api/')
+  // Bersihkan prefix host/origin backend jika ada
+  let cleanPath = path
+    .replace(/^https?:\/\/[^/]+\//i, '')
+    .replace(/^\/+/, '')
 
-  if (cleanPath.startsWith('https://')) {
-    return cleanPath
+  // Pastikan melewati endpoint proxy /api/storage/
+  if (!cleanPath.startsWith('api/storage/') && !cleanPath.startsWith('storage/')) {
+    cleanPath = `api/storage/${cleanPath}`
+  } else if (cleanPath.startsWith('storage/')) {
+    cleanPath = `api/${cleanPath}`
+  }
+
+  // Bersihkan duplikasi /api/api/
+  cleanPath = cleanPath.replace(/^api\/api\//, 'api/')
+
+  // Di browser:
+  if (typeof window !== 'undefined') {
+    const isLocal =
+      window.location.hostname === 'localhost' ||
+      window.location.hostname === '127.0.0.1' ||
+      window.location.hostname.endsWith('.local')
+
+    if (isLocal) {
+      // Di lokal: gunakan path relatif /api/storage/ (akan di-proxy oleh Vite ke http://localhost:8000)
+      return `/${cleanPath}`
+    }
   }
 
   const apiBase = import.meta.env.VITE_API_URL || defaultBaseUrl
   try {
-    const origin = new URL(apiBase).origin.replace(/^http:\/\//i, 'https://')
-    return `${origin}/${cleanPath.replace(/^\/+/, '')}`
+    const origin = new URL(apiBase).origin
+    return `${origin}/${cleanPath}`
   } catch {
-    return cleanPath
+    return `/${cleanPath}`
   }
 }
 

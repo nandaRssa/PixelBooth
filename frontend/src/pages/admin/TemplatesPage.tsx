@@ -81,8 +81,24 @@ const TemplatesPage: React.FC = () => {
     kind: "template" | "preview",
   ) => {
     const file = e.target.files?.[0] ?? null;
-    if (kind === "template") setTemplateFile(file);
-    else setPreviewFile(file);
+    if (kind === "template") {
+      setTemplateFile(file);
+      if (file) {
+        const url = URL.createObjectURL(file);
+        const img = new Image();
+        img.onload = () => {
+          setForm((prev) => ({
+            ...prev,
+            canvas_width: String(img.naturalWidth || img.width),
+            canvas_height: String(img.naturalHeight || img.height),
+          }));
+          URL.revokeObjectURL(url);
+        };
+        img.src = url;
+      }
+    } else {
+      setPreviewFile(file);
+    }
   };
 
   const setField = (field: keyof UploadForm, value: string) => {
@@ -424,20 +440,6 @@ const TemplatesPage: React.FC = () => {
                         {template.canvas_width} x {template.canvas_height}
                       </p>
                     </div>
-                    {template.status === "draft" && !selectionMode && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          navigate(`/templates/${template.id}/editor`);
-                        }}
-                        className="w-6 h-6 sm:w-7 sm:h-7 rounded-md bg-[#FF5A36] text-white hover:bg-[#ff7354] active:scale-95 shadow-md flex items-center justify-center transition-all shrink-0"
-                        title="Konfigurasi Frame"
-                        aria-label="Konfigurasi Frame"
-                      >
-                        <SlidersHorizontal size={11} />
-                      </button>
-                    )}
                   </div>
                 </motion.div>
               );

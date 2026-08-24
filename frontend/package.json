@@ -5,17 +5,24 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "api": "tsx server/dev.ts",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview"
   },
   "dependencies": {
+    "@hono/node-server": "^2.1.1",
     "@hookform/resolvers": "^5.9.1",
+    "@supabase/supabase-js": "^2.112.3",
     "@tanstack/react-query": "^5.101.4",
     "axios": "^1.19.0",
     "canvas-confetti": "^1.9.4",
     "framer-motion": "^13.1.1",
+    "hono": "^4.13.3",
+    "jpeg-js": "^0.4.4",
     "lucide-react": "^1.33.0",
+    "pngjs": "^7.0.0",
+    "qrcode": "^1.5.4",
     "qrcode.react": "^4.2.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
@@ -24,14 +31,21 @@
     "zod": "^3.25.76",
     "zustand": "^5.0.15"
   },
+  "optionalDependencies": {
+    "better-sqlite3": "^13.0.3"
+  },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.3",
+    "@types/better-sqlite3": "^9.6.0",
     "@types/node": "^24.13.3",
+    "@types/pngjs": "^6.0.5",
+    "@types/qrcode": "^1.5.6",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.4",
     "oxlint": "^1.75.0",
     "tailwindcss": "^4.3.3",
+    "tsx": "^4.23.12",
     "typescript": "~6.0.2",
     "vite": "^8.2.0"
   }

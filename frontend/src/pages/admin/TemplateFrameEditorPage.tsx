@@ -1322,6 +1322,8 @@ const TemplateFrameEditorPage: React.FC = () => {
     const nf = normalizeFrame({
       id: newId,
       order: frames.length,
+      shape: "rectangle",
+      source: "manual",
       x: (template.canvas_width - w) / 2 + offset,
       y: (template.canvas_height - h) / 2 + offset,
       width: w,
@@ -1332,6 +1334,63 @@ const TemplateFrameEditorPage: React.FC = () => {
     setFrames((prev) => [...prev, nf]);
     setSelectedId(newId);
     setMode("select");
+  };
+
+  const addCircleFrame = () => {
+    if (!template) return;
+    pushHistory();
+    const newId = Math.max(0, ...frames.map((f) => f.id)) + 1;
+    const size = Math.min(template.canvas_width * 0.38, template.canvas_height * 0.28);
+    const offset = frames.length * 24;
+    const nf = normalizeFrame({
+      id: newId,
+      order: frames.length,
+      shape: "ellipse",
+      source: "manual",
+      x: (template.canvas_width - size) / 2 + offset,
+      y: (template.canvas_height - size) / 2 + offset,
+      width: size,
+      height: size,
+      rotation: 0,
+      ...DEFAULT_CLEAR,
+    });
+    setFrames((prev) => [...prev, nf]);
+    setSelectedId(newId);
+    setMode("select");
+  };
+
+  const addPolygonFrame = () => {
+    if (!template) return;
+    pushHistory();
+    const newId = Math.max(0, ...frames.map((f) => f.id)) + 1;
+    const w = template.canvas_width * 0.45;
+    const h = template.canvas_height * 0.32;
+    const offset = frames.length * 24;
+    const pts = generateDefaultPolygon(w, h, 8);
+    const nf = normalizeFrame({
+      id: newId,
+      order: frames.length,
+      shape: "polygon",
+      source: "manual",
+      polygon_points: pts,
+      x: (template.canvas_width - w) / 2 + offset,
+      y: (template.canvas_height - h) / 2 + offset,
+      width: w,
+      height: h,
+      rotation: 0,
+      ...DEFAULT_CLEAR,
+    });
+    setFrames((prev) => [...prev, nf]);
+    setSelectedId(newId);
+    setMode("select");
+  };
+
+  const clearAllFrames = () => {
+    if (frames.length === 0) return;
+    pushHistory();
+    setFrames([]);
+    setSelectedId(null);
+    toast.info("Semua frame dibersihkan.");
   };
 
   const duplicateFrame = () => {

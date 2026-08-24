@@ -90,14 +90,16 @@ const PhotoCapturePage: React.FC = () => {
 
   const activeSlot = previewSlots[activeFrameIndex] ?? null
 
-  // Foto hasil tiap frame (dari capture terbaru yang disetujui server)
+  const localCapturesRef = useRef<Record<number, string>>({})
+
+  // Foto hasil tiap frame (prioritaskan cache base64 lokal untuk render instan)
   const frameImages = useMemo(() => {
     const arr: (string | null)[] = Array(totalFrames).fill(null)
     for (const cap of session?.captures ?? []) {
       if (cap.status === 'retaken') continue
       const idx = cap.frame_number - 1
       if (idx >= 0 && idx < totalFrames) {
-        arr[idx] = cap.photo_url
+        arr[idx] = localCapturesRef.current[cap.frame_number] || cap.photo_url
       }
     }
     return arr
@@ -120,7 +122,7 @@ const PhotoCapturePage: React.FC = () => {
 
     let cancelled = false
     buildTemplateOverlay(
-      getStorageUrl(tpl.template_url),
+      tpl.template_url,
       previewSlots,
       tpl.canvas_width,
       tpl.canvas_height
@@ -322,6 +324,8 @@ const PhotoCapturePage: React.FC = () => {
       ctx.filter = 'none'
 
       const base64 = canvas.toDataURL('image/jpeg', 0.85)
+      const currentFrameNum = session.current_frame || 1
+      localCapturesRef.current[currentFrameNum] = base64
 
       const result = await sessionApi.capture(session.id, base64)
       setSession(result.session)
@@ -348,10 +352,26 @@ const PhotoCapturePage: React.FC = () => {
     captureFnRef.current = doCapture
   })
 
+  const completingRef = useRef(false)
+
+  // Auto-complete saat semua frame selesai (mode default)
+  useEffect(() => {
+    if (!allDone || !session || completingRef.current) return
+    completingRef.current = true
+
+    const timer = setTimeout(() => {
+      void handleComplete()
+    }, 400)
+
+    return () => clearTimeout(timer)
+  }, [allDone, session, template, previewSlots, frameImages])
+
   // ===== Retake frame tertentu =====
   const handleRetakeFrame = async (frameIndex: number) => {
     if (!session || phase === 'countdown' || isCapturing) return
     try {
+      completingRef.current = false
+      delete localCapturesRef.current[frameIndex + 1]
       const updated = await sessionApi.retake(session.id, frameIndex + 1)
       setSession(updated)
       setAllDone(false)
@@ -371,6 +391,8 @@ const PhotoCapturePage: React.FC = () => {
   const handleRestartSession = async () => {
     if (!session || phase === 'countdown' || isCapturing) return
     try {
+      completingRef.current = false
+      localCapturesRef.current = {}
       const updated = await sessionApi.restart(session.id)
       setSession(updated)
       setAllDone(false)
@@ -409,7 +431,11 @@ const PhotoCapturePage: React.FC = () => {
       const result = await sessionApi.complete(session.id, {
         final_image_base64: finalImageBase64,
       })
-      setResultPhoto(result.photo as { url?: string; qr_url?: string })
+      const photoData = (result.photo || {}) as any
+      setResultPhoto({
+        url: photoData.url || photoData.photo_url || photoData.storage_path,
+        qr_url: photoData.qr_url || photoData.qr_path,
+      })
       toast.success('Sesi selesai. Foto tersimpan di galeri.')
     } catch (err: unknown) {
       const error = err as { response?: { data?: { message?: string } } }
@@ -636,18 +662,18 @@ const PhotoCapturePage: React.FC = () => {
                 </p>
               </div>
 
-              <div className="bg-white p-5 rounded-2xl border border-pb-border shadow-2xl w-full max-w-[320px] sm:max-w-[380px]">
+              <div className="bg-white p-4 sm:p-5 rounded-2xl border border-pb-border shadow-xl flex items-center justify-center">
                 <img
                   src={getStorageUrl(resultPhoto.qr_url)}
                   alt="QR Code Foto"
-                  className="w-full h-auto object-contain rounded-lg"
+                  className="w-48 h-48 sm:w-60 sm:h-60 max-w-full aspect-square object-contain rounded-lg block"
                 />
               </div>
 
               <button
                 type="button"
                 onClick={() => setShowQrModal(false)}
-                className="w-full max-w-xs py-3 rounded-xl bg-pb-surface-hover text-pb-text text-sm font-semibold hover:bg-pb-border transition-colors mt-1"
+                className="w-full max-w-xs py-2.5 sm:py-3 rounded-xl bg-pb-surface-hover text-pb-text text-sm font-semibold hover:bg-pb-border transition-colors mt-1 cursor-pointer"
               >
                 Tutup
               </button>

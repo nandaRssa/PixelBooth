@@ -50,68 +50,70 @@ const PhotoQrModal: React.FC<PhotoQrModalProps> = ({ isOpen, onClose, photo }) =
   }
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="QR Code Foto" size="md">
+    <Modal isOpen={isOpen} onClose={onClose} title="QR Code Foto" size="sm">
       <div className="flex flex-col items-center text-center">
-        {/* ===== CARD DESIGN SESUAI MOCKUP ===== */}
-        <div className="w-[300px] max-w-full rounded-3xl overflow-hidden shadow-2xl border border-pb-border bg-white mb-5 transition-transform hover:scale-[1.01]">
+        {/* ===== CARD DESIGN SESUAI MOCKUP (COMPACT & BALANCED) ===== */}
+        <div className="w-[260px] sm:w-[280px] max-w-full rounded-2xl overflow-hidden shadow-2xl border border-pb-border bg-white mb-3.5 transition-transform hover:scale-[1.01]">
           {/* Header Hitam */}
-          <div className="bg-[#141416] px-4 pt-5 pb-4 text-center select-none">
-            <p className="text-zinc-400 text-[11px] font-semibold tracking-[0.35em] uppercase mb-1">
+          <div className="bg-[#141416] px-3 pt-3 pb-2.5 text-center select-none">
+            <p className="text-zinc-400 text-[8px] font-bold tracking-[0.3em] uppercase">
               F O T O
             </p>
-            <h3 className="text-white text-lg font-black tracking-[0.22em] uppercase leading-tight">
+            <h3 className="text-white text-sm sm:text-base font-black tracking-[0.2em] uppercase leading-tight mt-0.5">
               P I X E L B O O T H
             </h3>
-            <p className="text-zinc-400 text-[9px] font-medium tracking-[0.25em] uppercase mt-1">
+            <p className="text-zinc-400 text-[7px] font-medium tracking-[0.2em] uppercase mt-0.5">
               P H O T O B O O T H
             </p>
           </div>
 
           {/* Body Putih dengan QR */}
-          <div className="p-5 pt-6 pb-5 bg-white flex flex-col items-center">
-            <div className="w-full flex items-center justify-center mb-4">
+          <div className="px-3 pt-3 pb-2.5 bg-white flex flex-col items-center justify-center">
+            <div className="w-full flex items-center justify-center mb-1.5">
               <QRCodeCanvas
                 id="photo-qr-canvas"
                 value={photoUrl}
-                size={300}
+                size={240}
                 level="H"
                 bgColor="#FFFFFF"
                 fgColor="#000000"
                 includeMargin={false}
-                className="w-full h-auto max-w-[220px]"
+                className="w-36 h-36 sm:w-40 sm:h-40 aspect-square block"
               />
             </div>
 
             {/* Garis Pembatas Halus */}
-            <div className="w-32 h-[1px] bg-zinc-200 mb-3" />
+            <div className="w-16 h-[1px] bg-zinc-200 my-1.5" />
 
             {/* Keterangan Bawah */}
-            <p className="text-zinc-600 text-[11px] font-normal leading-relaxed text-center mb-1">
+            <p className="text-zinc-600 text-[10px] font-medium leading-tight text-center max-w-[210px]">
               Scan untuk melihat foto Anda
             </p>
-            <p className="text-zinc-400 text-[8px] font-semibold tracking-[0.25em] uppercase text-center">
+            <p className="text-zinc-400 text-[7px] font-bold tracking-[0.2em] uppercase text-center mt-1">
               P I X E L B O O T H
             </p>
           </div>
         </div>
 
         {/* Tombol Aksi */}
-        <div className="w-full flex flex-col gap-2">
-          <Button
-            variant="primary"
-            fullWidth
-            onClick={handleDownloadQr}
-            leftIcon={<Download size={16} />}
-          >
-            Unduh Desain QR Card
-          </Button>
+        <div className="w-[260px] sm:w-[280px] max-w-full grid grid-cols-2 gap-2">
           <Button
             variant="secondary"
             fullWidth
+            size="sm"
             onClick={handleShare}
-            leftIcon={<Share2 size={16} />}
+            leftIcon={<Share2 size={14} />}
           >
-            Bagikan Link
+            Bagikan
+          </Button>
+          <Button
+            variant="primary"
+            fullWidth
+            size="sm"
+            onClick={handleDownloadQr}
+            leftIcon={<Download size={14} />}
+          >
+            Unduh Desain
           </Button>
         </div>
       </div>

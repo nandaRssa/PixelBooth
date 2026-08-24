@@ -71,14 +71,16 @@ const FullscreenSessionPage: React.FC = () => {
     return Math.min(Math.max((session?.current_frame ?? 1) - 1, 0), totalFrames - 1)
   }, [session?.current_frame, totalFrames])
 
-  // Foto hasil tiap frame dari server
+  const localCapturesRef = useRef<Record<number, string>>({})
+
+  // Foto hasil tiap frame (prioritaskan cache base64 lokal untuk render instan)
   const frameImages = useMemo(() => {
     const arr: (string | null)[] = Array(totalFrames).fill(null)
     for (const cap of session?.captures ?? []) {
       if (cap.status === 'retaken') continue
       const idx = cap.frame_number - 1
       if (idx >= 0 && idx < totalFrames) {
-        arr[idx] = cap.photo_url
+        arr[idx] = localCapturesRef.current[cap.frame_number] || cap.photo_url
       }
     }
     return arr
@@ -100,7 +102,7 @@ const FullscreenSessionPage: React.FC = () => {
     if (!tpl || !tpl.template_url || previewSlots.length === 0) return
 
     let cancelled = false
-    buildTemplateOverlay(getStorageUrl(tpl.template_url), previewSlots, tpl.canvas_width, tpl.canvas_height)
+    buildTemplateOverlay(tpl.template_url, previewSlots, tpl.canvas_width, tpl.canvas_height)
       .then((url) => {
         if (!cancelled) setOverlay({ url, token: overlayToken })
       })
@@ -276,6 +278,8 @@ const FullscreenSessionPage: React.FC = () => {
       ctx.filter = 'none'
 
       const base64 = canvas.toDataURL('image/jpeg', 0.85)
+      const currentFrameNum = session.current_frame || 1
+      localCapturesRef.current[currentFrameNum] = base64
 
       const result = await sessionApi.capture(session.id, base64)
       setSession(result.session)
@@ -323,7 +327,12 @@ const FullscreenSessionPage: React.FC = () => {
         const res = await sessionApi.complete(session.id, {
           final_image_base64: finalImageBase64,
         })
-        setResultPhoto(res.photo as { url?: string; qr_url?: string })
+        const photoData = (res.photo || {}) as any
+        setResultPhoto({
+          url: photoData.url || photoData.photo_url || photoData.storage_path,
+          qr_url: photoData.qr_url || photoData.qr_path,
+          filename: photoData.filename || 'pixelbooth-photo.jpg',
+        })
         toast.success('Sesi selesai! Foto tersimpan di galeri.')
       } catch {
         toast.error('Gagal menyelesaikan sesi.')
@@ -338,6 +347,7 @@ const FullscreenSessionPage: React.FC = () => {
     if (!session || phase === 'countdown' || isCapturing || isRetaking) return
     setIsRetaking(true)
     try {
+      delete localCapturesRef.current[frameIndex + 1]
       const updated = await sessionApi.retake(session.id, frameIndex + 1)
       setSession(updated)
       setAllDone(false)
@@ -360,6 +370,7 @@ const FullscreenSessionPage: React.FC = () => {
     if (!session || phase === 'countdown' || isCapturing || isRetaking) return
     setIsRetaking(true)
     try {
+      localCapturesRef.current = {}
       const updated = await sessionApi.restart(session.id)
       setSession(updated)
       setAllDone(false)
@@ -869,18 +880,18 @@ const FullscreenSessionPage: React.FC = () => {
               </p>
             </div>
 
-            <div className="bg-white p-5 rounded-2xl border border-pb-border shadow-2xl w-full max-w-[320px] sm:max-w-[380px]">
+            <div className="bg-white p-4 sm:p-5 rounded-2xl border border-pb-border shadow-xl flex items-center justify-center">
               <img
                 src={getStorageUrl(resultPhoto.qr_url)}
                 alt="QR Code Foto"
-                className="w-full h-auto object-contain rounded-lg"
+                className="w-48 h-48 sm:w-60 sm:h-60 max-w-full aspect-square object-contain rounded-lg block"
               />
             </div>
 
             <button
               type="button"
               onClick={() => setShowQrModal(false)}
-              className="w-full max-w-xs py-3 rounded-xl bg-pb-surface-hover text-pb-text text-sm font-semibold hover:bg-pb-border transition-colors mt-1"
+              className="w-full max-w-xs py-2.5 sm:py-3 rounded-xl bg-pb-surface-hover text-pb-text text-sm font-semibold hover:bg-pb-border transition-colors mt-1 cursor-pointer"
             >
               Tutup
             </button>

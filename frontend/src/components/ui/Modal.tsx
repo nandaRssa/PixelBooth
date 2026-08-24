@@ -33,7 +33,7 @@ export const Modal: React.FC<ModalProps> = ({
   return (
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
           {/* Backdrop */}
           <motion.div
             initial={{ opacity: 0 }}
@@ -57,25 +57,25 @@ export const Modal: React.FC<ModalProps> = ({
           >
             {/* Header */}
             {(title || showClose) && (
-              <div className="flex items-center justify-between px-6 py-4 border-b border-pb-border">
+              <div className="flex items-center justify-between px-4 py-3 sm:px-6 sm:py-4 border-b border-pb-border">
                 {title && (
-                  <h3 className="text-pb-text font-semibold text-base">{title}</h3>
+                  <h3 className="text-pb-text font-semibold text-sm sm:text-base">{title}</h3>
                 )}
                 {showClose && (
                   <button
                     type="button"
                     onClick={onClose}
-                    className="w-8 h-8 rounded-lg bg-pb-elevated border border-pb-border hover:border-pb-border-strong text-pb-text-secondary hover:text-pb-text flex items-center justify-center transition-colors ml-auto shrink-0"
+                    className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-pb-elevated border border-pb-border hover:border-pb-border-strong text-pb-text-secondary hover:text-pb-text flex items-center justify-center transition-colors ml-auto shrink-0"
                     title="Tutup"
                     aria-label="Tutup"
                   >
-                    <X size={16} />
+                    <X size={15} />
                   </button>
                 )}
               </div>
             )}
             {/* Content */}
-            <div className="p-6">{children}</div>
+            <div className="p-3.5 sm:p-6">{children}</div>
           </motion.div>
         </div>
       )}
