@@ -27,13 +27,22 @@ templatesRouter.post('/', async (c) => {
     const body = await c.req.parseBody()
     const name = (body.name as string) || 'Template Baru'
     const status = (body.status as string) || 'active'
-    const file = body.file as File | string
+    const canvasWidth = parseInt((body.canvas_width as string) || '1200')
+    const canvasHeight = parseInt((body.canvas_height as string) || '1800')
+    const frameCount = parseInt((body.frame_count as string) || '1')
+    let frameConfig: any[] = []
+    if (body.frame_configuration) {
+      try { frameConfig = JSON.parse(body.frame_configuration as string) } catch {}
+    }
+
+    // Frontend sends 'template_file', accept both
+    const file = (body.template_file || body.file) as File | string
 
     let fileUrl = ''
     if (file && typeof file !== 'string') {
       const buffer = Buffer.from(await file.arrayBuffer())
-      fileUrl = await uploadToCloudinary(buffer, 'templates', `${Date.now()}-${file.name}`)
-    } else if (typeof file === 'string') {
+      fileUrl = await uploadToCloudinary(buffer, 'templates', `${Date.now()}-${(file as any).name || 'template.png'}`)
+    } else if (typeof file === 'string' && file.length > 0) {
       fileUrl = file
     }
 
@@ -44,11 +53,11 @@ templatesRouter.post('/', async (c) => {
       slug,
       template_file: fileUrl,
       preview_file: fileUrl,
-      frame_count: 1,
-      canvas_width: 1200,
-      canvas_height: 1800,
+      frame_count: frameCount,
+      canvas_width: canvasWidth,
+      canvas_height: canvasHeight,
       status,
-      frame_configuration: [],
+      frame_configuration: frameConfig,
     })
 
     return c.json({ message: 'Template berhasil diunggah', data: template }, 201)
