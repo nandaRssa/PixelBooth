@@ -112,11 +112,11 @@ templatesRouter.post('/', async (c) => {
       slug,
       template_file: fileUrl,
       preview_file: fileUrl,
-      frame_count: frameConfig.length || frameCount || 1,
+      frame_count: frameConfig.length || 0,
       canvas_width: finalCanvasWidth,
       canvas_height: finalCanvasHeight,
       status: 'draft',
-      frame_configuration: frameConfig,
+      frame_configuration: frameConfig || [],
     })
 
     return c.json({ message: 'Template berhasil diunggah. Atur posisi kamera pada Frame Editor.', data: template }, 201)
