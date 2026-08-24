@@ -208,6 +208,107 @@ export const db = {
     return (data || []).map((f) => ({ ...f, photos_count: 0, subfolders_count: 0 }))
   },
 
+  // --- Sessions ---
+  async createSession(payload: any) {
+    const sdb = getSqlite()
+    if (sdb) {
+      const stmt = sdb.prepare(`
+        INSERT INTO photo_sessions (template_id, folder_id, session_token, total_frames, current_frame, status, started_at, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'), datetime('now'))
+      `)
+      const info = stmt.run(
+        payload.template_id, payload.folder_id || null,
+        payload.session_token, payload.total_frames || 1,
+        payload.current_frame || 1, payload.status || 'ready',
+      )
+      return sdb.prepare('SELECT * FROM photo_sessions WHERE id = ?').get(info.lastInsertRowid)
+    }
+    const { data } = await supabase.from('photo_sessions').insert(payload).select().single()
+    return data
+  },
+
+  async getSession(id: number | string) {
+    const sdb = getSqlite()
+    if (sdb) {
+      const session = sdb.prepare('SELECT * FROM photo_sessions WHERE id = ?').get(id)
+      if (!session) return null
+      const template = (session as any).template_id
+        ? sdb.prepare('SELECT * FROM templates WHERE id = ?').get((session as any).template_id)
+        : null
+      const captures = sdb.prepare('SELECT * FROM session_captures WHERE session_id = ? ORDER BY frame_number ASC').all(id)
+      const folder = (session as any).folder_id
+        ? sdb.prepare('SELECT * FROM folders WHERE id = ?').get((session as any).folder_id)
+        : null
+      return { session, template, captures, folder }
+    }
+    const { data: session } = await supabase.from('photo_sessions').select('*').eq('id', id).single()
+    if (!session) return null
+    const { data: template } = session.template_id
+      ? await supabase.from('templates').select('*').eq('id', session.template_id).single()
+      : { data: null }
+    const { data: captures } = await supabase.from('session_captures').select('*').eq('session_id', id).order('frame_number', { ascending: true })
+    const { data: folder } = session.folder_id
+      ? await supabase.from('folders').select('*').eq('id', session.folder_id).single()
+      : { data: null }
+    return { session, template, captures: captures || [], folder }
+  },
+
+  async updateSession(id: number | string, payload: any) {
+    const sdb = getSqlite()
+    if (sdb) {
+      const sets: string[] = ["updated_at = datetime('now')"]
+      const values: any[] = []
+      if (payload.status !== undefined) { sets.push('status = ?'); values.push(payload.status) }
+      if (payload.current_frame !== undefined) { sets.push('current_frame = ?'); values.push(payload.current_frame) }
+      if (payload.folder_id !== undefined) { sets.push('folder_id = ?'); values.push(payload.folder_id) }
+      if (payload.completed_at !== undefined) { sets.push('completed_at = ?'); values.push(payload.completed_at) }
+      values.push(id)
+      sdb.prepare(`UPDATE photo_sessions SET ${sets.join(', ')} WHERE id = ?`).run(...values)
+      return sdb.prepare('SELECT * FROM photo_sessions WHERE id = ?').get(id)
+    }
+    const { data } = await supabase.from('photo_sessions').update(payload).eq('id', id).select().single()
+    return data
+  },
+
+  async createCapture(payload: any) {
+    const sdb = getSqlite()
+    if (sdb) {
+      // Mark previous captures for this frame as retaken
+      sdb.prepare('UPDATE session_captures SET status = ? WHERE session_id = ? AND frame_number = ?')
+        .run('retaken', payload.session_id, payload.frame_number)
+      const stmt = sdb.prepare(`
+        INSERT INTO session_captures (session_id, frame_number, photo_path, status, captured_at, created_at, updated_at)
+        VALUES (?, ?, ?, ?, datetime('now'), datetime('now'), datetime('now'))
+      `)
+      const info = stmt.run(payload.session_id, payload.frame_number, payload.photo_path, payload.status || 'approved')
+      return sdb.prepare('SELECT * FROM session_captures WHERE id = ?').get(info.lastInsertRowid)
+    }
+    await supabase.from('session_captures').update({ status: 'retaken' })
+      .eq('session_id', payload.session_id).eq('frame_number', payload.frame_number)
+    const { data } = await supabase.from('session_captures').insert(payload).select().single()
+    return data
+  },
+
+  async createPhoto(payload: any) {
+    const sdb = getSqlite()
+    if (sdb) {
+      const stmt = sdb.prepare(`
+        INSERT INTO photos (session_id, folder_id, filename, storage_path, thumbnail_path, unique_token, qr_path, is_final, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+      `)
+      const info = stmt.run(
+        payload.session_id, payload.folder_id || null,
+        payload.filename, payload.storage_path,
+        payload.thumbnail_path || payload.storage_path,
+        payload.unique_token, payload.qr_path || null,
+        payload.is_final ? 1 : 0,
+      )
+      return sdb.prepare('SELECT * FROM photos WHERE id = ?').get(info.lastInsertRowid)
+    }
+    const { data } = await supabase.from('photos').insert(payload).select().single()
+    return data
+  },
+
   // --- Photos ---
   async getPhotos(folderId?: string | null, page = 1, perPage = 20) {
     const sdb = getSqlite()
