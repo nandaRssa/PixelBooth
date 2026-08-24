@@ -110,13 +110,13 @@ const PhotoQrModal: React.FC<PhotoQrModalProps> = ({ isOpen, onClose, photo }) =
 
           <button
             type="button"
-            title="Unduh Desain Kartu QR"
-            aria-label="Unduh Desain"
+            title="Unduh QR Code"
+            aria-label="Unduh QR"
             onClick={handleDownloadQr}
-            className="h-11 w-full rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white flex items-center justify-center gap-2 text-xs font-semibold transition-all active:scale-95 cursor-pointer shadow-xs whitespace-nowrap"
+            className="h-11 w-full rounded-xl bg-gradient-to-r from-[#FF5A36] via-[#FF7836] to-[#FF9836] hover:brightness-105 shadow-md shadow-orange-500/20 text-white flex items-center justify-center gap-2 text-xs font-semibold transition-all active:scale-95 cursor-pointer whitespace-nowrap"
           >
             <Download size={18} className="shrink-0 text-white" />
-            <span className="hidden lg:inline">Unduh Desain</span>
+            <span className="hidden lg:inline">Unduh QR</span>
           </button>
         </div>
       </div>
