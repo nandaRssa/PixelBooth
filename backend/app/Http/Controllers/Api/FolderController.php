@@ -99,20 +99,30 @@ class FolderController extends Controller
             ], 422);
         }
 
-        // Hapus foto beserta file-nya di dalam folder ini
+        // Kumpulkan file foto di dalam folder ini
         $photos = Photo::where('folder_id', $folder->id)->get();
+        $filesToDelete = [];
+        $sessionIds = [];
 
         foreach ($photos as $photo) {
-            Storage::disk('public')->delete(array_filter([
-                $photo->storage_path,
-                $photo->thumbnail_path,
-                $photo->qr_path,
-            ]));
+            $filesToDelete[] = $photo->storage_path;
+            $filesToDelete[] = $photo->thumbnail_path;
+            $filesToDelete[] = $photo->qr_path;
+            if ($photo->session_id) {
+                $sessionIds[] = $photo->session_id;
+            }
             $photo->delete();
         }
 
-        // Hapus QR code folder
-        Storage::disk('public')->delete(array_filter([$folder->qr_path]));
+        if (!empty($sessionIds)) {
+            $captures = \App\Models\SessionCapture::whereIn('session_id', array_unique($sessionIds))->pluck('photo_path')->filter()->all();
+            $filesToDelete = array_merge($filesToDelete, $captures);
+        }
+
+        $filesToDelete[] = $folder->qr_path;
+
+        // Hapus file secara asinkron di background
+        \App\Services\CloudStorageService::deleteAsync(array_filter($filesToDelete));
 
         $folder->delete();
 
@@ -132,20 +142,30 @@ class FolderController extends Controller
         ]);
 
         $folders = Folder::whereIn('id', $request->folder_ids)->get();
+        $filesToDelete = [];
+        $sessionIds = [];
 
         foreach ($folders as $folder) {
             $photos = Photo::where('folder_id', $folder->id)->get();
             foreach ($photos as $photo) {
-                Storage::disk('public')->delete(array_filter([
-                    $photo->storage_path,
-                    $photo->thumbnail_path,
-                    $photo->qr_path,
-                ]));
+                $filesToDelete[] = $photo->storage_path;
+                $filesToDelete[] = $photo->thumbnail_path;
+                $filesToDelete[] = $photo->qr_path;
+                if ($photo->session_id) {
+                    $sessionIds[] = $photo->session_id;
+                }
                 $photo->delete();
             }
-            Storage::disk('public')->delete(array_filter([$folder->qr_path]));
+            $filesToDelete[] = $folder->qr_path;
             $folder->delete();
         }
+
+        if (!empty($sessionIds)) {
+            $captures = \App\Models\SessionCapture::whereIn('session_id', array_unique($sessionIds))->pluck('photo_path')->filter()->all();
+            $filesToDelete = array_merge($filesToDelete, $captures);
+        }
+
+        \App\Services\CloudStorageService::deleteAsync(array_filter($filesToDelete));
 
         return response()->json([
             'message' => count($request->folder_ids) . ' folder berhasil dihapus.',

@@ -20,7 +20,11 @@ interface FolderQrModalProps {
 const FolderQrModal: React.FC<FolderQrModalProps> = ({ isOpen, onClose, folder }) => {
   if (!folder) return null
 
-  const folderUrl = `${window.location.origin}/folder/${folder.unique_token}`
+  const rawQr = (folder as any).qr_link
+  const folderToken = folder.unique_token || (folder as any).share_token || ''
+  const folderUrl = (rawQr && (rawQr.startsWith('http://') || rawQr.startsWith('https://')))
+    ? rawQr
+    : `${window.location.origin}/folder/${folderToken}`
 
   const handleDownloadQr = async () => {
     try {

@@ -9,6 +9,7 @@ import { getStorageUrl } from '@/api/client'
 
 // In-memory image cache to avoid re-fetching the same image multiple times
 const memoryImageCache = new Map<string, HTMLImageElement>()
+const overlayCanvasCache = new Map<string, HTMLCanvasElement>()
 
 /** Muat gambar dengan in-memory cache, CORS & fallback cepat. */
 export async function loadImage(src: string): Promise<HTMLImageElement> {
@@ -77,6 +78,11 @@ export function buildOverlayCanvas(
   canvasH: number,
   work?: WorkTemplate
 ): HTMLCanvasElement {
+  const cacheKey = `${templateImg.src}_${canvasW}_${canvasH}_${frames.length}_${frames.map(f => `${f.x},${f.y},${f.width},${f.height}`).join(';')}`
+  if (overlayCanvasCache.has(cacheKey)) {
+    return overlayCanvasCache.get(cacheKey)!
+  }
+
   const canvas = document.createElement('canvas')
   canvas.width = canvasW
   canvas.height = canvasH
@@ -85,7 +91,10 @@ export function buildOverlayCanvas(
 
   ctx.drawImage(templateImg, 0, 0, canvasW, canvasH)
 
-  if (frames.length === 0) return canvas
+  if (frames.length === 0) {
+    overlayCanvasCache.set(cacheKey, canvas)
+    return canvas
+  }
 
   const wt = work ?? downscaleTemplate(templateImg, canvasW, canvasH)
   const tmp = document.createElement('canvas')
@@ -104,6 +113,7 @@ export function buildOverlayCanvas(
   }
   ctx.globalCompositeOperation = 'source-over'
 
+  overlayCanvasCache.set(cacheKey, canvas)
   return canvas
 }
 

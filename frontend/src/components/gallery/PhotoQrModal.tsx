@@ -20,7 +20,10 @@ interface PhotoQrModalProps {
 const PhotoQrModal: React.FC<PhotoQrModalProps> = ({ isOpen, onClose, photo }) => {
   if (!photo) return null
 
-  const photoUrl = `${window.location.origin}/photo/${photo.unique_token}`
+  const rawQr = (photo as any).qr_link
+  const photoUrl = (rawQr && (rawQr.startsWith('http://') || rawQr.startsWith('https://')))
+    ? rawQr
+    : `${window.location.origin}/photo/${photo.unique_token || (photo as any).token || ''}`
 
   const handleDownloadQr = async () => {
     try {

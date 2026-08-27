@@ -291,8 +291,23 @@ sessionsRouter.post('/:id/complete', async (c) => {
           return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16)
         })
 
-    const frontendUrl = process.env.FRONTEND_URL || ''
-    const photoViewUrl = frontendUrl ? `${frontendUrl}/photo/${uniqueToken}` : `/photo/${uniqueToken}`
+    let reqOrigin = ''
+    try {
+      const headerOrigin = c.req.header('origin')
+      const headerReferer = c.req.header('referer')
+      if (headerOrigin) {
+        reqOrigin = new URL(headerOrigin).origin
+      } else if (headerReferer) {
+        reqOrigin = new URL(headerReferer).origin
+      } else if (c.req.url) {
+        reqOrigin = new URL(c.req.url).origin
+      }
+    } catch {
+      // ignore URL parse errors
+    }
+
+    const frontendUrl = (process.env.FRONTEND_URL || reqOrigin || 'https://pixelbooth.pages.dev').replace(/\/$/, '')
+    const photoViewUrl = `${frontendUrl}/photo/${uniqueToken}`
     let qrPath = `qr/photos/${uniqueToken}.png`
     try {
       const qrDataUrl = await generateQrDataUrl(photoViewUrl)

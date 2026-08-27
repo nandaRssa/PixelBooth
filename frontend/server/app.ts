@@ -68,8 +68,13 @@ api.route('/public', customerRouter)
 app.route('/api', api)
 app.route('/', api)
 
-// Fallback 404
-app.notFound((c) => c.json({ message: 'Endpoint tidak ditemukan' }, 404))
+// Fallback 404 & SPA Asset Handling (Cloudflare Workers ASSETS binding)
+app.notFound(async (c) => {
+  if ((c.env as any)?.ASSETS) {
+    return (c.env as any).ASSETS.fetch(c.req.raw)
+  }
+  return c.json({ message: 'Endpoint tidak ditemukan' }, 404)
+})
 
 // Global Error Handler
 app.onError((err, c) => {

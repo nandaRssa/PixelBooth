@@ -89,11 +89,18 @@ class CustomerController extends Controller
             ], 404);
         }
 
-        \Illuminate\Support\Facades\Storage::disk('public')->delete(array_filter([
+        $filesToDelete = array_filter([
             $photo->storage_path,
             $photo->thumbnail_path,
             $photo->qr_path,
-        ]));
+        ]);
+
+        if ($photo->session_id) {
+            $captures = \App\Models\SessionCapture::where('session_id', $photo->session_id)->pluck('photo_path')->filter()->all();
+            $filesToDelete = array_merge($filesToDelete, $captures);
+        }
+
+        \App\Services\CloudStorageService::deleteAsync($filesToDelete);
 
         $photo->delete();
 
@@ -111,15 +118,25 @@ class CustomerController extends Controller
         ]);
 
         $photos = Photo::whereIn('unique_token', $request->tokens)->get();
+        $filesToDelete = [];
+        $sessionIds = [];
 
         foreach ($photos as $photo) {
-            \Illuminate\Support\Facades\Storage::disk('public')->delete(array_filter([
-                $photo->storage_path,
-                $photo->thumbnail_path,
-                $photo->qr_path,
-            ]));
+            $filesToDelete[] = $photo->storage_path;
+            $filesToDelete[] = $photo->thumbnail_path;
+            $filesToDelete[] = $photo->qr_path;
+            if ($photo->session_id) {
+                $sessionIds[] = $photo->session_id;
+            }
             $photo->delete();
         }
+
+        if (!empty($sessionIds)) {
+            $captures = \App\Models\SessionCapture::whereIn('session_id', array_unique($sessionIds))->pluck('photo_path')->filter()->all();
+            $filesToDelete = array_merge($filesToDelete, $captures);
+        }
+
+        \App\Services\CloudStorageService::deleteAsync(array_filter($filesToDelete));
 
         return response()->json(['message' => count($photos) . ' foto berhasil dihapus.']);
     }
