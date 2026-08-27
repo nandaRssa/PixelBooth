@@ -18,11 +18,12 @@ import { getStorageUrl } from '@/api/client'
 import { useFolders } from '@/hooks/useFolders'
 import { useCreateSession } from '@/hooks/useSessions'
 import { getSessionDisplayMode } from '@/utils/sessionDisplay'
+import TemplatePreviewModal from '@/components/template/TemplatePreviewModal'
 import type { Template } from '@/types'
 
 // ==========================================
 // Photo / Photobooth Menu Page
-// Pilih template -> langsung mulai sesi.
+// Pilih template -> preview template -> mulai sesi.
 // Sumber kamera utama: webcam device (browser).
 // DSLR via hardware bridge bersifat opsional.
 // ==========================================
@@ -63,6 +64,7 @@ const PhotoMenuPage: React.FC = () => {
   const navigate = useNavigate()
   const [selectedFolderId, setSelectedFolderId] = useState<number | null>(null)
   const [startingTemplateId, setStartingTemplateId] = useState<number | null>(null)
+  const [previewTemplate, setPreviewTemplate] = useState<Template | null>(null)
 
   const templatesQuery = useTemplates()
   const foldersQuery = useFolders(null)
@@ -87,6 +89,7 @@ const PhotoMenuPage: React.FC = () => {
         folderId: selectedFolderId,
       })
       toast.success(`Sesi dimulai dengan template "${template.name}".`)
+      setPreviewTemplate(null)
 
       const mode = getSessionDisplayMode()
       if (mode === 'fullscreen' || window.innerWidth < 1024) {
@@ -230,7 +233,7 @@ const PhotoMenuPage: React.FC = () => {
                   whileHover={startingTemplateId ? {} : { y: -4, scale: 1.02 }}
                   whileTap={startingTemplateId ? {} : { scale: 0.98 }}
                   transition={{ type: "spring", stiffness: 350, damping: 25 }}
-                  onClick={() => handleSelectTemplate(template)}
+                  onClick={() => setPreviewTemplate(template)}
                   disabled={!!startingTemplateId}
                   className="relative aspect-[3/4] bg-pb-surface border border-pb-border hover:border-[#FF5A36] rounded-xl overflow-hidden text-left shadow-xs hover:shadow-xl transition-all duration-200 group disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
                 >
@@ -279,6 +282,16 @@ const PhotoMenuPage: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* ===== Template Preview Modal (Slide & 1 Action Button) ===== */}
+      <TemplatePreviewModal
+        template={previewTemplate}
+        templates={templates}
+        onSelectTemplate={setPreviewTemplate}
+        onClose={() => setPreviewTemplate(null)}
+        onUseTemplate={handleSelectTemplate}
+        isLoading={startingTemplateId !== null}
+      />
     </div>
   )
 }
