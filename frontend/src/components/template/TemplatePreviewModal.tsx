@@ -1,35 +1,23 @@
 import React, { useEffect, useState, useCallback } from 'react'
-import {
-  ChevronLeft,
-  ChevronRight,
-  Download,
-  ExternalLink,
-  FolderInput,
-  QrCode,
-  Trash2,
-  X,
-} from 'lucide-react'
+import { Camera, ChevronLeft, ChevronRight, ImageIcon, X } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Button } from '@/components/ui/Button'
 import { getStorageUrl } from '@/api/client'
-import { downloadFile } from '@/utils/download'
-import type { Photo } from '@/types'
-
 import type { Variants } from 'framer-motion'
+import type { Template } from '@/types'
 
 // ==========================================
-// Photo Preview Modal — Preview foto fullscreen dengan fitur slide / swipe
-// Selaras 100% dengan Design System (Light & Dark Theme)
+// Template Preview Modal — Preview template foto dengan slide & tombol "Gunakan Template"
+// Desain selaras 100% dengan PhotoPreviewModal di Galeri
 // ==========================================
 
-interface PhotoPreviewModalProps {
-  photo: Photo | null
-  photos?: Photo[]
-  onSelectPhoto?: (photo: Photo) => void
+interface TemplatePreviewModalProps {
+  template: Template | null
+  templates: Template[]
+  onSelectTemplate: (template: Template) => void
   onClose: () => void
-  onMove: (photo: Photo) => void
-  onDelete: (photo: Photo) => void
-  onShowQr: (photo: Photo) => void
+  onUseTemplate: (template: Template) => void
+  isLoading?: boolean
 }
 
 const slideVariants: Variants = {
@@ -58,47 +46,45 @@ const slideVariants: Variants = {
   }),
 }
 
-const PhotoPreviewModal: React.FC<PhotoPreviewModalProps> = ({
-  photo,
-  photos = [],
-  onSelectPhoto,
+const TemplatePreviewModal: React.FC<TemplatePreviewModalProps> = ({
+  template,
+  templates = [],
+  onSelectTemplate,
   onClose,
-  onMove,
-  onDelete,
-  onShowQr,
+  onUseTemplate,
+  isLoading = false,
 }) => {
   const [direction, setDirection] = useState(0)
   const [touchStartX, setTouchStartX] = useState<number | null>(null)
 
-  // Gunakan list photos jika ada, fallback ke [photo]
-  const photoList = photos.length > 0 ? photos : photo ? [photo] : []
-  const activeIndex = photo ? photoList.findIndex((p) => p.id === photo.id) : -1
-  const currentPhoto = activeIndex >= 0 ? photoList[activeIndex] : photo
+  const templateList = templates.length > 0 ? templates : template ? [template] : []
+  const activeIndex = template ? templateList.findIndex((t) => t.id === template.id) : -1
+  const currentTemplate = activeIndex >= 0 ? templateList[activeIndex] : template
 
   const hasPrev = activeIndex > 0
-  const hasNext = activeIndex >= 0 && activeIndex < photoList.length - 1
+  const hasNext = activeIndex >= 0 && activeIndex < templateList.length - 1
 
   const handlePrev = useCallback(() => {
     if (!hasPrev) return
     setDirection(-1)
-    const prevPhoto = photoList[activeIndex - 1]
-    if (onSelectPhoto && prevPhoto) {
-      onSelectPhoto(prevPhoto)
+    const prevTpl = templateList[activeIndex - 1]
+    if (onSelectTemplate && prevTpl) {
+      onSelectTemplate(prevTpl)
     }
-  }, [hasPrev, photoList, activeIndex, onSelectPhoto])
+  }, [hasPrev, templateList, activeIndex, onSelectTemplate])
 
   const handleNext = useCallback(() => {
     if (!hasNext) return
     setDirection(1)
-    const nextPhoto = photoList[activeIndex + 1]
-    if (onSelectPhoto && nextPhoto) {
-      onSelectPhoto(nextPhoto)
+    const nextTpl = templateList[activeIndex + 1]
+    if (onSelectTemplate && nextTpl) {
+      onSelectTemplate(nextTpl)
     }
-  }, [hasNext, photoList, activeIndex, onSelectPhoto])
+  }, [hasNext, templateList, activeIndex, onSelectTemplate])
 
-  // Keyboard navigation: Panah Kiri, Panah Kanan, Escape
+  // Keyboard navigation
   useEffect(() => {
-    if (!photo) return
+    if (!template) return
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'ArrowLeft') {
@@ -110,14 +96,17 @@ const PhotoPreviewModal: React.FC<PhotoPreviewModalProps> = ({
       } else if (e.key === 'Escape') {
         e.preventDefault()
         onClose()
+      } else if (e.key === 'Enter' && !isLoading && currentTemplate) {
+        e.preventDefault()
+        onUseTemplate(currentTemplate)
       }
     }
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [photo, handlePrev, handleNext, onClose])
+  }, [template, currentTemplate, handlePrev, handleNext, onClose, onUseTemplate, isLoading])
 
-  // Touch swipe handling
+  // Touch swipe
   const handleTouchStart = (e: React.TouchEvent) => {
     setTouchStartX(e.touches[0].clientX)
   }
@@ -126,7 +115,7 @@ const PhotoPreviewModal: React.FC<PhotoPreviewModalProps> = ({
     if (touchStartX === null) return
     const touchEndX = e.changedTouches[0].clientX
     const diff = touchEndX - touchStartX
-    const minSwipeDistance = 50 // px threshold
+    const minSwipeDistance = 50
 
     if (diff > minSwipeDistance) {
       handlePrev()
@@ -138,7 +127,7 @@ const PhotoPreviewModal: React.FC<PhotoPreviewModalProps> = ({
 
   return (
     <AnimatePresence>
-      {currentPhoto && (
+      {currentTemplate && (
         <>
           {/* Backdrop Overlay */}
           <motion.div
@@ -165,18 +154,17 @@ const PhotoPreviewModal: React.FC<PhotoPreviewModalProps> = ({
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
                     <h3 className="text-pb-text font-semibold text-sm sm:text-base truncate max-w-[200px] sm:max-w-md">
-                      {currentPhoto.filename}
+                      {currentTemplate.name}
                     </h3>
-                    {photoList.length > 1 && (
+                    {templateList.length > 1 && (
                       <span className="text-[10px] sm:text-xs font-semibold px-2 py-0.5 rounded-full bg-pb-elevated text-[#FF5A36] border border-pb-border shrink-0">
-                        {activeIndex + 1} / {photoList.length}
+                        {activeIndex + 1} / {templateList.length}
                       </span>
                     )}
                   </div>
                   <p className="text-pb-text-muted text-xs mt-0.5">
-                    {photoList.length > 1
-                      ? 'Geser atau gunakan tombol panah untuk melihat foto lainnya'
-                      : 'Preview Foto Photobooth'}
+                    {currentTemplate.frame_count} Frame · {currentTemplate.canvas_width} ×{' '}
+                    {currentTemplate.canvas_height} px
                   </p>
                 </div>
               </div>
@@ -192,7 +180,7 @@ const PhotoPreviewModal: React.FC<PhotoPreviewModalProps> = ({
               </button>
             </div>
 
-            {/* Image Preview Container with Slide Navigation */}
+            {/* Template Image Preview Container with Slide Navigation */}
             <div
               className="relative flex-1 min-h-[45vh] max-h-[62vh] bg-pb-bg border border-pb-border rounded-xl overflow-hidden flex items-center justify-center p-2 touch-pan-y"
               onTouchStart={handleTouchStart}
@@ -210,7 +198,7 @@ const PhotoPreviewModal: React.FC<PhotoPreviewModalProps> = ({
                     w-9 h-9 sm:w-11 sm:h-11 rounded-full bg-black/60 hover:bg-black/85 text-white
                     border border-white/20 backdrop-blur-md shadow-xl flex items-center justify-center
                     transition-all active:scale-95 cursor-pointer hover:scale-105"
-                  title="Foto Sebelumnya (Panah Kiri)"
+                  title="Template Sebelumnya (Panah Kiri)"
                   aria-label="Sebelumnya"
                 >
                   <ChevronLeft size={22} className="shrink-0" />
@@ -229,17 +217,17 @@ const PhotoPreviewModal: React.FC<PhotoPreviewModalProps> = ({
                     w-9 h-9 sm:w-11 sm:h-11 rounded-full bg-black/60 hover:bg-black/85 text-white
                     border border-white/20 backdrop-blur-md shadow-xl flex items-center justify-center
                     transition-all active:scale-95 cursor-pointer hover:scale-105"
-                  title="Foto Selanjutnya (Panah Kanan)"
+                  title="Template Selanjutnya (Panah Kanan)"
                   aria-label="Selanjutnya"
                 >
                   <ChevronRight size={22} className="shrink-0" />
                 </button>
               )}
 
-              {/* Foto Animasi dengan Slide Transition */}
+              {/* Template Image with Slide Transition */}
               <AnimatePresence initial={false} custom={direction} mode="wait">
                 <motion.div
-                  key={currentPhoto.id}
+                  key={currentTemplate.id}
                   custom={direction}
                   variants={slideVariants}
                   initial="enter"
@@ -247,87 +235,37 @@ const PhotoPreviewModal: React.FC<PhotoPreviewModalProps> = ({
                   exit="exit"
                   className="w-full h-full flex items-center justify-center"
                 >
-                  {currentPhoto.url ? (
+                  {currentTemplate.preview_url || currentTemplate.template_url ? (
                     <img
-                      src={getStorageUrl(currentPhoto.url)}
-                      alt={currentPhoto.filename}
+                      src={getStorageUrl(
+                        currentTemplate.preview_url || currentTemplate.template_url || ''
+                      )}
+                      alt={currentTemplate.name}
                       className="max-w-full max-h-[58vh] object-contain rounded-lg shadow-md select-none pointer-events-none"
                     />
                   ) : (
-                    <p className="text-pb-text-muted text-sm py-12">Gambar tidak tersedia</p>
+                    <div className="flex flex-col items-center justify-center gap-2 py-12">
+                      <ImageIcon size={36} className="text-pb-faint" />
+                      <p className="text-pb-text-muted text-sm">Gambar template tidak tersedia</p>
+                    </div>
                   )}
                 </motion.div>
               </AnimatePresence>
             </div>
 
-            {/* Actions Bar — Terstruktur & Responsif */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pt-2 border-t border-pb-border/60">
-              {/* Grup Aksi Utama: Unduh & QR Code */}
-              <div className="grid grid-cols-2 sm:flex items-center gap-2">
-                <Button
-                  variant="primary"
-                  size="sm"
-                  onClick={async () => {
-                    await downloadFile(
-                      currentPhoto.url,
-                      currentPhoto.filename || 'pixelbooth-photo.jpg'
-                    )
-                  }}
-                  leftIcon={<Download size={15} />}
-                  className="text-xs font-semibold py-2"
-                >
-                  Unduh Foto
-                </Button>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => {
-                    onShowQr(currentPhoto)
-                    onClose()
-                  }}
-                  leftIcon={<QrCode size={15} className="text-cyan-400" />}
-                  className="text-xs font-medium py-2"
-                >
-                  QR Code
-                </Button>
-              </div>
-
-              {/* Grup Aksi Manajemen: Buka, Pindah, Hapus */}
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => window.open(getStorageUrl(currentPhoto.url), '_blank')}
-                  leftIcon={<ExternalLink size={14} />}
-                  className="flex-1 sm:flex-initial text-xs py-2"
-                >
-                  Buka Tab
-                </Button>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => {
-                    onMove(currentPhoto)
-                    onClose()
-                  }}
-                  leftIcon={<FolderInput size={14} className="text-amber-400" />}
-                  className="flex-1 sm:flex-initial text-xs py-2"
-                >
-                  Pindah
-                </Button>
-                <Button
-                  variant="danger"
-                  size="sm"
-                  onClick={() => {
-                    onDelete(currentPhoto)
-                    onClose()
-                  }}
-                  leftIcon={<Trash2 size={14} />}
-                  className="text-xs py-2 px-3 shrink-0"
-                >
-                  Hapus
-                </Button>
-              </div>
+            {/* Actions Bar — 1 Tombol Utama untuk Menggunakan Template Ini */}
+            <div className="pt-2 border-t border-pb-border/60">
+              <Button
+                variant="primary"
+                size="lg"
+                fullWidth
+                onClick={() => onUseTemplate(currentTemplate)}
+                loading={isLoading}
+                leftIcon={<Camera size={18} />}
+                className="font-semibold text-sm sm:text-base py-3 rounded-xl shadow-lg shadow-orange-500/20"
+              >
+                {isLoading ? 'Memulai Sesi...' : 'Gunakan Template Ini'}
+              </Button>
             </div>
           </motion.div>
         </>
@@ -336,4 +274,4 @@ const PhotoPreviewModal: React.FC<PhotoPreviewModalProps> = ({
   )
 }
 
-export default PhotoPreviewModal
+export default TemplatePreviewModal

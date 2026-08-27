@@ -593,6 +593,8 @@ const GalleryPage: React.FC = () => {
 
       <PhotoPreviewModal
         photo={previewTarget}
+        photos={photos}
+        onSelectPhoto={setPreviewTarget}
         onClose={() => setPreviewTarget(null)}
         onMove={setMoveTarget}
         onDelete={setDeletePhotoTarget}
