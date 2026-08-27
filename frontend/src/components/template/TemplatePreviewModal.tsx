@@ -22,26 +22,23 @@ interface TemplatePreviewModalProps {
 
 const slideVariants: Variants = {
   enter: (direction: number) => ({
-    x: direction > 0 ? 160 : -160,
+    x: direction > 0 ? 80 : -80,
     opacity: 0,
-    scale: 0.96,
   }),
   center: {
     x: 0,
     opacity: 1,
-    scale: 1,
     transition: {
-      x: { type: 'spring', stiffness: 350, damping: 30 },
-      opacity: { duration: 0.2 },
+      x: { type: 'tween', duration: 0.18, ease: 'easeOut' },
+      opacity: { duration: 0.12 },
     },
   },
   exit: (direction: number) => ({
-    x: direction > 0 ? -160 : 160,
+    x: direction > 0 ? -80 : 80,
     opacity: 0,
-    scale: 0.96,
     transition: {
-      x: { type: 'spring', stiffness: 350, damping: 30 },
-      opacity: { duration: 0.15 },
+      x: { type: 'tween', duration: 0.14, ease: 'easeIn' },
+      opacity: { duration: 0.1 },
     },
   }),
 }
@@ -225,7 +222,7 @@ const TemplatePreviewModal: React.FC<TemplatePreviewModalProps> = ({
               )}
 
               {/* Template Image with Slide Transition */}
-              <AnimatePresence initial={false} custom={direction} mode="wait">
+              <AnimatePresence initial={false} custom={direction} mode="popLayout">
                 <motion.div
                   key={currentTemplate.id}
                   custom={direction}
