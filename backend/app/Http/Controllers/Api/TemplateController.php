@@ -216,9 +216,16 @@ class TemplateController extends Controller
      */
     public function destroy(Template $template): JsonResponse
     {
+        $filesToDelete = array_filter([
+            $template->template_file,
+            $template->preview_file,
+        ]);
+
         if ($template->template_file) {
             Storage::disk('public')->deleteDirectory(dirname($template->template_file));
         }
+
+        \App\Services\CloudStorageService::deleteAsync($filesToDelete);
 
         $template->delete();
 

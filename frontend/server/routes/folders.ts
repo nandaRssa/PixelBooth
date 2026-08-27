@@ -36,8 +36,22 @@ foldersRouter.get('/:id', async (c) => {
     if (!folder) {
       return c.json({ message: 'Folder tidak ditemukan' }, 404)
     }
-    const frontendUrl = process.env.FRONTEND_URL || ''
-    const qrLink = frontendUrl ? `${frontendUrl}/folder/${folder.share_token}` : `/folder/${folder.share_token}`
+    let reqOrigin = ''
+    try {
+      const headerOrigin = c.req.header('origin')
+      const headerReferer = c.req.header('referer')
+      if (headerOrigin) {
+        reqOrigin = new URL(headerOrigin).origin
+      } else if (headerReferer) {
+        reqOrigin = new URL(headerReferer).origin
+      } else if (c.req.url) {
+        reqOrigin = new URL(c.req.url).origin
+      }
+    } catch {
+      // ignore URL parse errors
+    }
+    const frontendUrl = (process.env.FRONTEND_URL || reqOrigin || 'https://pixelbooth.pages.dev').replace(/\/$/, '')
+    const qrLink = `${frontendUrl}/folder/${folder.share_token}`
     return c.json({
       data: {
         ...folder,
@@ -58,8 +72,22 @@ foldersRouter.post('/', async (c) => {
     const parentFolderId = json.parent_folder_id || null
     const shareToken = generateUUID()
 
-    const frontendUrl = process.env.FRONTEND_URL || ''
-    const qrLink = frontendUrl ? `${frontendUrl}/folder/${shareToken}` : `/folder/${shareToken}`
+    let reqOrigin = ''
+    try {
+      const headerOrigin = c.req.header('origin')
+      const headerReferer = c.req.header('referer')
+      if (headerOrigin) {
+        reqOrigin = new URL(headerOrigin).origin
+      } else if (headerReferer) {
+        reqOrigin = new URL(headerReferer).origin
+      } else if (c.req.url) {
+        reqOrigin = new URL(c.req.url).origin
+      }
+    } catch {
+      // ignore URL parse errors
+    }
+    const frontendUrl = (process.env.FRONTEND_URL || reqOrigin || 'https://pixelbooth.pages.dev').replace(/\/$/, '')
+    const qrLink = `${frontendUrl}/folder/${shareToken}`
     let qrPath = `qr/folders/${shareToken}.png`
     let qrDataUrl: string | null = null
     try {

@@ -109,11 +109,16 @@ class SessionController extends Controller
             @unlink($tmpPath);
         }
 
-        // Tandai retake capture sebelumnya jika ada
-        SessionCapture::where('session_id', $session->id)
+        // Tandai retake capture sebelumnya jika ada & bersihkan file lamanya
+        $oldCaptures = SessionCapture::where('session_id', $session->id)
             ->where('frame_number', $frameNumber)
             ->whereIn('status', ['captured', 'approved'])
-            ->update(['status' => 'retaken']);
+            ->get();
+
+        if ($oldCaptures->isNotEmpty()) {
+            \App\Services\CloudStorageService::deleteAsync($oldCaptures->pluck('photo_path')->filter()->all());
+            SessionCapture::whereIn('id', $oldCaptures->pluck('id'))->update(['status' => 'retaken']);
+        }
 
         // Simpan capture baru
         $capture = SessionCapture::create([
@@ -196,10 +201,15 @@ class SessionController extends Controller
             return response()->json(['message' => 'Sesi tidak aktif.'], 422);
         }
 
-        // Tandai semua capture sebelumnya sebagai retaken
-        SessionCapture::where('session_id', $session->id)
+        // Hapus file captures lama di background
+        $oldCaptures = SessionCapture::where('session_id', $session->id)
             ->whereIn('status', ['captured', 'approved'])
-            ->update(['status' => 'retaken']);
+            ->get();
+
+        if ($oldCaptures->isNotEmpty()) {
+            \App\Services\CloudStorageService::deleteAsync($oldCaptures->pluck('photo_path')->filter()->all());
+            SessionCapture::whereIn('id', $oldCaptures->pluck('id'))->update(['status' => 'retaken']);
+        }
 
         $session->update([
             'status' => 'active',
@@ -240,35 +250,70 @@ class SessionController extends Controller
 
         if ($request->filled('final_image_base64')) {
             $base64 = $request->input('final_image_base64');
-            $tmpPath = tempnam(sys_get_temp_dir(), 'final_');
             $imgData = base64_decode(preg_replace('#^data:image/\w+;base64,#i', '', $base64));
-            file_put_contents($tmpPath, $imgData);
-            $fileSize = filesize($tmpPath);
+            $fileSize = strlen($imgData);
 
-            $finalPath = \App\Services\CloudStorageService::upload(
-                $tmpPath,
-                'photos',
-                $session->session_token . '-final'
-            );
-            $thumbnailPath = $finalPath;
-            @unlink($tmpPath);
+            $scopeName = 'Photo';
+            if ($session->folder && !empty($session->folder->name)) {
+                $cleanName = preg_replace('/[^A-Za-z0-9]/', '', $session->folder->name);
+                $scopeName = !empty($cleanName) ? $cleanName : 'Photo';
+            } elseif ($session->template && !empty($session->template->name)) {
+                $cleanName = preg_replace('/[^A-Za-z0-9]/', '', $session->template->name);
+                $scopeName = !empty($cleanName) ? $cleanName : 'Photo';
+            }
+
+            $photoCount = Photo::where('folder_id', $session->folder_id)->where('is_final', true)->count() + 1;
+            $formattedFilename = "PixelBooth-{$scopeName}-{$photoCount}.jpg";
+            $relativePath = "photos/{$formattedFilename}";
+
+            // Simpan langsung ke local disk (instan <5ms)
+            Storage::disk('public')->put($relativePath, $imgData);
+            $finalPath = $relativePath;
+            $thumbnailPath = $relativePath;
+
+            // Jika Cloudinary terkonfigurasi, jadwalkan upload di background
+            $cloudName = env('CLOUDINARY_CLOUD_NAME');
+            $apiKey = env('CLOUDINARY_API_KEY');
+            $cloudinaryUrl = env('CLOUDINARY_URL');
+            if ($cloudName || $apiKey || $cloudinaryUrl) {
+                app()->terminating(function () use ($session, $formattedFilename) {
+                    try {
+                        $fullLocalPath = storage_path('app/public/photos/' . $formattedFilename);
+                        if (file_exists($fullLocalPath)) {
+                            $cloudUrl = \App\Services\CloudStorageService::upload(
+                                $fullLocalPath,
+                                'photos',
+                                $session->session_token . '-final'
+                            );
+                            if ($cloudUrl && str_starts_with($cloudUrl, 'http')) {
+                                Photo::where('session_id', $session->id)
+                                    ->where('is_final', true)
+                                    ->update([
+                                        'storage_path' => $cloudUrl,
+                                        'thumbnail_path' => $cloudUrl,
+                                    ]);
+                            }
+                        }
+                    } catch (\Throwable $e) {
+                        \Illuminate\Support\Facades\Log::warning('Background Cloudinary sync error: ' . $e->getMessage());
+                    }
+                });
+            }
         } else {
             [$finalPath, $fileSize] = $this->photoRenderService->renderFinal($session);
             $thumbnailPath = $this->photoRenderService->renderThumbnail($session, $finalPath);
-        }
 
-        // Generate custom filename: PixelBooth-{Event/Folder/Template}-{Number}.jpg
-        $scopeName = 'Photo';
-        if ($session->folder && !empty($session->folder->name)) {
-            $cleanName = preg_replace('/[^A-Za-z0-9]/', '', $session->folder->name);
-            $scopeName = !empty($cleanName) ? $cleanName : 'Photo';
-        } elseif ($session->template && !empty($session->template->name)) {
-            $cleanName = preg_replace('/[^A-Za-z0-9]/', '', $session->template->name);
-            $scopeName = !empty($cleanName) ? $cleanName : 'Photo';
+            $scopeName = 'Photo';
+            if ($session->folder && !empty($session->folder->name)) {
+                $cleanName = preg_replace('/[^A-Za-z0-9]/', '', $session->folder->name);
+                $scopeName = !empty($cleanName) ? $cleanName : 'Photo';
+            } elseif ($session->template && !empty($session->template->name)) {
+                $cleanName = preg_replace('/[^A-Za-z0-9]/', '', $session->template->name);
+                $scopeName = !empty($cleanName) ? $cleanName : 'Photo';
+            }
+            $photoCount = Photo::where('folder_id', $session->folder_id)->where('is_final', true)->count() + 1;
+            $formattedFilename = "PixelBooth-{$scopeName}-{$photoCount}.jpg";
         }
-
-        $photoCount = Photo::where('folder_id', $session->folder_id)->where('is_final', true)->count() + 1;
-        $formattedFilename = "PixelBooth-{$scopeName}-{$photoCount}.jpg";
 
         // Update atau buat data Photo final
         $photo = Photo::updateOrCreate(
@@ -306,7 +351,12 @@ class SessionController extends Controller
             return response()->json(['message' => 'Sesi tidak aktif.'], 422);
         }
 
-        // Hapus semua file temporary
+        // Hapus semua capture file
+        $captures = SessionCapture::where('session_id', $session->id)->get();
+        if ($captures->isNotEmpty()) {
+            \App\Services\CloudStorageService::deleteAsync($captures->pluck('photo_path')->filter()->all());
+        }
+
         $sessionDir = "sessions/{$session->session_token}";
         Storage::disk('public')->deleteDirectory($sessionDir);
 

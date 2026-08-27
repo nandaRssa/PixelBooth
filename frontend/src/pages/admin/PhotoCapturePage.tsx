@@ -79,6 +79,7 @@ const PhotoCapturePage: React.FC = () => {
   const captureTriggeredRef = useRef(false)
   const captureInFlightRef = useRef(false)
   const captureFnRef = useRef<() => Promise<void>>(() => Promise.resolve())
+  const pendingCapturesRef = useRef<Promise<any>[]>([])
 
   // ===== Slot preview =====
   // Cerminan PhotoRenderService::resolveSlots agar preview sesuai hasil akhir
@@ -307,7 +308,7 @@ const PhotoCapturePage: React.FC = () => {
     }
   }, [])
 
-  // ===== Capture =====
+  // ===== Capture — pipeline instan & non-blocking =====
   const doCapture = async () => {
     if (!session || !videoRef.current) {
       // Tidak bisa mengambil foto — kembali ke keadaan siap agar tidak stuck
@@ -335,18 +336,56 @@ const PhotoCapturePage: React.FC = () => {
       const currentFrameNum = session.current_frame || 1
       localCapturesRef.current[currentFrameNum] = base64
 
-      const result = await sessionApi.capture(session.id, base64)
-      setSession(result.session)
+      const isLastFrame = currentFrameNum >= totalFrames
+      const nextFrameNum = isLastFrame ? totalFrames : currentFrameNum + 1
 
-      if (result.all_done) {
+      // 1. Update UI secara instan (Optimistic UI)
+      setSession((prev) => {
+        if (!prev) return prev
+        return {
+          ...prev,
+          current_frame: nextFrameNum,
+          captures: [
+            ...(prev.captures || []).filter((c) => c.frame_number !== currentFrameNum),
+            {
+              id: Date.now(),
+              session_id: prev.id,
+              frame_number: currentFrameNum,
+              photo_url: base64,
+              photo_path: '',
+              status: 'approved',
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            } as any,
+          ],
+        }
+      })
+
+      if (isLastFrame) {
         // Semua frame selesai — matikan kamera, frame sudah tampil semua
         streamRef.current?.getTracks().forEach((track) => track.stop())
         setCameraActive(false)
         setAllDone(true)
         toast.success('Semua frame selesai!')
       } else {
-        toast.success(`Foto ${result.capture.frame_number} berhasil diambil.`)
+        toast.success(`Foto ${currentFrameNum} berhasil diambil.`)
       }
+
+      // 2. Kirim upload ke server di background
+      const uploadPromise = sessionApi.capture(session.id, base64)
+        .then((result) => {
+          setSession((prev) => (prev ? { ...prev, ...result.session } : result.session))
+          if (result.all_done) {
+            setAllDone(true)
+          }
+          return result
+        })
+        .catch((err) => {
+          console.error('Background frame capture upload error:', err)
+          toast.error('Gagal mengunggah foto. Coba lagi.')
+        })
+
+      pendingCapturesRef.current.push(uploadPromise)
     } catch {
       toast.error('Gagal mengambil foto. Coba lagi.')
     } finally {
@@ -421,6 +460,11 @@ const PhotoCapturePage: React.FC = () => {
     if (!session || !template) return
     setIsCapturing(true)
     try {
+      // Tunggu semua capture frame di background selesai
+      if (pendingCapturesRef.current.length > 0) {
+        await Promise.allSettled(pendingCapturesRef.current)
+      }
+
       let finalImageBase64: string | undefined = undefined
       try {
         if (template.template_url) {
@@ -441,7 +485,10 @@ const PhotoCapturePage: React.FC = () => {
       })
       const photoData = (result.photo || {}) as any
       const uniqueToken = photoData.unique_token || session.session_token || String(session.id)
-      const qrLink = photoData.qr_link || `${window.location.origin}/photo/${uniqueToken}`
+      let qrLink = photoData.qr_link || `${window.location.origin}/photo/${uniqueToken}`
+      if (!qrLink.startsWith('http://') && !qrLink.startsWith('https://')) {
+        qrLink = `${window.location.origin}${qrLink.startsWith('/') ? '' : '/'}${qrLink}`
+      }
       setResultPhoto({
         id: photoData.id,
         url: photoData.url || photoData.photo_url || photoData.storage_path,
@@ -695,7 +742,11 @@ const PhotoCapturePage: React.FC = () => {
                   <div className="w-full flex items-center justify-center mb-1.5">
                     <QRCodeCanvas
                       id="capture-session-qr-canvas"
-                      value={resultPhoto.qr_link || `${window.location.origin}/photo/${resultPhoto.unique_token || ''}`}
+                      value={
+                        resultPhoto.qr_link && (resultPhoto.qr_link.startsWith('http://') || resultPhoto.qr_link.startsWith('https://'))
+                          ? resultPhoto.qr_link
+                          : `${window.location.origin}/photo/${resultPhoto.unique_token || ''}`
+                      }
                       size={240}
                       level="H"
                       bgColor="#FFFFFF"
@@ -723,7 +774,10 @@ const PhotoCapturePage: React.FC = () => {
                   title="Bagikan Link Foto"
                   aria-label="Bagikan"
                   onClick={async () => {
-                    const link = resultPhoto.qr_link || `${window.location.origin}/photo/${resultPhoto.unique_token || ''}`
+                    const rawLink = resultPhoto.qr_link || `${window.location.origin}/photo/${resultPhoto.unique_token || ''}`
+                    const link = (rawLink.startsWith('http://') || rawLink.startsWith('https://'))
+                      ? rawLink
+                      : `${window.location.origin}${rawLink.startsWith('/') ? '' : '/'}${rawLink}`
                     if (navigator.share) {
                       try {
                         await navigator.share({ title: 'Foto PixelBooth', url: link })
