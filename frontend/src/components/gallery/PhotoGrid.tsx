@@ -49,7 +49,7 @@ const PhotoGrid: React.FC<PhotoGridProps> = ({
 }) => {
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-20">
+      <div className="flex items-center justify-center min-h-[60vh]">
         <Spinner size="lg" className="text-pb-text" />
       </div>
     )
@@ -147,7 +147,7 @@ const PhotoGrid: React.FC<PhotoGridProps> = ({
         )}
       </div>
 
-      {/* Grid: 3 kolom di mobile (iPhone 14 dsb), 3-5 kolom di tablet & desktop */}
+      {/* Grid: 3-5 kolom konsisten dengan template dan photo */}
       <div className="grid grid-cols-3 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 2xl:grid-cols-5 gap-2 sm:gap-4 lg:gap-5">
         {photos.map((photo) => (
           <PhotoCard

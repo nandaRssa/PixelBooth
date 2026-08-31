@@ -10,31 +10,36 @@ interface CameraStatusBadgeProps {
   className?: string
 }
 
-const statusConfig: Record<CameraStatus, { label: string; dotClass: string; textClass: string }> = {
+const statusConfig: Record<CameraStatus, { label: string; dotClass: string; textClass: string; bgClass: string }> = {
   connected: {
     label: 'Kamera Terhubung',
-    dotClass: 'bg-green-400 shadow-[0_0_6px_rgba(74,222,128,0.6)]',
-    textClass: 'text-green-400',
+    dotClass: 'bg-green-400 shadow-[0_0_8px_rgba(74,222,128,0.8)]',
+    textClass: 'text-green-400 font-bold',
+    bgClass: 'border-green-500/60 bg-green-500/10',
   },
   disconnected: {
     label: 'Kamera Tidak Terhubung',
-    dotClass: 'bg-pb-text-muted',
-    textClass: 'text-pb-text-muted',
+    dotClass: 'bg-red-400 shadow-[0_0_8px_rgba(248,113,113,0.8)]',
+    textClass: 'text-red-400 font-bold',
+    bgClass: 'border-red-500/60 bg-red-500/10',
   },
   error: {
     label: 'Error Kamera',
-    dotClass: 'bg-red-400 shadow-[0_0_6px_rgba(248,113,113,0.6)]',
-    textClass: 'text-red-400',
+    dotClass: 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.8)]',
+    textClass: 'text-red-400 font-bold',
+    bgClass: 'border-red-500/60 bg-red-500/10',
   },
   capturing: {
     label: 'Mengambil Foto...',
-    dotClass: 'bg-amber-400 shadow-[0_0_6px_rgba(251,191,36,0.6)] animate-pulse',
-    textClass: 'text-amber-400',
+    dotClass: 'bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.8)] animate-pulse',
+    textClass: 'text-amber-400 font-bold',
+    bgClass: 'border-amber-500/60 bg-amber-500/10',
   },
   checking: {
     label: 'Memeriksa Kamera...',
-    dotClass: 'bg-pb-text-secondary animate-pulse',
-    textClass: 'text-pb-text-secondary',
+    dotClass: 'bg-[var(--pb-text-muted)] animate-pulse',
+    textClass: 'text-[var(--pb-text-muted)] font-bold',
+    bgClass: 'border-[var(--pb-border-strong)] bg-[var(--pb-elevated)]',
   },
 }
 
@@ -45,9 +50,13 @@ export const CameraStatusBadge: React.FC<CameraStatusBadgeProps> = ({
   const config = statusConfig[status]
 
   return (
-    <div className={`flex items-center gap-2 ${className}`}>
-      <span className={`w-2 h-2 rounded-full flex-shrink-0 ${config.dotClass}`} />
-      <span className={`text-xs font-medium ${config.textClass}`}>{config.label}</span>
+    <div
+      className={`inline-flex items-center gap-2 sm:gap-2.5 px-3 py-1.5 sm:px-4 sm:py-2 rounded-[4px] border-[2px] shadow-[2px_2px_0px_#000] transition-all shrink-0 ${config.bgClass} ${className}`}
+    >
+      <span className={`w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full flex-shrink-0 ${config.dotClass}`} />
+      <span className={`font-retro text-base sm:text-lg lg:text-xl uppercase tracking-wider leading-none ${config.textClass}`}>
+        {config.label}
+      </span>
     </div>
   )
 }

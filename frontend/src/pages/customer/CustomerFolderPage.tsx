@@ -151,10 +151,10 @@ const CustomerFolderPage: React.FC = () => {
   // ===== Loading View =====
   if (status === 'loading') {
     return (
-      <div className="min-h-screen bg-pb-bg flex items-center justify-center p-4">
+      <div className="min-h-screen bg-[var(--pb-bg)] flex items-center justify-center p-4">
         <div className="text-center">
           <Spinner size="lg" className="text-[#FF5A36] mx-auto mb-3" />
-          <p className="text-pb-text-muted text-sm font-medium">Memuat galeri foto...</p>
+          <p className="font-retro text-[var(--pb-text-muted)] text-lg tracking-wide">Memuat galeri foto...</p>
         </div>
       </div>
     )
@@ -163,11 +163,11 @@ const CustomerFolderPage: React.FC = () => {
   // ===== Error / Not Found View =====
   if (status === 'error' || !folder) {
     return (
-      <div className="min-h-screen bg-pb-bg flex items-center justify-center p-4">
-        <div className="text-center max-w-sm bg-pb-surface border border-pb-border rounded-2xl p-6 sm:p-8 shadow-xl">
-          <FolderOpen size={48} className="text-pb-faint mx-auto mb-4" />
-          <h1 className="text-pb-text font-bold text-lg mb-2">Galeri Tidak Ditemukan</h1>
-          <p className="text-pb-text-muted text-xs sm:text-sm leading-relaxed mb-6">
+      <div className="min-h-screen bg-[var(--pb-bg)] flex items-center justify-center p-4">
+        <div className="text-center max-w-sm bg-[var(--pb-surface)] border-[3px] border-[#FF5A36] rounded-[4px] p-6 sm:p-8 shadow-[6px_6px_0px_var(--pb-shadow-solid)]">
+          <FolderOpen size={48} className="text-[var(--pb-faint)] mx-auto mb-4" />
+          <h1 className="font-pixel text-[var(--pb-text)] text-sm leading-relaxed mb-3">Galeri Tidak Ditemukan</h1>
+          <p className="font-retro text-[var(--pb-text-muted)] text-base leading-relaxed mb-6">
             Link QR mungkin sudah tidak berlaku atau foto dalam folder telah dihapus.
           </p>
           <Button variant="primary" size="md" fullWidth onClick={() => window.location.reload()}>
@@ -181,61 +181,57 @@ const CustomerFolderPage: React.FC = () => {
   const allSelected = folder.photos.length > 0 && selectedTokens.size === folder.photos.length
 
   return (
-    <div className="min-h-screen bg-pb-bg p-3 sm:p-6 pb-16">
-      <motion.div
-        initial={{ opacity: 0, y: 15 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="max-w-3xl mx-auto"
-      >
-        {/* ===== Header Galeri Folder ===== */}
-        <div className="text-center mb-5 pt-2 sm:pt-4">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-orange-500/10 border border-orange-500/20 text-[#FF5A36] text-[11px] font-semibold tracking-wider uppercase mb-2 shadow-xs">
-            <Sparkles size={12} />
+    <div className="min-h-screen bg-[var(--pb-bg)] p-4 sm:p-8 pb-20">
+      <div className="max-w-4xl mx-auto animate-pixel-fade-in">
+        {/* ===== Header ===== */}
+        <div className="text-center mb-6 pt-2 sm:pt-4">
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-none bg-[#FF5A36]/15 border-[2px] border-[#FF5A36] text-[#FF5A36] font-pixel text-[9px] sm:text-[10px] tracking-widest uppercase mb-4 shadow-[2px_2px_0px_var(--pb-shadow-solid)]">
+            <Sparkles size={14} />
             <span>PIXELBOOTH GALLERY</span>
           </div>
-          <h1 className="text-pb-text font-bold text-xl sm:text-2xl truncate">{folder.name}</h1>
-          <p className="text-pb-text-muted text-xs sm:text-sm mt-1">
+          <h1 className="font-pixel text-[var(--pb-text)] text-lg sm:text-2xl lg:text-3xl leading-relaxed truncate">{folder.name}</h1>
+          <p className="font-retro text-[var(--pb-text-muted)] text-xl sm:text-2xl mt-1.5 tracking-wide">
             {folder.photos.length} foto tersimpan
           </p>
         </div>
 
-        {/* ===== Card Info & Bagikan Galeri ===== */}
-        <div className="bg-pb-surface border border-pb-border rounded-2xl p-3.5 sm:p-4 mb-4 shadow-sm flex items-center justify-between gap-3 flex-wrap sm:flex-nowrap">
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="bg-white p-1.5 rounded-xl shrink-0 shadow-xs border border-white/20">
-              <QRCodeSVG value={pageUrl} size={52} fgColor="#0A0A0A" />
+        {/* ===== QR Share Card ===== */}
+        <div className="bg-[var(--pb-surface)] border-[2px] border-[var(--pb-border-strong)] rounded-[4px] p-4 sm:p-5 mb-6 shadow-[3px_3px_0px_#000,6px_6px_0px_var(--pb-shadow-solid)] flex items-center justify-between gap-4 flex-wrap sm:flex-nowrap">
+          <div className="flex items-center gap-4 min-w-0">
+            <div className="bg-white p-2 rounded-none shrink-0 shadow-[2px_2px_0px_#000] border-[2px] border-black">
+              <QRCodeSVG value={pageUrl} size={60} fgColor="#0A0A0A" />
             </div>
             <div className="min-w-0">
-              <p className="text-pb-text text-xs sm:text-sm font-semibold truncate">
+              <p className="font-pixel text-[var(--pb-text)] text-[11px] sm:text-xs leading-relaxed truncate">
                 Bagikan Galeri Ini
               </p>
-              <p className="text-pb-text-muted text-[11px] sm:text-xs leading-relaxed truncate">
+              <p className="font-retro text-[var(--pb-text-muted)] text-base sm:text-lg leading-relaxed truncate">
                 Scan QR atau salin link untuk berbagi folder
               </p>
             </div>
           </div>
           <Button
             variant="secondary"
-            size="sm"
+            size="md"
             onClick={handleShare}
-            leftIcon={<Share2 size={15} />}
+            leftIcon={<Share2 size={16} />}
             className="shrink-0 ml-auto sm:ml-0"
           >
             Bagikan
           </Button>
         </div>
 
-        {/* ===== Toolbar Aksi: Pilih, Pilih Semua, Batalkan, Unduh, Hapus ===== */}
+        {/* ===== Toolbar Aksi ===== */}
         {folder.photos.length > 0 && (
-          <div className="bg-pb-surface border border-pb-border rounded-2xl p-2.5 sm:p-3 mb-4 shadow-sm sticky top-3 z-20 backdrop-blur-md bg-pb-surface/95">
-            <div className="flex items-center justify-between gap-2 flex-wrap">
+          <div className="bg-[var(--pb-surface)] border-[2px] border-[var(--pb-border-strong)] rounded-[4px] p-3 sm:p-4 mb-6 shadow-[3px_3px_0px_#000,5px_5px_0px_var(--pb-shadow-solid)] sticky top-3 z-20">
+            <div className="flex items-center justify-between gap-3 flex-wrap">
               {!selectionMode ? (
                 <>
-                  <div className="flex items-center gap-2">
-                    <span className="text-pb-text font-semibold text-xs sm:text-sm">
-                      Daftar Foto
+                  <div className="flex items-center gap-2.5">
+                    <span className="font-pixel text-[var(--pb-text)] text-[10px] sm:text-xs leading-relaxed">
+                      DAFTAR FOTO
                     </span>
-                    <span className="text-pb-text-muted text-xs">
+                    <span className="font-retro text-[var(--pb-text-muted)] text-lg sm:text-xl font-bold">
                       ({folder.photos.length})
                     </span>
                   </div>
@@ -245,7 +241,7 @@ const CustomerFolderPage: React.FC = () => {
                       variant="secondary"
                       size="sm"
                       onClick={() => setSelectionMode(true)}
-                      leftIcon={<CheckSquare size={15} />}
+                      leftIcon={<CheckSquare size={16} />}
                     >
                       Pilih Foto
                     </Button>
@@ -270,7 +266,7 @@ const CustomerFolderPage: React.FC = () => {
                     >
                       Batal
                     </Button>
-                    <span className="text-[11px] sm:text-xs text-pb-text-secondary font-medium pl-1">
+                    <span className="font-retro text-sm text-[var(--pb-text-secondary)] pl-1">
                       {selectedTokens.size} dipilih
                     </span>
                   </div>
@@ -294,25 +290,28 @@ const CustomerFolderPage: React.FC = () => {
 
         {/* ===== Photos Grid ===== */}
         {folder.photos.length === 0 ? (
-          <div className="bg-pb-surface border border-pb-border rounded-2xl p-10 flex flex-col items-center justify-center text-center shadow-sm">
-            <ImageIcon size={44} className="text-pb-faint mb-3" />
-            <p className="text-pb-text font-semibold text-sm mb-1">Belum Ada Foto</p>
-            <p className="text-pb-text-muted text-xs max-w-xs leading-relaxed">
+          <div className="bg-[var(--pb-surface)] border-[2px] border-dashed border-[var(--pb-border-strong)] rounded-[4px] p-10 flex flex-col items-center justify-center text-center">
+            <ImageIcon size={44} className="text-[var(--pb-faint)] mb-3" />
+            <p className="font-pixel text-[var(--pb-text)] text-[10px] leading-relaxed mb-2">Belum Ada Foto</p>
+            <p className="font-retro text-[var(--pb-text-muted)] text-base max-w-xs leading-relaxed">
               Semua foto dalam folder ini mungkin telah dihapus atau belum ada sesi yang tersimpan.
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 sm:gap-3.5">
+          <div className="grid grid-cols-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-1.5 sm:gap-2.5">
             {folder.photos.map((photo, index) => {
               const isSelected = selectedTokens.has(photo.token)
               return (
                 <div
                   key={photo.token}
-                  className={`group relative aspect-[3/4] bg-pb-surface border rounded-2xl overflow-hidden shadow-xs transition-all duration-200 cursor-pointer select-none ${
-                    isSelected
-                      ? 'border-[#FF5A36] ring-2 ring-[#FF5A36]/40 scale-[0.98]'
-                      : 'border-pb-border hover:border-pb-border-strong hover:shadow-md'
-                  }`}
+                  className={`group relative aspect-[3/4] bg-[var(--pb-surface)] overflow-hidden cursor-pointer select-none
+                    transition-[transform,box-shadow,border-color] duration-[60ms] rounded-none
+                    border-[3px]
+                    ${
+                      isSelected
+                        ? 'border-[#FF5A36] shadow-[3px_3px_0px_#FF5A36]'
+                        : 'border-white shadow-[3px_3px_0px_var(--pb-shadow-solid)] hover:border-[#FF5A36] hover:shadow-[5px_5px_0px_var(--pb-shadow-solid)]'
+                    }`}
                   onClick={() => {
                     if (selectionMode) {
                       handleToggleSelect(photo.token)
@@ -325,28 +324,28 @@ const CustomerFolderPage: React.FC = () => {
                     src={getStorageUrl(photo.thumbnail_url || photo.photo_url || photo.url || '')}
                     alt={`Foto ${index + 1}`}
                     loading="lazy"
-                    className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                    className="w-full h-full object-cover"
                   />
 
-                  {/* Badge Nomor Urut Foto */}
-                  <span className="absolute bottom-2 left-2 px-2 py-0.5 rounded-md bg-black/75 backdrop-blur-md text-white text-[10px] font-medium border border-white/10 shadow-xs">
-                    Foto #{index + 1}
+                  {/* Number badge */}
+                  <span className="absolute bottom-1 left-1 font-pixel text-white text-[7px] px-1.5 py-0.5 bg-black/90 border border-[#FF5A36]/50">
+                    #{index + 1}
                   </span>
 
-                  {/* Overlay Seleksi / Checkbox Bulat */}
+                  {/* Selection checkbox */}
                   {selectionMode && (
                     <div
-                      className={`absolute top-2 right-2 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${
+                      className={`absolute top-1.5 right-1.5 w-5 h-5 sm:w-6 sm:h-6 rounded-none border-[2px] flex items-center justify-center transition-all ${
                         isSelected
-                          ? 'bg-[#FF5A36] border-white text-white shadow-md scale-105'
-                          : 'bg-black/50 border-white/80 text-transparent backdrop-blur-xs'
+                          ? 'bg-[#FF5A36] border-black text-white shadow-[2px_2px_0px_#000]'
+                          : 'bg-black/60 border-white/70 text-transparent'
                       }`}
                     >
-                      <Check size={14} strokeWidth={3} />
+                      <Check size={13} strokeWidth={3} />
                     </div>
                   )}
 
-                  {/* Tombol Unduh Cepat di Hover Desktop (saat tidak mode seleksi) */}
+                  {/* Quick download on hover (desktop, non-selection mode) */}
                   {!selectionMode && (
                     <button
                       type="button"
@@ -354,10 +353,10 @@ const CustomerFolderPage: React.FC = () => {
                         e.stopPropagation()
                         handleDownloadSingle(photo)
                       }}
-                      className="absolute top-2 right-2 w-8 h-8 rounded-full bg-black/75 backdrop-blur-md text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-150 hover:bg-[#FF5A36] shadow-md"
+                      className="absolute top-1.5 right-1.5 w-7 h-7 sm:w-8 sm:h-8 rounded-none bg-black/90 border-[2px] border-[#FF5A36]/60 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-100 hover:bg-[#FF5A36] shadow-[2px_2px_0px_#000]"
                       title="Unduh Foto Ini"
                     >
-                      <Download size={14} />
+                      <Download size={13} />
                     </button>
                   )}
                 </div>
@@ -365,7 +364,7 @@ const CustomerFolderPage: React.FC = () => {
             })}
           </div>
         )}
-      </motion.div>
+      </div>
 
       {/* ===== Preview Modal ===== */}
       <AnimatePresence>
@@ -375,43 +374,43 @@ const CustomerFolderPage: React.FC = () => {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50"
+              className="fixed inset-0 bg-black/95 z-50"
               onClick={() => setPreview(null)}
             />
             <motion.div
-              initial={{ opacity: 0, scale: 0.94, y: 15 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.94, y: 15 }}
-              transition={{ type: 'spring', damping: 25, stiffness: 350 }}
+              initial={{ opacity: 0, y: 40 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 20 }}
+              transition={{ duration: 0.15, ease: 'linear' }}
               className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-[calc(100vw-2rem)] max-w-lg"
             >
-              <div className="bg-pb-surface border border-pb-border rounded-2xl p-4 shadow-2xl">
+              <div className="bg-[var(--pb-surface)] border-[3px] border-[#FF5A36] rounded-[4px] p-4 shadow-[6px_6px_0px_var(--pb-shadow-solid)]">
                 <div className="flex items-center justify-between mb-3">
                   <div>
-                    <p className="text-pb-text text-sm font-semibold truncate">{folder.name}</p>
-                    <p className="text-pb-text-muted text-xs">
+                    <p className="font-pixel text-[var(--pb-text)] text-[9px] leading-relaxed truncate">{folder.name}</p>
+                    <p className="font-retro text-[var(--pb-text-muted)] text-base">
                       Foto #{folder.photos.findIndex((p) => p.token === preview.token) + 1}
                     </p>
                   </div>
                   <button
                     type="button"
                     onClick={() => setPreview(null)}
-                    className="w-8 h-8 rounded-lg bg-pb-elevated border border-pb-border hover:border-pb-border-strong text-pb-text-secondary hover:text-pb-text flex items-center justify-center transition-colors shrink-0 ml-auto"
+                    className="w-8 h-8 rounded-[3px] bg-[var(--pb-elevated)] border-[2px] border-[var(--pb-border-strong)] hover:border-[#FF5A36] hover:text-[#FF5A36] text-[var(--pb-text-secondary)] flex items-center justify-center transition-colors shrink-0 ml-auto shadow-[2px_2px_0px_var(--pb-shadow-solid)] active:translate-x-[1px] active:translate-y-[1px]"
                     title="Tutup"
                   >
                     <X size={16} />
                   </button>
                 </div>
 
-                <div className="bg-black/50 border border-pb-border rounded-xl overflow-hidden flex items-center justify-center max-h-[65vh]">
+                <div className="bg-black border-[2px] border-[var(--pb-border-strong)] overflow-hidden flex items-center justify-center max-h-[65vh]">
                   <img
                     src={getStorageUrl(preview.photo_url || preview.url || '')}
                     alt="Foto galeri"
-                    className="max-w-full max-h-[65vh] object-contain rounded-lg"
+                    className="max-w-full max-h-[65vh] object-contain"
                   />
                 </div>
 
-                <div className="mt-3 pt-3 border-t border-pb-border">
+                <div className="mt-3 pt-3 border-t-[2px] border-dashed border-[var(--pb-border-strong)]">
                   <Button
                     variant="primary"
                     size="md"

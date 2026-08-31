@@ -1,6 +1,5 @@
 import React from 'react'
-import { Link, NavLink, Outlet } from 'react-router-dom'
-import { motion } from 'framer-motion'
+import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 import {
   Home,
   LayoutGrid,
@@ -13,7 +12,8 @@ import {
 import { getTheme, setTheme, type ThemeMode } from '@/utils/theme'
 
 // ==========================================
-// Admin Layout — Sidebar + Main Content
+// Admin Layout — Retro Arcade Style
+// Sidebar + Main Content
 // ==========================================
 
 interface NavItem {
@@ -23,14 +23,16 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-  { to: '/', icon: <Home size={20} />, label: 'Dashboard' },
-  { to: '/gallery', icon: <LayoutGrid size={20} />, label: 'Galeri' },
-  { to: '/photo', icon: <Camera size={20} />, label: 'Photo' },
-  { to: '/templates', icon: <Layers size={20} />, label: 'Kelola Template' },
+  { to: '/', icon: <Home size={18} />, label: 'Dashboard' },
+  { to: '/gallery', icon: <LayoutGrid size={18} />, label: 'Galeri' },
+  { to: '/photo', icon: <Camera size={18} />, label: 'Photo' },
+  { to: '/templates', icon: <Layers size={18} />, label: 'Template' },
 ]
 
 export const AdminLayout: React.FC = () => {
   const [theme, setThemeState] = React.useState<ThemeMode>(getTheme)
+  const location = useLocation()
+  const isEditorPage = location.pathname.includes('/editor')
 
   const toggleTheme = () => {
     const next: ThemeMode = theme === 'dark' ? 'light' : 'dark'
@@ -39,66 +41,71 @@ export const AdminLayout: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-pb-bg flex flex-col lg:flex-row">
+    <div className="min-h-screen w-full relative">
       {/* ===== Mobile Top Header (< lg) ===== */}
-      <header className="lg:hidden fixed top-0 left-0 right-0 h-14 bg-pb-bg/90 backdrop-blur-md border-b border-pb-border flex items-center justify-between px-4 z-30">
-        <Link to="/" className="flex items-center gap-2 hover:opacity-90 transition-opacity">
-          <span className="w-8 h-8 rounded-lg bg-gradient-to-tr from-[#FF5A36] to-[#FF8836] flex items-center justify-center text-white font-bold text-xs shadow-sm shadow-orange-500/30">
-            PB
-          </span>
-          <h1 className="text-pb-text font-bold text-base tracking-tight">
-            Pixel<span className="text-[#FF5A36]">Booth</span>
-          </h1>
+      <header className="lg:hidden fixed top-0 left-0 right-0 h-14 bg-[var(--pb-bg)] border-b-[3px] border-[#FF5E00] flex items-center justify-between px-4 z-30">
+        <Link to="/" className="flex items-center hover:opacity-80 transition-opacity">
+          <img
+            src={theme === 'dark' ? '/logo-spot-white.png' : '/logo-spot.png'}
+            alt="SPOT"
+            className="h-8 w-auto object-contain"
+          />
         </Link>
         <button
           type="button"
           onClick={toggleTheme}
           aria-label={theme === 'dark' ? 'Mode siang' : 'Mode malam'}
           title={theme === 'dark' ? 'Mode siang' : 'Mode malam'}
-          className="flex items-center justify-center w-9 h-9 rounded-xl bg-pb-surface border border-pb-border text-pb-text-secondary hover:text-pb-text transition-colors"
+          className="flex items-center justify-center w-9 h-9 rounded-[4px] bg-[var(--pb-elevated)] border-[2px] border-[var(--pb-border-strong)] text-[var(--pb-text-secondary)] hover:text-[var(--pb-text)] hover:border-[#FF5A36] transition-colors shadow-[2px_2px_0px_var(--pb-shadow-solid)]"
         >
-          {theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
+          {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
         </button>
       </header>
 
       {/* ===== Desktop Sidebar (lg+) ===== */}
-      <aside className="hidden lg:flex w-64 bg-pb-bg border-r border-pb-border flex-col fixed h-full z-20">
+      <aside className="hidden lg:flex w-72 bg-[var(--pb-bg)] border-r-[3px] border-[#FF5E00] flex-col fixed inset-y-0 top-0 bottom-0 left-0 h-screen h-[100dvh] z-20 overflow-y-auto">
         {/* Logo */}
-        <div className="px-6 py-6 border-b border-pb-border">
-          <div className="flex items-center justify-between gap-2">
+        <div className="px-6 py-6 border-b-[2px] border-[var(--pb-border)] shrink-0">
+          <div className="flex items-center justify-between gap-3">
             <button
               type="button"
               onClick={toggleTheme}
               aria-label={theme === 'dark' ? 'Mode siang' : 'Mode malam'}
               title={theme === 'dark' ? 'Mode siang' : 'Mode malam'}
-              className="flex items-center justify-center w-8 h-8 rounded-lg shrink-0
-                text-pb-text-secondary hover:text-pb-text hover:bg-white/5 transition-colors"
+              className="flex items-center justify-center w-9 h-9 rounded-[4px] shrink-0
+                border-[2px] border-[var(--pb-border-strong)] bg-[var(--pb-elevated)]
+                text-[var(--pb-text-secondary)] hover:text-[var(--pb-text)] hover:border-[#FF5A36]
+                transition-colors shadow-[2px_2px_0px_var(--pb-shadow-solid)]
+                active:translate-x-[1px] active:translate-y-[1px] active:shadow-none"
             >
               {theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
             </button>
-            <Link to="/" className="min-w-0 flex-1 ml-2 block group">
-              <h1 className="text-pb-text font-bold text-lg tracking-tight group-hover:text-pb-text transition-colors">
-                Pixel<span className="text-[#FF5A36]">Booth</span>
-              </h1>
-              <p className="text-pb-text-muted text-xs mt-0.5">Sistem Photobooth Profesional</p>
+            <Link to="/" className="min-w-0 flex-1 ml-2.5 block group">
+              <img
+                src={theme === 'dark' ? '/logo-spot-white.png' : '/logo-spot.png'}
+                alt="SPOT"
+                className="h-10 xl:h-11 w-auto object-contain group-hover:opacity-80 transition-opacity"
+              />
+              <p className="font-retro text-[var(--pb-text-muted)] text-base mt-1.5 font-bold">Sistema Photobooth_</p>
             </Link>
           </div>
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 px-3 py-4 space-y-1">
+        <nav className="flex-1 px-4 py-5 space-y-2.5">
           {navItems.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
+              end={item.to === '/'}
               onClick={() => window.scrollTo({ top: 0, left: 0, behavior: 'smooth' })}
               title={item.label}
               className={({ isActive }) => `
-                flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold
-                transition-all duration-200 group hover:translate-x-1.5
+                flex items-center gap-3.5 px-5 py-3.5 text-xl font-retro tracking-wider uppercase
+                transition-all duration-100 border-[2px] rounded-[4px]
                 ${isActive
-                  ? 'bg-gradient-to-r from-[#FF5A36] to-[#FF8836] text-white shadow-md shadow-orange-500/25'
-                  : 'text-pb-text-secondary hover:text-pb-text hover:bg-pb-elevated'
+                  ? 'bg-[#FF5A36] text-white border-black shadow-[3px_3px_0px_var(--pb-shadow-solid)] translate-x-1 font-bold'
+                  : 'bg-transparent text-[var(--pb-text-secondary)] border-transparent hover:bg-[var(--pb-elevated)] hover:text-[var(--pb-text)] hover:border-[var(--pb-border-strong)] hover:translate-x-1.5'
                 }
               `}
             >
@@ -109,79 +116,80 @@ export const AdminLayout: React.FC = () => {
         </nav>
 
         {/* Footer */}
-        <div className="px-3 py-4 border-t border-pb-border">
+        <div className="px-4 py-5 border-t-[2px] border-[var(--pb-border)] shrink-0 mt-auto">
           <NavLink
             to="/settings"
             onClick={() => window.scrollTo({ top: 0, left: 0, behavior: 'smooth' })}
             title="Pengaturan"
             className={({ isActive }) => `
-              flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold
-              transition-all duration-200 hover:translate-x-1.5
-              ${isActive ? 'bg-gradient-to-r from-[#FF5A36] to-[#FF8836] text-white shadow-md shadow-orange-500/25' : 'text-pb-text-secondary hover:text-pb-text hover:bg-pb-elevated'}
+              flex items-center gap-3.5 px-5 py-3.5 text-xl font-retro tracking-wider uppercase
+              transition-all duration-100 border-[2px] rounded-[4px]
+              ${isActive
+                ? 'bg-[#FF5A36] text-white border-black shadow-[3px_3px_0px_var(--pb-shadow-solid)] translate-x-1 font-bold'
+                : 'bg-transparent text-[var(--pb-text-secondary)] border-transparent hover:bg-[var(--pb-elevated)] hover:text-[var(--pb-text)] hover:border-[var(--pb-border-strong)] hover:translate-x-1.5'
+              }
             `}
           >
-            <Settings size={20} />
+            <Settings size={22} />
             <span>Pengaturan</span>
           </NavLink>
         </div>
       </aside>
 
       {/* ===== Main Content Area ===== */}
-      <main className="flex-1 w-full lg:ml-64 min-h-screen pt-16 lg:pt-0 pb-20 lg:pb-0">
-        <motion.div
-          initial={{ opacity: 0, y: 4 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.2 }}
-          className="p-4 sm:p-6 lg:p-8"
-        >
+      <main className={`lg:pl-72 min-h-screen min-h-[100dvh] ${isEditorPage ? 'pt-16 lg:pt-0 pb-6 lg:pb-0' : 'pt-16 lg:pt-0 pb-20 lg:pb-0'} w-full flex flex-col`}>
+        <div className={`w-full max-w-6xl xl:max-w-7xl mx-auto ${isEditorPage ? 'p-3 sm:p-5 lg:p-8' : 'p-5 sm:p-7 lg:p-8'} animate-pixel-fade-in flex-1 flex flex-col`}>
           <Outlet />
-        </motion.div>
+        </div>
       </main>
 
-      {/* ===== Mobile Bottom Navigation Bar (< lg) ===== */}
-      <nav className="lg:hidden fixed bottom-0 left-0 right-0 h-15 bg-pb-surface/95 backdrop-blur-lg border-t border-pb-border flex items-center justify-around px-4 z-30 shadow-lg">
-        {navItems.map((item) => (
+      {/* ===== Mobile Bottom Navigation Bar (< lg) - Hidden on Editor ===== */}
+      {!isEditorPage && (
+        <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-[var(--pb-surface)] border-t-[3px] border-[#FF5E00] flex items-center justify-around px-4 z-30 h-[60px]">
+          {navItems.map((item) => (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              end={item.to === '/'}
+              onClick={() => window.scrollTo({ top: 0, left: 0, behavior: 'smooth' })}
+              title={item.label}
+              aria-label={item.label}
+              className="flex items-center justify-center flex-1 py-1 transition-all"
+            >
+              {({ isActive }) => (
+                <div
+                  className={`w-10 h-10 rounded-[4px] flex items-center justify-center transition-all border-[2px] ${
+                    isActive
+                      ? 'bg-[#FF5A36] text-white border-black shadow-[2px_2px_0px_#000]'
+                      : 'bg-transparent text-[var(--pb-text-muted)] border-transparent hover:text-[var(--pb-text)] hover:bg-[var(--pb-elevated)] hover:border-[var(--pb-border-strong)]'
+                  }`}
+                >
+                  {item.icon}
+                </div>
+              )}
+            </NavLink>
+          ))}
           <NavLink
-            key={item.to}
-            to={item.to}
+            to="/settings"
             onClick={() => window.scrollTo({ top: 0, left: 0, behavior: 'smooth' })}
-            title={item.label}
-            aria-label={item.label}
+            title="Pengaturan"
+            aria-label="Pengaturan"
             className="flex items-center justify-center flex-1 py-1 transition-all"
           >
             {({ isActive }) => (
               <div
-                className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${
+                className={`w-10 h-10 rounded-[4px] flex items-center justify-center transition-all border-[2px] ${
                   isActive
-                    ? 'bg-gradient-to-tr from-[#FF5A36] to-[#FF8836] text-white shadow-md shadow-orange-500/30 scale-105'
-                    : 'text-pb-text-muted hover:text-pb-text hover:bg-pb-elevated'
+                    ? 'bg-[#FF5A36] text-white border-black shadow-[2px_2px_0px_#000]'
+                    : 'bg-transparent text-[var(--pb-text-muted)] border-transparent hover:text-[var(--pb-text)] hover:bg-[var(--pb-elevated)] hover:border-[var(--pb-border-strong)]'
                 }`}
               >
-                {item.icon}
+                <Settings size={18} />
               </div>
             )}
           </NavLink>
-        ))}
-        <NavLink
-          to="/settings"
-          onClick={() => window.scrollTo({ top: 0, left: 0, behavior: 'smooth' })}
-          title="Pengaturan"
-          aria-label="Pengaturan"
-          className="flex items-center justify-center flex-1 py-1 transition-all"
-        >
-          {({ isActive }) => (
-            <div
-              className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${
-                isActive
-                  ? 'bg-gradient-to-tr from-[#FF5A36] to-[#FF8836] text-white shadow-md shadow-orange-500/30 scale-105'
-                  : 'text-pb-text-muted hover:text-pb-text hover:bg-pb-elevated'
-              }`}
-            >
-              <Settings size={20} />
-            </div>
-          )}
-        </NavLink>
-      </nav>
+        </nav>
+      )}
     </div>
   )
 }

@@ -37,6 +37,24 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 
+    <!-- DNS Prefetch for external services -->
+    <link rel="dns-prefetch" href="https://res.cloudinary.com" />
+    <link rel="dns-prefetch" href="https://fonts.gstatic.com" />
+
+    <!-- Preload critical fonts so they are ready before CSS parses -->
+    <link
+      rel="preload"
+      as="style"
+      href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323:wght@400&family=Courier+Prime:wght@400;700&display=swap"
+      onload="this.onload=null;this.rel='stylesheet'"
+    />
+    <noscript>
+      <link
+        rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323:wght@400&family=Courier+Prime:wght@400;700&display=swap"
+      />
+    </noscript>
+
     <!-- Early Theme Execution — Mencegah Flicker/Mismatch Warna Saat Awal Akses -->
     <script>
       (function () {

@@ -68,15 +68,19 @@ Dokumen ini berisi rincian teknis mengenai bahasa pemrograman, framework, kebutu
 
 ## 3. 🔌 Integrasi Perangkat & Konektivitas Hardware
 
-1. **Kamera DSLR (Canon / Nikon / Sony):**
-   - Dihubungkan via kabel USB ke PC host, dikontrol oleh service `hardware-bridge` (Python) untuk memotret fisik resolusi tertinggi.
-2. **Kamera Internal / Webcam (iPad / Tablet / Laptop):**
-   - Digunakan sebagai *Live Preview* real-time di layar sentuh iPad.
-3. **Remote Shutter Bluetooth (*Hands-Free Trigger*):**
+1. **Kamera DSLR / Mirrorless Canon (Metode Utama & Cepat — EOS Webcam Utility):**
+   - Dihubungkan via kabel data USB ke PC/Laptop dengan software resmi **Canon EOS Webcam Utility**.
+   - Terdeteksi langsung di browser sebagai perangkat WebRTC DirectShow dengan kualitas sensor DSLR.
+   - Pilihan kamera tersimpan di `localStorage` dan dapat diganti secara langsung via komponen `CameraSelector`.
+2. **Kamera DSLR (Advanced Shutter Trigger — Canon EDSDK / Python Bridge):**
+   - Dikontrol oleh service `hardware-bridge` (Python di port 5000) untuk memotret fisik resolusi RAW/JPEG tertinggi.
+3. **Kamera Internal / Webcam Eksternal USB (Logitech / Laptop / iPad / Tablet):**
+   - Mendukung multi-kamera dengan deteksi otomatis saat kabel dicolok/dicabut (`ondevicechange`).
+4. **Remote Shutter Bluetooth (*Hands-Free Trigger*):**
    - Mendengarkan tombol `Space`, `Enter`, `AudioVolumeUp` (Tombol Volume +), dan `PageDown` pada remote Bluetooth selfie stick / presenter slide.
-4. **iPad & Tablet:**
+5. **iPad & Tablet:**
    - Dikembangkan dengan mode Fullscreen PWA tanpa navbar/footer browser.
-5. **Cloud Storage (Cloudflare R2 / AWS S3):**
+6. **Cloud Storage (Cloudflare R2 / AWS S3):**
    - 10 GB Storage Gratis per bulan & **0 Rupiah biaya Egress/Bandwidth** saat customer scan QR Code foto.
 
 ---

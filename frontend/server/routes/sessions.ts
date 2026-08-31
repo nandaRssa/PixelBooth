@@ -261,29 +261,6 @@ sessionsRouter.post('/:id/complete', async (c) => {
 
     const currentSession = sessionData.session
 
-    let finalUrl = ''
-    if (finalImageBase64) {
-      try {
-        finalUrl = await saveMedia(
-          finalImageBase64,
-          'photos',
-          `${currentSession.session_token || id}-final`
-        )
-      } catch (err) {
-        console.error('saveMedia finalImage error:', err)
-      }
-    }
-
-    // Fallback: If composite image is missing or failed, use the latest valid capture from this session
-    if (!finalUrl) {
-      const captures = sessionData.captures || []
-      if (captures && captures.length > 0) {
-        const validCaptures = captures.filter((c: any) => c.status !== 'retaken')
-        const chosen = validCaptures[validCaptures.length - 1] || captures[captures.length - 1]
-        finalUrl = chosen.photo_url || chosen.photo_path || ''
-      }
-    }
-
     const uniqueToken = (typeof globalThis !== 'undefined' && globalThis.crypto && typeof globalThis.crypto.randomUUID === 'function')
       ? globalThis.crypto.randomUUID()
       : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
@@ -308,15 +285,45 @@ sessionsRouter.post('/:id/complete', async (c) => {
 
     const frontendUrl = (process.env.FRONTEND_URL || reqOrigin || 'https://pixelbooth.pages.dev').replace(/\/$/, '')
     const photoViewUrl = `${frontendUrl}/photo/${uniqueToken}`
-    let qrPath = `qr/photos/${uniqueToken}.png`
-    try {
-      const qrDataUrl = await generateQrDataUrl(photoViewUrl)
-      const uploadedQr = await saveMedia(qrDataUrl, 'qr', `${uniqueToken}.png`)
-      if (uploadedQr && !uploadedQr.startsWith('data:') && uploadedQr.length <= 255) {
-        qrPath = uploadedQr
+
+    // 1. Eksekusi penyimpanan Foto Final & QR Code secara PARALEL agar respon secepat kilat
+    const saveFinalPromise = (async () => {
+      if (!finalImageBase64) return ''
+      try {
+        return await saveMedia(
+          finalImageBase64,
+          'photos',
+          `${currentSession.session_token || id}-final`
+        )
+      } catch (err) {
+        console.error('saveMedia finalImage error:', err)
+        return ''
       }
-    } catch (e) {
-      console.warn('QR upload skipped:', e)
+    })()
+
+    const saveQrPromise = (async () => {
+      try {
+        const qrDataUrl = await generateQrDataUrl(photoViewUrl)
+        const uploadedQr = await saveMedia(qrDataUrl, 'qr', `${uniqueToken}.png`)
+        if (uploadedQr && !uploadedQr.startsWith('data:') && uploadedQr.length <= 255) {
+          return uploadedQr
+        }
+      } catch (e) {
+        console.warn('QR upload skipped:', e)
+      }
+      return `qr/photos/${uniqueToken}.png`
+    })()
+
+    let [finalUrl, qrPath] = await Promise.all([saveFinalPromise, saveQrPromise])
+
+    // Fallback: If composite image is missing or failed, use the latest valid capture from this session
+    if (!finalUrl) {
+      const captures = sessionData.captures || []
+      if (captures && captures.length > 0) {
+        const validCaptures = captures.filter((c: any) => c.status !== 'retaken')
+        const chosen = validCaptures[validCaptures.length - 1] || captures[captures.length - 1]
+        finalUrl = chosen.photo_url || chosen.photo_path || ''
+      }
     }
 
     const folderName = sessionData.folder?.name || ''

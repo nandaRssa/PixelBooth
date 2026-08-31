@@ -1,8 +1,8 @@
 import React from 'react'
-import { motion } from 'framer-motion'
 
 // ==========================================
-// Button Component — PixelBooth Design System
+// Button Component — PixelBooth Retro Arcade Design System
+// 3D bevel push effect, no framer-motion scale
 // ==========================================
 
 type ButtonVariant = 'primary' | 'secondary' | 'danger' | 'ghost' | 'outline'
@@ -25,18 +25,18 @@ interface ButtonProps {
 }
 
 const variantStyles: Record<ButtonVariant, string> = {
-  primary: 'bg-gradient-to-r from-[#FF5A36] via-[#FF7836] to-[#FF9836] text-white shadow-md shadow-orange-500/20 hover:shadow-lg hover:shadow-orange-500/35 hover:brightness-105 active:scale-[0.98]',
-  secondary: 'bg-pb-elevated text-pb-text border border-pb-border hover:bg-pb-surface hover:border-pb-border-strong',
-  danger: 'bg-red-500/10 text-red-500 border border-red-500/20 hover:bg-red-500/20 hover:border-red-500/30',
-  ghost: 'text-pb-text-secondary hover:text-pb-text hover:bg-pb-elevated',
-  outline: 'border border-pb-border-strong text-pb-text hover:bg-pb-elevated hover:border-pb-text-muted',
+  primary:   'bg-[#FF5A36] text-white border-[2px] border-black shadow-[4px_4px_0px_var(--pb-shadow-solid)] hover:bg-[#FF7040] hover:shadow-[5px_5px_0px_#FFB800] active:translate-x-[2px] active:translate-y-[2px] active:shadow-[1px_1px_0px_var(--pb-shadow-solid)]',
+  secondary: 'bg-[var(--pb-elevated)] text-[var(--pb-text)] border-[2px] border-[var(--pb-border-strong)] shadow-[3px_3px_0px_var(--pb-shadow-solid)] hover:bg-[var(--pb-border)] hover:border-[#FFB800] active:translate-x-[2px] active:translate-y-[2px] active:shadow-[1px_1px_0px_var(--pb-shadow-solid)]',
+  danger:    'bg-[#8B0000] text-[#FFEEEE] border-[2px] border-[#EF4444] shadow-[3px_3px_0px_#EF4444] hover:bg-[#AA0000] hover:text-white active:translate-x-[2px] active:translate-y-[2px] active:shadow-[1px_1px_0px_#EF4444]',
+  ghost:     'bg-transparent text-[var(--pb-text-secondary)] border-[2px] border-transparent hover:border-[var(--pb-border-strong)] hover:text-[var(--pb-text)] hover:bg-[var(--pb-elevated)]',
+  outline:   'bg-transparent text-[var(--pb-text)] border-[2px] border-[var(--pb-border-strong)] shadow-[3px_3px_0px_var(--pb-shadow-solid)] hover:bg-[var(--pb-elevated)] hover:border-[#FFB800] active:translate-x-[2px] active:translate-y-[2px] active:shadow-[1px_1px_0px_var(--pb-shadow-solid)]',
 }
 
 const sizeStyles: Record<ButtonSize, string> = {
-  sm: 'px-3 py-1.5 text-sm min-h-[36px]',
-  md: 'px-4 py-2.5 text-sm min-h-[44px]',
-  lg: 'px-6 py-3 text-base min-h-[52px]',
-  xl: 'px-8 py-4 text-lg min-h-[64px]',
+  sm:  'px-3.5 py-1.5 text-base sm:text-lg min-h-[38px]',
+  md:  'px-5 py-2.5 text-lg sm:text-xl min-h-[46px]',
+  lg:  'px-7 py-3 text-xl sm:text-2xl min-h-[54px]',
+  xl:  'px-9 py-4 text-2xl sm:text-3xl min-h-[64px]',
 }
 
 export const Button: React.FC<ButtonProps> = ({
@@ -57,20 +57,20 @@ export const Button: React.FC<ButtonProps> = ({
   const isDisabled = disabled || loading
 
   return (
-    <motion.button
-      whileHover={isDisabled ? undefined : { y: -1, scale: 1.01 }}
-      whileTap={isDisabled ? undefined : { scale: 0.98 }}
-      transition={{ duration: 0.12 }}
+    <button
       type={type}
       id={id}
       form={form}
       onClick={onClick}
       disabled={isDisabled}
       className={`
-        inline-flex items-center justify-center gap-2 rounded-lg font-medium
-        transition-colors duration-150 cursor-pointer select-none
-        disabled:opacity-50 disabled:cursor-not-allowed
-        focus:outline-none focus:ring-2 focus:ring-white/20 focus:ring-offset-2 focus:ring-offset-black
+        inline-flex items-center justify-center gap-2 rounded-[4px]
+        font-retro tracking-wide uppercase
+        transition-[transform,box-shadow,background-color] duration-[50ms]
+        cursor-pointer select-none
+        disabled:opacity-40 disabled:cursor-not-allowed
+        disabled:!translate-x-0 disabled:!translate-y-0 disabled:!shadow-none
+        focus:outline-none focus:ring-2 focus:ring-[#FF5A36] focus:ring-offset-2 focus:ring-offset-[var(--pb-bg)]
         ${variantStyles[variant]}
         ${sizeStyles[size]}
         ${fullWidth ? 'w-full' : ''}
@@ -78,26 +78,10 @@ export const Button: React.FC<ButtonProps> = ({
       `}
     >
       {loading ? (
-        <svg
-          className="animate-spin h-4 w-4"
-          xmlns="http://www.w3.org/2000/svg"
-          fill="none"
-          viewBox="0 0 24 24"
-        >
-          <circle
-            className="opacity-25"
-            cx="12" cy="12" r="10"
-            stroke="currentColor" strokeWidth="4"
-          />
-          <path
-            className="opacity-75"
-            fill="currentColor"
-            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-          />
-        </svg>
+        <span className="inline-block w-4 h-4 border-2 border-current border-t-transparent animate-spin rounded-full" />
       ) : leftIcon}
       {children}
       {!loading && rightIcon}
-    </motion.button>
+    </button>
   )
 }

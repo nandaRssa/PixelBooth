@@ -1,10 +1,13 @@
 import React from 'react'
+import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X } from 'lucide-react'
 import { Button } from './Button'
 
 // ==========================================
-// Modal Component
+// Modal Component — Retro Arcade Style
+// Hard border, no glassmorphism, step animation
+// Light/Dark mode supported via CSS variables
 // ==========================================
 
 interface ModalProps {
@@ -17,9 +20,9 @@ interface ModalProps {
 }
 
 const sizeMap = {
-  sm: 'max-w-sm',
-  md: 'max-w-md',
-  lg: 'max-w-lg',
+  sm: 'max-w-md',
+  md: 'max-w-xl',
+  lg: 'max-w-2xl',
 }
 
 export const Modal: React.FC<ModalProps> = ({
@@ -30,61 +33,77 @@ export const Modal: React.FC<ModalProps> = ({
   size = 'md',
   showClose = true,
 }) => {
-  return (
+  if (typeof document === 'undefined') return null
+
+  return createPortal(
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
-          {/* Backdrop */}
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-6 overflow-y-auto w-screen h-screen">
+          {/* Backdrop — solid dark full screen */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.15 }}
-            className="fixed inset-0 bg-black/80 backdrop-blur-sm"
+            transition={{ duration: 0.1 }}
+            className="fixed inset-0 bg-black/85 w-full h-full"
             onClick={onClose}
           />
-          {/* Modal Card */}
+          {/* Modal Card — retro double border */}
           <motion.div
-            initial={{ opacity: 0, scale: 0.94, y: 12 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.94, y: 8 }}
-            transition={{ type: 'spring', damping: 26, stiffness: 380 }}
+            initial={{ opacity: 0, y: 30, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 20, scale: 0.96 }}
+            transition={{ duration: 0.15, ease: 'easeOut' }}
             className={`
               relative z-10 my-auto
               w-full ${sizeMap[size]}
-              bg-pb-surface border border-pb-border rounded-2xl shadow-2xl overflow-hidden
+              bg-[var(--pb-surface)]
+              border-[3px] border-[#FF5A36]
+              shadow-[6px_6px_0px_var(--pb-shadow-solid)]
+              rounded-[4px]
+              overflow-hidden
             `}
           >
+            {/* Scanline overlay on modal */}
+            <div
+              className="absolute inset-0 pointer-events-none z-0"
+              style={{
+                background: 'repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(0,0,0,0.06) 3px, rgba(0,0,0,0.06) 4px)',
+              }}
+            />
             {/* Header */}
             {(title || showClose) && (
-              <div className="flex items-center justify-between px-4 py-3 sm:px-6 sm:py-4 border-b border-pb-border">
+              <div className="relative z-10 flex items-center justify-between px-5 sm:px-6 py-4 border-b-[2px] border-[#FF5A36] bg-[#FF5A36]/15">
                 {title && (
-                  <h3 className="text-pb-text font-semibold text-sm sm:text-base">{title}</h3>
+                  <h3 className="font-pixel text-[var(--pb-text)] text-sm sm:text-base lg:text-lg leading-relaxed uppercase tracking-wider pr-2">
+                    {title}
+                  </h3>
                 )}
                 {showClose && (
                   <button
                     type="button"
                     onClick={onClose}
-                    className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-pb-elevated border border-pb-border hover:border-pb-border-strong text-pb-text-secondary hover:text-pb-text flex items-center justify-center transition-colors ml-auto shrink-0"
+                    className="w-9 h-9 sm:w-10 sm:h-10 rounded-[4px] bg-[var(--pb-elevated)] border-[2px] border-[var(--pb-border-strong)] text-[var(--pb-text)] hover:text-white hover:bg-[#FF5A36] hover:border-[#FF5A36] flex items-center justify-center transition-colors ml-auto shrink-0 cursor-pointer active:translate-x-[2px] active:translate-y-[2px]"
                     title="Tutup"
                     aria-label="Tutup"
                   >
-                    <X size={15} />
+                    <X size={18} />
                   </button>
                 )}
               </div>
             )}
             {/* Content */}
-            <div className="p-3.5 sm:p-6">{children}</div>
+            <div className="relative z-10 p-5 sm:p-6">{children}</div>
           </motion.div>
         </div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   )
 }
 
 // ==========================================
-// Confirm Modal — untuk konfirmasi destructive action
+// Confirm Modal — konfirmasi destructive action
 // ==========================================
 
 interface ConfirmModalProps {
@@ -112,10 +131,13 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
 }) => {
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={title} size="sm">
-      <p className="text-pb-text-secondary text-sm leading-relaxed mb-6">{message}</p>
+      <p className="font-retro text-[var(--pb-text)] text-xl sm:text-2xl font-bold leading-relaxed mb-6">
+        {message}
+      </p>
       <div className="flex gap-3">
         <Button
           variant="secondary"
+          size="md"
           fullWidth
           onClick={onClose}
           disabled={loading}
@@ -124,6 +146,7 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
         </Button>
         <Button
           variant={danger ? 'danger' : 'primary'}
+          size="md"
           fullWidth
           onClick={onConfirm}
           loading={loading}

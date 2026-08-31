@@ -28,37 +28,9 @@ import type { Template } from '@/types'
 // DSLR via hardware bridge bersifat opsional.
 // ==========================================
 
-// Hook sederhana untuk memeriksa ketersediaan kamera device
-function useWebcamAvailability() {
-  const [available, setAvailable] = useState<boolean | null>(null)
+import { CameraSelector } from '@/components/camera/CameraSelector'
+import { useCameraDevices } from '@/hooks/useCameraDevices'
 
-  useEffect(() => {
-    let cancelled = false
-
-    const check = async () => {
-      try {
-        if (!navigator.mediaDevices?.enumerateDevices) {
-          if (!cancelled) setAvailable(false)
-          return
-        }
-        const devices = await navigator.mediaDevices.enumerateDevices()
-        if (!cancelled) {
-          setAvailable(devices.some((d) => d.kind === 'videoinput'))
-        }
-      } catch {
-        if (!cancelled) setAvailable(false)
-      }
-    }
-
-    check()
-
-    return () => {
-      cancelled = true
-    }
-  }, [])
-
-  return available
-}
 
 const PhotoMenuPage: React.FC = () => {
   const navigate = useNavigate()
@@ -71,7 +43,8 @@ const PhotoMenuPage: React.FC = () => {
   const hardwareQuery = useHardwareStatus()
   const createSession = useCreateSession()
 
-  const webcamAvailable = useWebcamAvailability()
+  const { devices, isLoading: isCameraLoading, hasPermission } = useCameraDevices()
+  const cameraAvailable = devices.length > 0 && hasPermission !== false
   // Hanya template yang sudah dikonfirmasi di Frame Editor yang bisa dipakai
   const templates = (templatesQuery.data ?? []).filter((t) => t.status === 'active')
   const folders = foldersQuery.data ?? []
@@ -104,76 +77,81 @@ const PhotoMenuPage: React.FC = () => {
   }
 
   return (
-    <div className="flex flex-col min-h-[calc(100vh-6rem)] sm:h-[calc(100vh-4rem)]">
+    <div className="flex flex-col w-full pb-12">
       {/* ===== Header ===== */}
-      <div className="flex items-center justify-between mb-3 sm:mb-6 shrink-0">
-        <div>
-          <h1 className="text-pb-text text-xl sm:text-2xl font-bold">Photo</h1>
-          <p className="text-pb-text-muted text-xs sm:text-sm mt-0.5 sm:mt-1">Pilih template untuk langsung memulai sesi pemotretan</p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mb-5 sm:mb-6 shrink-0">
+        <div className="min-w-0">
+          <h1 className="font-pixel text-[var(--pb-text)] text-lg sm:text-xl lg:text-2xl leading-relaxed">Photo</h1>
+          <p className="font-retro text-[var(--pb-text-muted)] text-lg sm:text-xl font-bold mt-1 tracking-wide">
+            Pilih template untuk memulai sesi pemotretan
+          </p>
         </div>
-        <CameraStatusBadge
-          status={
-            webcamAvailable === null ? 'checking' : webcamAvailable ? 'connected' : 'disconnected'
-          }
-        />
+        <div className="self-start sm:self-auto shrink-0">
+          <CameraStatusBadge
+            status={
+              isCameraLoading ? 'checking' : cameraAvailable ? 'connected' : 'disconnected'
+            }
+          />
+        </div>
       </div>
 
-      {/* ===== Status Sumber Kamera (Compact di HP) ===== */}
-      <div className="bg-pb-surface border border-pb-border rounded-xl p-3 sm:p-4 mb-3 sm:mb-4 shrink-0">
-        <div className="flex items-center justify-between gap-2">
+      {/* ===== Selector & Status Kamera ===== */}
+      <div className="bg-[var(--pb-surface)] border-[2px] border-[var(--pb-border-strong)] rounded-[4px] p-4 sm:p-5 mb-4 shrink-0 shadow-[3px_3px_0px_#000,5px_5px_0px_var(--pb-shadow-solid)]">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="min-w-0">
-            <p className="text-pb-text text-xs sm:text-sm font-medium flex items-center gap-1.5 truncate">
-              {webcamAvailable === false ? (
-                <VideoOff size={15} className="text-amber-400 shrink-0" />
+            <p className="font-retro text-[var(--pb-text)] text-lg sm:text-xl flex items-center gap-2 truncate uppercase tracking-wider font-bold">
+              {!cameraAvailable && !isCameraLoading ? (
+                <VideoOff size={18} className="text-amber-400 shrink-0" />
               ) : (
-                <Video size={15} className="text-green-400 shrink-0" />
+                <Video size={18} className="text-[#22C55E] shrink-0" />
               )}
-              <span>Webcam Device (Utama)</span>
+              <span>Sumber Kamera Aktif</span>
             </p>
-            <p className="text-pb-text-muted text-[11px] sm:text-xs mt-0.5 truncate sm:whitespace-normal">
-              {webcamAvailable === null
-                ? 'Memeriksa kamera device...'
-                : webcamAvailable
-                  ? 'Kamera terdeteksi · Capture via browser.'
-                  : 'Tidak ada kamera terdeteksi.'}
+            <p className="font-retro text-[var(--pb-text-muted)] text-base sm:text-lg mt-1 truncate sm:whitespace-normal">
+              {isCameraLoading
+                ? '>> Memindai perangkat kamera...'
+                : cameraAvailable
+                  ? `>> ${devices.length} kamera terdeteksi. Siap untuk sesi foto.`
+                  : '>> ERROR: Kamera tidak ditemukan atau izin belum diberikan.'}
             </p>
           </div>
-          <span className="text-[10px] sm:text-xs text-pb-text-muted shrink-0 bg-pb-elevated px-2 py-0.5 rounded-md border border-pb-border/50">
-            Default
-          </span>
+
+          <div className="shrink-0 w-full sm:w-auto">
+            <CameraSelector compact />
+          </div>
         </div>
 
-        {/* DSLR opsional */}
+        {/* DSLR optional bridge status */}
         {hardware?.bridge_online && (
-          <div className="flex items-center justify-between mt-2 pt-2 border-t border-pb-border">
-            <p className="text-green-400 text-[11px] sm:text-xs flex items-center gap-1.5">
-              <Wifi size={13} />
+          <div className="flex items-center justify-between mt-3 pt-3 border-t-[2px] border-dashed border-[var(--pb-border)]">
+            <p className="font-retro text-[#22C55E] text-base sm:text-lg flex items-center gap-2 uppercase tracking-wide font-bold">
+              <Wifi size={16} />
               {dslrConnected
-                ? `DSLR: ${hardware.camera_model ?? 'kamera'}`
-                : 'Bridge online'}
+                ? `DSLR Bridge: ${hardware.camera_model ?? 'kamera'}`
+                : 'DSLR Bridge online'}
             </p>
-            <span className="text-[10px] text-pb-text-muted">DSLR</span>
+            <span className="font-pixel text-[10px] text-[var(--pb-text-muted)]">DSLR</span>
           </div>
         )}
       </div>
 
-      {/* ===== Pilihan Folder Tujuan (Compact di HP) ===== */}
-      <div className="mb-3 sm:mb-5 bg-pb-surface border border-pb-border rounded-xl p-3 sm:p-4 shrink-0 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-4">
+      {/* ===== Folder Tujuan ===== */}
+      <div className="mb-5 sm:mb-6 bg-[var(--pb-surface)] border-[2px] border-[var(--pb-border-strong)] rounded-[4px] p-4 sm:p-5 shrink-0 flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-5 shadow-[3px_3px_0px_#000,5px_5px_0px_var(--pb-shadow-solid)]">
         <div className="min-w-0">
-          <p className="text-pb-text font-semibold text-xs sm:text-sm flex items-center gap-1.5">
-            <FolderPlus size={14} className="text-[#FF5A36]" />
-            Target Folder Galeri
+          <p className="font-pixel text-[var(--pb-text)] text-[10px] sm:text-xs leading-relaxed flex items-center gap-2">
+            <FolderPlus size={16} className="text-[#FF5A36]" />
+            TARGET FOLDER GALERI
           </p>
-          <p className="text-pb-text-muted text-[11px] sm:text-xs mt-0.5">
+          <p className="font-retro text-[var(--pb-text-muted)] text-base sm:text-lg mt-1">
             Pilih folder tujuan sebelum memilih template.
           </p>
         </div>
 
-        <div className="w-full sm:w-64 shrink-0">
+        <div className="w-full sm:w-72 shrink-0">
           {foldersQuery.isLoading ? (
-            <div className="flex items-center gap-2 bg-pb-bg border border-pb-border rounded-lg px-3 py-1.5">
-              <Spinner size="sm" className="text-pb-text" />
-              <span className="text-pb-text-muted text-xs">Memuat...</span>
+            <div className="flex items-center gap-2 bg-[var(--pb-bg)] border-[2px] border-[var(--pb-border-strong)] rounded-[4px] px-4 py-2.5">
+              <Spinner size="sm" className="text-[var(--pb-text)]" />
+              <span className="font-retro text-[var(--pb-text-muted)] text-lg">Memuat...</span>
             </div>
           ) : (
             <select
@@ -181,11 +159,13 @@ const PhotoMenuPage: React.FC = () => {
               onChange={(e) =>
                 setSelectedFolderId(e.target.value === '' ? null : Number(e.target.value))
               }
-              className="w-full bg-pb-bg border border-pb-border rounded-lg px-3 py-2
-                text-pb-text text-xs sm:text-sm focus:outline-none focus:ring-1 focus:border-[#FF5A36]
-                [&>option]:bg-pb-bg"
+              className="w-full bg-[var(--pb-bg)] border-[2px] border-[var(--pb-border-strong)] rounded-[4px] px-4 py-2.5
+                font-retro text-[var(--pb-text)] text-lg sm:text-xl tracking-wider
+                focus:outline-none focus:border-[#FFB800]
+                shadow-[2px_2px_0px_var(--pb-shadow-solid)]
+                [&>option]:bg-[var(--pb-bg)]"
             >
-              <option value="">Galeri (Tanpa Folder)</option>
+              <option value="">[ Galeri - Tanpa Folder ]</option>
               {folders.map((folder) => (
                 <option key={folder.id} value={folder.id}>
                   {folder.name}
@@ -198,10 +178,10 @@ const PhotoMenuPage: React.FC = () => {
 
       {/* ===== Daftar Template (Full Page Scroll) ===== */}
       <div className="w-full pb-8">
-        <h2 className="text-pb-text text-xs sm:text-sm font-semibold mb-2.5 flex items-center gap-2">
-          <Layers size={15} className="text-[#FF5A36]" />
-          <span>Pilih Template</span>
-          <span className="text-pb-text-muted font-normal text-xs">
+        <h2 className="text-[var(--pb-text)] text-xs sm:text-sm font-pixel mb-3 flex items-center gap-2">
+          <Layers size={16} className="text-[#FF5A36]" />
+          <span>PILIH TEMPLATE</span>
+          <span className="text-[var(--pb-text-muted)] font-retro text-base sm:text-lg font-normal ml-1">
             ({templatesQuery.isLoading ? '...' : templates.length})
           </span>
         </h2>
@@ -225,17 +205,26 @@ const PhotoMenuPage: React.FC = () => {
             {templates.map((template) => {
               const isStarting = startingTemplateId === template.id
               return (
-                <motion.button
+                <button
                   key={template.id}
                   type="button"
-                  initial={{ opacity: 0, scale: 0.97 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  whileHover={startingTemplateId ? {} : { y: -4, scale: 1.02 }}
-                  whileTap={startingTemplateId ? {} : { scale: 0.98 }}
-                  transition={{ type: "spring", stiffness: 350, damping: 25 }}
                   onClick={() => setPreviewTemplate(template)}
                   disabled={!!startingTemplateId}
-                  className="relative aspect-[3/4] bg-pb-surface border border-pb-border hover:border-[#FF5A36] rounded-xl overflow-hidden text-left shadow-xs hover:shadow-xl transition-all duration-200 group disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
+                  className="relative aspect-[3/4]
+                    bg-[var(--pb-surface)]
+                    border-[3px] border-white
+                    rounded-none overflow-hidden text-left
+                    shadow-[3px_3px_0px_#000,6px_6px_0px_var(--pb-shadow-solid)]
+                    cursor-pointer
+                    transition-all
+                    duration-150 ease-out
+                    hover:border-[#FF5A36]
+                    hover:shadow-[5px_5px_0px_#000,10px_10px_0px_var(--pb-shadow-solid)]
+                    hover:-translate-x-1 hover:-translate-y-1
+                    active:translate-x-1 active:translate-y-1
+                    active:shadow-[1px_1px_0px_var(--pb-shadow-solid)]
+                    disabled:opacity-60 disabled:cursor-not-allowed
+                    group"
                 >
                   {template.preview_url ? (
                     <img
@@ -250,33 +239,40 @@ const PhotoMenuPage: React.FC = () => {
                       className="absolute inset-0 w-full h-full object-cover"
                     />
                   ) : (
-                    <div className="absolute inset-0 flex items-center justify-center bg-pb-elevated">
-                      <ImageIcon size={24} className="text-pb-faint" />
+                    <div className="absolute inset-0 flex items-center justify-center bg-[var(--pb-elevated)]">
+                      <ImageIcon size={24} className="text-[var(--pb-faint)]" />
                     </div>
                   )}
 
-                  {/* Loading Overlay jika card sedang diklik */}
+                  {/* Scanline overlay */}
+                  <div
+                    className="absolute inset-0 pointer-events-none z-[1]"
+                    style={{
+                      background: 'repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(0,0,0,0.07) 3px, rgba(0,0,0,0.07) 4px)',
+                    }}
+                  />
+
+                  {/* Loading overlay */}
                   {isStarting && (
-                    <div className="absolute inset-0 bg-black/70 backdrop-blur-xs flex flex-col items-center justify-center gap-1.5 z-10">
-                      <Spinner size="md" className="text-white" />
-                      <span className="text-white text-[10px] sm:text-xs font-medium">Memuat Sesi...</span>
+                    <div className="absolute inset-0 bg-black/80 flex flex-col items-center justify-center gap-1.5 z-10">
+                      <Spinner size="md" className="text-[#FF5A36]" />
+                      <span className="font-pixel text-white text-[8px] leading-relaxed">LOADING...</span>
                     </div>
                   )}
 
-                  {/* Badge jumlah frame */}
-                  <span className="absolute top-1.5 right-1.5 px-1.5 py-0.5 rounded-md bg-black/75 backdrop-blur-md
-                    text-white text-[9px] sm:text-[10px] font-medium border border-white/10 shadow-md">
-                    {template.frame_count} f
+                  {/* Frame count badge */}
+                  <span className="absolute top-1 right-1 sm:top-2 sm:right-2 font-pixel text-white text-[7px] sm:text-[9px] md:text-[10px] px-1 py-0.5 sm:px-2 sm:py-1 rounded-none bg-black/90 border border-[#FF5A36] shadow-[1px_1px_0px_#000] sm:shadow-[2px_2px_0px_#000] z-[2]">
+                    x{template.frame_count}
                   </span>
 
-                  {/* Info bawah */}
-                  <div className="absolute bottom-0 left-0 right-0 p-1.5 sm:p-2.5 bg-gradient-to-t from-black/95 via-black/70 to-transparent">
-                    <p className="text-white text-[11px] sm:text-xs font-semibold truncate leading-tight">{template.name}</p>
-                    <p className="text-white/70 text-[9px] sm:text-[10px] mt-0.5">
-                      {template.canvas_width} x {template.canvas_height}
+                  {/* Bottom info — hidden on mobile so it doesn't obstruct the template design, visible on sm+, fades out on hover */}
+                  <div className="hidden sm:block absolute bottom-0 left-0 right-0 p-2 sm:p-2.5 bg-black/55 border-t-[2px] border-[#FF5A36] z-[2] transition-opacity duration-150 group-hover:opacity-0">
+                    <p className="font-retro text-white text-base sm:text-lg truncate leading-tight font-bold">{template.name}</p>
+                    <p className="font-retro pb-size-text font-bold text-xs sm:text-sm mt-0.5 drop-shadow-[0_1px_1px_rgba(0,0,0,0.8)]">
+                      {template.canvas_width}x{template.canvas_height} px
                     </p>
                   </div>
-                </motion.button>
+                </button>
               )
             })}
           </div>
