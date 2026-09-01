@@ -81,6 +81,15 @@ html.light :not([class*="bg-black"]):not([class*="bg-[#141416]"]):not([class*="b
   border-color: #8F4F00 !important;
 }
 
+html.light :not([class*="bg-black"]):not([class*="bg-[#141416]"]):not([class*="bg-[#0a0500]"]).text-amber-400,
+html.light :not([class*="bg-black"]):not([class*="bg-[#141416]"]):not([class*="bg-[#0a0500]"]).text-amber-300,
+html.light :not([class*="bg-black"]):not([class*="bg-[#141416]"]):not([class*="bg-[#0a0500]"]).text-amber-500,
+html.light :not([class*="bg-black"]):not([class*="bg-[#141416]"]):not([class*="bg-[#0a0500]"])[class*="text-amber-400"],
+html.light :not([class*="bg-black"]):not([class*="bg-[#141416]"]):not([class*="bg-[#0a0500]"])[class*="text-amber-300"],
+html.light :not([class*="bg-black"]):not([class*="bg-[#141416]"]):not([class*="bg-[#0a0500]"])[class*="text-amber-500"] {
+  color: #78350F !important;
+}
+
 /* Explicit high-visibility neon colors for buttons on black/dark card backgrounds */
 html.light [class*="bg-black"].text-\[\#00FFCC\],
 html.light [class*="bg-black"] .text-\[\#00FFCC\],

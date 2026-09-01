@@ -111,7 +111,7 @@ const MovePhotoModal: React.FC<MovePhotoModalProps> = ({
                     text-left font-retro text-base sm:text-lg font-bold text-[var(--pb-text)] hover:border-[#FFB800] hover:bg-[var(--pb-elevated)]
                     shadow-[2px_2px_0px_var(--pb-shadow-solid)] transition-all disabled:opacity-50 cursor-pointer"
                 >
-                  <FolderIcon size={20} className="text-amber-400 shrink-0" />
+                  <FolderIcon size={20} className="text-[var(--pb-yellow)] shrink-0 stroke-[2.5]" />
                   <span className="flex-1 truncate">{folder.name}</span>
                   <span className="font-retro text-sm text-[var(--pb-text-muted)] font-normal">
                     {folder.photo_count ?? 0} foto

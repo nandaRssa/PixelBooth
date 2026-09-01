@@ -12,6 +12,7 @@ import {
   Square,
   Check,
   Sparkles,
+  Printer,
 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Spinner } from '@/components/ui/StatusBadge'
@@ -19,6 +20,7 @@ import { toast } from '@/components/ui/Toast'
 import { customerApi } from '@/api/customer'
 import { getStorageUrl } from '@/api/client'
 import { downloadFile } from '@/utils/download'
+import PrintModal from '@/components/gallery/PrintModal'
 import type { CustomerFolder, CustomerFolderPhoto } from '@/types'
 
 // ==========================================
@@ -36,6 +38,15 @@ const CustomerFolderPage: React.FC = () => {
   const [selectionMode, setSelectionMode] = useState(false)
   const [selectedTokens, setSelectedTokens] = useState<Set<string>>(new Set())
   const [isDownloading, setIsDownloading] = useState(false)
+  const [printModalState, setPrintModalState] = useState<{
+    isOpen: boolean
+    photos: Array<{ id?: string | number; url: string; title?: string }>
+    title: string
+  }>({
+    isOpen: false,
+    photos: [],
+    title: 'Cetak Foto',
+  })
 
   const loadFolderData = (currentToken: string) => {
     customerApi
@@ -240,6 +251,26 @@ const CustomerFolderPage: React.FC = () => {
                     <Button
                       variant="secondary"
                       size="sm"
+                      onClick={() => {
+                        if (!folder || folder.photos.length === 0) return
+                        setPrintModalState({
+                          isOpen: true,
+                          photos: folder.photos.map((p, idx) => ({
+                            id: p.token,
+                            url: p.photo_url || p.url || '',
+                            title: `Foto ${idx + 1}`,
+                          })),
+                          title: `Cetak Semua Foto (${folder.photos.length}) — ${folder.name}`,
+                        })
+                      }}
+                      leftIcon={<Printer size={15} className="text-[#FFB800] stroke-[2.5]" />}
+                      className="hover:!border-[#FFB800]"
+                    >
+                      Print Semua
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      size="sm"
                       onClick={() => setSelectionMode(true)}
                       leftIcon={<CheckSquare size={16} />}
                     >
@@ -271,6 +302,29 @@ const CustomerFolderPage: React.FC = () => {
                     </span>
                   </div>
                   <div className="flex items-center gap-1.5 sm:gap-2 ml-auto">
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => {
+                        if (!folder) return
+                        const sel = folder.photos.filter((p) => selectedTokens.has(p.token))
+                        if (sel.length === 0) return
+                        setPrintModalState({
+                          isOpen: true,
+                          photos: sel.map((p, idx) => ({
+                            id: p.token,
+                            url: p.photo_url || p.url || '',
+                            title: `Foto ${idx + 1}`,
+                          })),
+                          title: `Cetak ${sel.length} Foto Terpilih`,
+                        })
+                      }}
+                      disabled={selectedTokens.size === 0}
+                      leftIcon={<Printer size={14} className="text-[#FFB800] stroke-[2.5]" />}
+                      className="hover:!border-[#FFB800]"
+                    >
+                      Print ({selectedTokens.size})
+                    </Button>
                     <Button
                       variant="primary"
                       size="sm"
@@ -410,15 +464,32 @@ const CustomerFolderPage: React.FC = () => {
                   />
                 </div>
 
-                <div className="mt-3 pt-3 border-t-[2px] border-dashed border-[var(--pb-border-strong)]">
+                <div className="mt-3 pt-3 border-t-[2px] border-dashed border-[var(--pb-border-strong)] grid grid-cols-2 gap-2">
                   <Button
                     variant="primary"
                     size="md"
-                    fullWidth
                     onClick={() => handleDownloadSingle(preview)}
                     leftIcon={<Download size={16} />}
                   >
                     Unduh Foto
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="md"
+                    onClick={() => {
+                      setPrintModalState({
+                        isOpen: true,
+                        photos: [{
+                          id: preview.token,
+                          url: preview.photo_url || preview.url || '',
+                          title: 'Foto Photobooth',
+                        }],
+                        title: 'Cetak Foto',
+                      })
+                    }}
+                    leftIcon={<Printer size={16} className="text-[#FFB800] stroke-[2.5]" />}
+                  >
+                    Print Foto
                   </Button>
                 </div>
               </div>
@@ -426,6 +497,16 @@ const CustomerFolderPage: React.FC = () => {
           </>
         )}
       </AnimatePresence>
+
+      {/* ===== Print Modal ===== */}
+      {printModalState.isOpen && printModalState.photos.length > 0 && (
+        <PrintModal
+          isOpen={printModalState.isOpen}
+          onClose={() => setPrintModalState((prev) => ({ ...prev, isOpen: false }))}
+          photos={printModalState.photos}
+          title={printModalState.title}
+        />
+      )}
     </div>
   )
 }

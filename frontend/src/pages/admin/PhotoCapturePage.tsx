@@ -3,13 +3,16 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
+  AlertTriangle,
   ArrowLeft,
   Camera as CameraIcon,
   Check,
+  CheckCircle2,
   Download,
   ExternalLink,
   FolderPlus,
   ImageIcon,
+  Printer,
   QrCode,
   RotateCcw,
   Share2,
@@ -29,7 +32,7 @@ import { buildTemplateOverlay, renderFinalComposite, preloadTemplateImage } from
 import { getStorageUrl } from '@/api/client'
 import { downloadFile } from '@/utils/download'
 import { createCameraStream, getSelectedCameraId } from '@/utils/cameraManager'
-import { CameraSelector } from '@/components/camera/CameraSelector'
+import PrintModal from '@/components/gallery/PrintModal'
 import type { PhotoSession } from '@/types'
 import type { PreviewSlot } from '@/utils/previewSlots'
 
@@ -65,7 +68,11 @@ const PhotoCapturePage: React.FC = () => {
     unique_token?: string
     filename?: string
   } | null>(null)
+  const [syncStatus, setSyncStatus] = useState<'syncing' | 'saved' | 'error'>('saved')
+  const [isNavigating, setIsNavigating] = useState(false)
+  const syncPromiseRef = useRef<Promise<boolean> | null>(null)
   const [showQrModal, setShowQrModal] = useState(false)
+  const [showPrintModal, setShowPrintModal] = useState(false)
   const [showRetakeOptions, setShowRetakeOptions] = useState(false)
 
   // ===== Folder tujuan penyimpanan =====
@@ -324,17 +331,21 @@ const PhotoCapturePage: React.FC = () => {
     try {
       const video = videoRef.current
       const canvas = document.createElement('canvas')
-      canvas.width = video.videoWidth || 1280
-      canvas.height = video.videoHeight || 720
+      // Gunakan resolusi native sensor penuh kamera
+      canvas.width = video.videoWidth || 1920
+      canvas.height = video.videoHeight || 1080
       const ctx = canvas.getContext('2d')
       if (!ctx) throw new Error('Canvas tidak tersedia')
+
+      ctx.imageSmoothingEnabled = true
+      ctx.imageSmoothingQuality = 'high'
 
       // Mirror untuk selfie dengan tone natural kamera
       ctx.translate(canvas.width, 0)
       ctx.scale(-1, 1)
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
 
-      const base64 = canvas.toDataURL('image/jpeg', 0.85)
+      const base64 = canvas.toDataURL('image/jpeg', 0.95)
       const currentFrameNum = session.current_frame || 1
       localCapturesRef.current[currentFrameNum] = base64
 
@@ -495,40 +506,122 @@ const PhotoCapturePage: React.FC = () => {
       setIsCapturing(true)
     }
 
-    // 3. Simpan di server di background (asynchronous)
-    try {
-      if (pendingCapturesRef.current.length > 0) {
-        await Promise.allSettled(pendingCapturesRef.current)
-      }
+    setSyncStatus('syncing')
 
+    // 3. Simpan di server di background (asynchronous) dengan auto-retry
+    const syncTask = async (): Promise<boolean> => {
+      try {
+        if (pendingCapturesRef.current.length > 0) {
+          await Promise.allSettled(pendingCapturesRef.current)
+        }
+
+        let result: any = null
+        let lastError: any = null
+        for (let attempt = 1; attempt <= 2; attempt++) {
+          try {
+            result = await sessionApi.complete(session.id, {
+              final_image_base64: finalImageBase64,
+            })
+            if (result) break
+          } catch (e) {
+            lastError = e
+            if (attempt < 2) await new Promise((r) => setTimeout(r, 400))
+          }
+        }
+
+        if (!result) throw lastError || new Error('Gagal menyimpan foto final ke server.')
+
+        const photoData = (result.photo || {}) as any
+        const finalToken = photoData.unique_token || uniqueToken
+        let qrLink = photoData.qr_link || `${window.location.origin}/photo/${finalToken}`
+        if (!qrLink.startsWith('http://') && !qrLink.startsWith('https://')) {
+          qrLink = `${window.location.origin}${qrLink.startsWith('/') ? '' : '/'}${qrLink}`
+        }
+
+        // Update data permanen dari server tanpa mengganggu tampilan foto
+        setResultPhoto({
+          id: photoData.id,
+          url: photoData.url || photoData.photo_url || photoData.storage_path || finalImageBase64,
+          qr_url: photoData.qr_url || photoData.qr_path || 'ready',
+          qr_link: qrLink,
+          unique_token: finalToken,
+          filename: photoData.filename,
+        })
+        setSyncStatus('saved')
+        queryClient.invalidateQueries({ queryKey: ['folders'] })
+        queryClient.invalidateQueries({ queryKey: ['photos'] })
+        return true
+      } catch (err: unknown) {
+        console.error('Background complete sync error:', err)
+        setSyncStatus('error')
+        toast.error('Gagal mengunggah foto ke galeri. Klik Coba Lagi.')
+        return false
+      } finally {
+        setIsCapturing(false)
+      }
+    }
+
+    syncPromiseRef.current = syncTask()
+  }
+
+  // ===== Coba lagi sinkronisasi jika gagal =====
+  const handleRetrySync = async () => {
+    if (!session || !resultPhoto) return
+    setSyncStatus('syncing')
+    toast.info('Mencoba menyimpan ulang foto ke galeri...')
+    try {
       const result = await sessionApi.complete(session.id, {
-        final_image_base64: finalImageBase64,
+        final_image_base64: resultPhoto.url,
       })
       const photoData = (result.photo || {}) as any
-      const finalToken = photoData.unique_token || uniqueToken
-      let qrLink = photoData.qr_link || `${window.location.origin}/photo/${finalToken}`
-      if (!qrLink.startsWith('http://') && !qrLink.startsWith('https://')) {
+      const finalToken = photoData.unique_token || resultPhoto.unique_token
+      let qrLink = photoData.qr_link || resultPhoto.qr_link
+      if (qrLink && !qrLink.startsWith('http://') && !qrLink.startsWith('https://')) {
         qrLink = `${window.location.origin}${qrLink.startsWith('/') ? '' : '/'}${qrLink}`
       }
 
-      // Update data permanen dari server tanpa mengganggu tampilan foto
-      setResultPhoto({
-        id: photoData.id,
-        url: photoData.url || photoData.photo_url || photoData.storage_path || finalImageBase64,
-        qr_url: photoData.qr_url || photoData.qr_path,
-        qr_link: qrLink,
-        unique_token: finalToken,
-        filename: photoData.filename,
-      })
+      setResultPhoto((prev) =>
+        prev
+          ? {
+              ...prev,
+              id: photoData.id,
+              qr_url: photoData.qr_url || photoData.qr_path || 'ready',
+              qr_link: qrLink,
+            }
+          : prev
+      )
+      setSyncStatus('saved')
       queryClient.invalidateQueries({ queryKey: ['folders'] })
       queryClient.invalidateQueries({ queryKey: ['photos'] })
-      toast.success('Foto final berhasil disimpan ke galeri.')
-    } catch (err: unknown) {
-      console.warn('Background complete sync:', err)
-      // Jika sync gagal di background, foto tetap bisa diunduh lokal oleh user
-    } finally {
-      setIsCapturing(false)
+      toast.success('Foto berhasil tersimpan ke galeri!')
+    } catch {
+      setSyncStatus('error')
+      toast.error('Masih gagal menyimpan foto. Silakan cek koneksi/server.')
     }
+  }
+
+  // ===== Navigasi pintar ke Galeri (tunggu sync tuntas jika sedang proses) =====
+  const handleGoToGallery = async () => {
+    if (syncStatus === 'syncing' && syncPromiseRef.current) {
+      setIsNavigating(true)
+      toast.info('Menyelesaikan penyimpanan foto ke galeri...')
+      await syncPromiseRef.current
+      setIsNavigating(false)
+    }
+    queryClient.invalidateQueries({ queryKey: ['photos'] })
+    queryClient.invalidateQueries({ queryKey: ['folders'] })
+    navigate(folderId ? `/gallery?folder_id=${folderId}` : '/gallery')
+  }
+
+  // ===== Navigasi Selesai (tunggu sync jika masih proses) =====
+  const handleFinishSession = async () => {
+    if (syncStatus === 'syncing' && syncPromiseRef.current) {
+      setIsNavigating(true)
+      toast.info('Menyelesaikan penyimpanan foto...')
+      await syncPromiseRef.current
+      setIsNavigating(false)
+    }
+    navigate('/photo')
   }
 
   // ===== Ubah folder tujuan penyimpanan =====
@@ -665,60 +758,108 @@ const PhotoCapturePage: React.FC = () => {
             </div>
           )}
 
-          {/* 5 Tombol Aksi Utama: Unduh Foto, Scan QR, Buka Galeri, Ulangi, Selesai */}
-          <div className="w-full max-w-2xl mx-auto flex flex-col sm:flex-row sm:flex-wrap sm:items-center sm:justify-center gap-2.5 sm:gap-4">
+          {/* Status Badge Sinkronisasi */}
+          <div className="mb-6">
+            {syncStatus === 'syncing' && (
+              <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-amber-500/15 border border-amber-500/40 text-amber-300 font-retro text-sm sm:text-base font-bold shadow-[2px_2px_0px_#000]">
+                <Spinner size="sm" className="text-amber-400" />
+                <span>Memproses & menyimpan ke galeri...</span>
+              </div>
+            )}
+            {syncStatus === 'saved' && (
+              <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-500/15 border border-emerald-500/40 text-emerald-400 font-retro text-sm sm:text-base font-bold shadow-[2px_2px_0px_#000]">
+                <CheckCircle2 size={18} className="text-emerald-400 stroke-[2.5]" />
+                <span>Foto 100% Tersimpan di Galeri</span>
+              </div>
+            )}
+            {syncStatus === 'error' && (
+              <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-red-500/15 border border-red-500/40 text-red-400 font-retro text-sm sm:text-base font-bold shadow-[2px_2px_0px_#000]">
+                <AlertTriangle size={18} className="text-red-400 stroke-[2.5]" />
+                <span>Gagal menyimpan ke galeri server</span>
+                <button
+                  type="button"
+                  onClick={handleRetrySync}
+                  className="underline hover:text-white ml-2 font-bold cursor-pointer"
+                >
+                  Coba Lagi
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* 6 Tombol Aksi Utama: Unduh Foto, Print Foto, Scan QR, Buka Galeri, Ulangi, Selesai */}
+          <div className="w-full max-w-3xl mx-auto flex flex-col sm:flex-row sm:flex-wrap sm:items-center sm:justify-center gap-2.5 sm:gap-4">
             {resultPhoto.url && (
               <Button
                 variant="primary"
                 size="lg"
                 onClick={() =>
-                  downloadFile(resultPhoto.url!, `pixelbooth-${session?.id ?? 'final'}.jpg`)
+                  downloadFile(resultPhoto.url!, resultPhoto.filename || `pixelbooth-${session?.id ?? 'final'}.jpg`)
                 }
                 leftIcon={<Download size={18} className="shrink-0" />}
-                className="!min-h-[44px] !py-2 !px-4 !text-base sm:!min-h-[54px] sm:!py-3 sm:!px-7 sm:!text-xl"
+                className="!min-h-[44px] !py-2 !px-4 !text-base sm:!min-h-[54px] sm:!py-3 sm:!px-6 sm:!text-xl"
               >
                 Unduh Foto
               </Button>
             )}
-            {resultPhoto.qr_url && (
+            {resultPhoto.url && (
               <Button
                 variant="primary"
                 size="lg"
-                onClick={() => setShowQrModal(true)}
-                leftIcon={<QrCode size={18} className="shrink-0" />}
-                className="bg-emerald-600 hover:bg-emerald-500 text-white !min-h-[44px] !py-2 !px-4 !text-base sm:!min-h-[54px] sm:!py-3 sm:!px-7 sm:!text-xl"
+                onClick={() => setShowPrintModal(true)}
+                leftIcon={<Printer size={18} className="shrink-0 stroke-[2.5]" />}
+                className="!bg-[#FF5A36] hover:!bg-[#FF7040] text-white shadow-[2px_2px_0px_#000] !min-h-[44px] !py-2 !px-4 !text-base sm:!min-h-[54px] sm:!py-3 sm:!px-6 sm:!text-xl font-bold"
               >
-                Scan QR
+                Print Foto
               </Button>
             )}
             <Button
+              variant="primary"
+              size="lg"
+              onClick={() => setShowQrModal(true)}
+              leftIcon={<QrCode size={18} className="shrink-0" />}
+              className="bg-emerald-600 hover:bg-emerald-500 text-white !min-h-[44px] !py-2 !px-4 !text-base sm:!min-h-[54px] sm:!py-3 sm:!px-6 sm:!text-xl"
+            >
+              Scan QR
+            </Button>
+            <Button
               variant="secondary"
               size="lg"
-              onClick={() => {
-                queryClient.invalidateQueries({ queryKey: ['photos'] })
-                queryClient.invalidateQueries({ queryKey: ['folders'] })
-                navigate(folderId ? `/gallery?folder_id=${folderId}` : '/gallery')
-              }}
-              leftIcon={<ExternalLink size={18} className="shrink-0" />}
-              className="!min-h-[44px] !py-2 !px-4 !text-base sm:!min-h-[54px] sm:!py-3 sm:!px-7 sm:!text-xl"
+              disabled={isNavigating}
+              onClick={handleGoToGallery}
+              leftIcon={
+                isNavigating ? (
+                  <Spinner size="sm" className="text-[var(--pb-text)] shrink-0" />
+                ) : (
+                  <ExternalLink size={18} className="shrink-0" />
+                )
+              }
+              className="!min-h-[44px] !py-2 !px-4 !text-base sm:!min-h-[54px] sm:!py-3 sm:!px-6 sm:!text-xl"
             >
-              Galeri
+              {isNavigating ? 'Menyimpan...' : 'Galeri'}
             </Button>
             <Button
               variant="secondary"
               size="lg"
               onClick={() => setShowRetakeOptions((prev) => !prev)}
               leftIcon={<RotateCcw size={18} className="shrink-0" />}
-              className={showRetakeOptions ? 'border-amber-500 text-amber-400 bg-amber-500/10 !min-h-[44px] !py-2 !px-4 !text-base sm:!min-h-[54px] sm:!py-3 sm:!px-7 sm:!text-xl' : '!min-h-[44px] !py-2 !px-4 !text-base sm:!min-h-[54px] sm:!py-3 sm:!px-7 sm:!text-xl'}
+              className={showRetakeOptions ? 'border-amber-500 text-amber-400 bg-amber-500/10 !min-h-[44px] !py-2 !px-4 !text-base sm:!min-h-[54px] sm:!py-3 sm:!px-6 sm:!text-xl' : '!min-h-[44px] !py-2 !px-4 !text-base sm:!min-h-[54px] sm:!py-3 sm:!px-6 sm:!text-xl'}
             >
               Ulangi
             </Button>
             <Button
               variant="secondary"
               size="lg"
-              onClick={() => navigate('/photo')}
-              leftIcon={<Check size={18} className="shrink-0" />}
-              className="!min-h-[44px] !py-2 !px-4 !text-base sm:!min-h-[54px] sm:!py-3 sm:!px-7 sm:!text-xl"
+              disabled={isNavigating}
+              onClick={handleFinishSession}
+              leftIcon={
+                isNavigating ? (
+                  <Spinner size="sm" className="text-[var(--pb-text)] shrink-0" />
+                ) : (
+                  <Check size={18} className="shrink-0" />
+                )
+              }
+              className="!min-h-[44px] !py-2 !px-4 !text-base sm:!min-h-[54px] sm:!py-3 sm:!px-6 sm:!text-xl"
             >
               Selesai
             </Button>
@@ -851,6 +992,20 @@ const PhotoCapturePage: React.FC = () => {
             </div>
           </div>
         )}
+
+        {/* Modal Print Foto */}
+        {showPrintModal && resultPhoto?.url && (
+          <PrintModal
+            isOpen={showPrintModal}
+            onClose={() => setShowPrintModal(false)}
+            photos={{
+              id: resultPhoto.id,
+              url: resultPhoto.url,
+              title: resultPhoto.filename || 'Hasil Sesi Foto',
+            }}
+            title="Cetak Foto Hasil Sesi"
+          />
+        )}
       </div>
     )
   }
@@ -892,7 +1047,6 @@ const PhotoCapturePage: React.FC = () => {
           </p>
         </div>
         <div className="flex items-center gap-3 self-start sm:self-auto flex-wrap">
-          <CameraSelector compact onChange={(id) => startCamera(id)} />
           {cameraActive ? (
             <CameraStatusBadge status="connected" />
           ) : (

@@ -81,8 +81,8 @@ export async function createCameraStream(
     throw new Error('WebRTC getUserMedia tidak didukung di browser ini.')
   }
 
-  const idealWidth = options?.width ?? 1280
-  const idealHeight = options?.height ?? 720
+  const idealWidth = options?.width ?? 1920
+  const idealHeight = options?.height ?? 1080
 
   const targetDeviceId = preferredDeviceId ?? getSelectedCameraId()
 
@@ -92,27 +92,51 @@ export async function createCameraStream(
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
           deviceId: { exact: targetDeviceId },
-          width: { ideal: idealWidth },
-          height: { ideal: idealHeight },
+          width: { ideal: idealWidth, min: 1280 },
+          height: { ideal: idealHeight, min: 720 },
         },
         audio: false,
       })
 
       return { stream, activeDeviceId: targetDeviceId }
-    } catch (err) {
-      console.warn('Gagal membuka kamera yang dipilih, mencoba fallback ke kamera bawaan...', err)
+    } catch {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            deviceId: { exact: targetDeviceId },
+            width: { ideal: idealWidth },
+            height: { ideal: idealHeight },
+          },
+          audio: false,
+        })
+        return { stream, activeDeviceId: targetDeviceId }
+      } catch (err) {
+        console.warn('Gagal membuka kamera yang dipilih, mencoba fallback ke kamera bawaan...', err)
+      }
     }
   }
 
-  // 2. Fallback: Buka default webcam perangkat
-  const stream = await navigator.mediaDevices.getUserMedia({
-    video: {
-      facingMode: options?.facingMode ?? 'user',
-      width: { ideal: idealWidth },
-      height: { ideal: idealHeight },
-    },
-    audio: false,
-  })
+  // 2. Fallback: Buka default webcam perangkat dengan kualitas maksimal
+  let stream: MediaStream
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        facingMode: options?.facingMode ?? 'user',
+        width: { ideal: idealWidth, min: 1280 },
+        height: { ideal: idealHeight, min: 720 },
+      },
+      audio: false,
+    })
+  } catch {
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        facingMode: options?.facingMode ?? 'user',
+        width: { ideal: idealWidth },
+        height: { ideal: idealHeight },
+      },
+      audio: false,
+    })
+  }
 
   // Dapatkan deviceId aktif dari track yang berhasil berjalan
   const videoTrack = stream.getVideoTracks()[0]

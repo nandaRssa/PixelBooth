@@ -3,6 +3,7 @@ import {
   Check,
   Folder as FolderIcon,
   Pencil,
+  Printer,
   QrCode,
   Square,
   Trash2,
@@ -20,6 +21,7 @@ interface FolderCardProps {
   onRename: (folder: Folder) => void;
   onDelete: (folder: Folder) => void;
   onShowQr: (folder: Folder) => void;
+  onPrint?: (folder: Folder) => void;
   selectionMode?: boolean;
   isSelected?: boolean;
   onToggleSelect?: (folder: Folder) => void;
@@ -31,6 +33,7 @@ const FolderCard: React.FC<FolderCardProps> = ({
   onRename,
   onDelete,
   onShowQr,
+  onPrint,
   selectionMode = false,
   isSelected = false,
   onToggleSelect,
@@ -102,6 +105,20 @@ const FolderCard: React.FC<FolderCardProps> = ({
         {/* Action buttons (normal mode only) */}
         {!selectionMode && (
           <div className="flex items-center gap-1 shrink-0">
+            {onPrint && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onPrint(folder);
+                }}
+                className="w-7 h-7 sm:w-8 sm:h-8 rounded-[3px] bg-[var(--pb-bg)] border-[2px] border-[#FF5A36] text-[#FF5A36] hover:bg-[var(--pb-border)] active:translate-x-[1px] active:translate-y-[1px] flex items-center justify-center transition-colors shadow-[1px_1px_0px_var(--pb-shadow-solid)] cursor-pointer"
+                title="Print Semua Foto Folder"
+                aria-label="Print Semua Foto Folder"
+              >
+                <Printer size={13} className="stroke-[2.5]" />
+              </button>
+            )}
             <button
               type="button"
               onClick={(e) => {

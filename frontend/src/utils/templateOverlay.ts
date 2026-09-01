@@ -161,6 +161,10 @@ export async function renderFinalComposite(
   const ctx = canvas.getContext('2d')
   if (!ctx) throw new Error('Canvas 2D context tidak tersedia')
 
+  // Render bicubic anti-aliasing berkualitas tinggi untuk hasil cetak profesional
+  ctx.imageSmoothingEnabled = true
+  ctx.imageSmoothingQuality = 'high'
+
   // 1. Muat template dan seluruh foto secara PARALEL
   const loadTasks: Promise<HTMLImageElement | null>[] = []
   
@@ -243,6 +247,6 @@ export async function renderFinalComposite(
     }
   }
 
-  // Gunakan quality 0.88 (kompresi 65% lebih ringan, 3x lebih cepat tanpa penurunan visual)
-  return canvas.toDataURL('image/jpeg', 0.88)
+  // Gunakan quality 0.96 (standar cetak foto profesional, tajam, tanpa artefak)
+  return canvas.toDataURL('image/jpeg', 0.96)
 }

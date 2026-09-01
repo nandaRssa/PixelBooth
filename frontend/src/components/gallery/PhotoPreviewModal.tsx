@@ -6,6 +6,7 @@ import {
   Download,
   ExternalLink,
   FolderInput,
+  Printer,
   QrCode,
   Trash2,
   X,
@@ -15,6 +16,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Button } from '@/components/ui/Button'
 import { getStorageUrl } from '@/api/client'
 import { downloadFile } from '@/utils/download'
+import PrintModal from '@/components/gallery/PrintModal'
 import type { Photo } from '@/types'
 import type { Variants } from 'framer-motion'
 
@@ -68,6 +70,7 @@ export const PhotoPreviewModal: React.FC<PhotoPreviewModalProps> = ({
 }) => {
   const [direction, setDirection] = useState(0)
   const [touchStartX, setTouchStartX] = useState<number | null>(null)
+  const [showPrintModal, setShowPrintModal] = useState<boolean>(false)
 
   const photoList = photos.length > 0 ? photos : photo ? [photo] : []
   const activeIndex = photo ? photoList.findIndex((p) => p.id === photo.id) : -1
@@ -263,134 +266,97 @@ export const PhotoPreviewModal: React.FC<PhotoPreviewModalProps> = ({
             </AnimatePresence>
           </div>
 
-          {/* Actions Bar (Mobile: 5 clean icon buttons in 1 row; Desktop: full text buttons) */}
-          {/* Mobile View (< sm) */}
-          <div className="grid grid-cols-5 gap-1.5 sm:hidden pt-3 border-t-[2px] border-[var(--pb-border)]">
-            <button
-              type="button"
-              onClick={async () => {
-                await downloadFile(
-                  currentPhoto.url,
-                  currentPhoto.filename || 'pixelbooth-photo.jpg'
-                )
-              }}
-              className="flex flex-col items-center justify-center py-2 px-1 rounded-[4px] bg-[#FF5A36] text-white border-[2px] border-black shadow-[2px_2px_0px_#000] active:translate-x-[1px] active:translate-y-[1px] transition-all cursor-pointer"
-              title="Unduh Foto"
-              aria-label="Unduh Foto"
-            >
-              <Download size={19} />
-              <span className="font-retro text-[11px] font-bold mt-0.5">Unduh</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                onShowQr(currentPhoto)
-                onClose()
-              }}
-              className="flex flex-col items-center justify-center py-2 px-1 rounded-[4px] bg-[var(--pb-elevated)] text-[#00FFCC] border-[2px] border-[var(--pb-border-strong)] shadow-[2px_2px_0px_#000] active:translate-x-[1px] active:translate-y-[1px] transition-all cursor-pointer"
-              title="QR Code"
-              aria-label="QR Code"
-            >
-              <QrCode size={19} />
-              <span className="font-retro text-[11px] font-bold mt-0.5">QR</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => window.open(getStorageUrl(currentPhoto.url), '_blank')}
-              className="flex flex-col items-center justify-center py-2 px-1 rounded-[4px] bg-[var(--pb-elevated)] text-[var(--pb-text)] border-[2px] border-[var(--pb-border-strong)] shadow-[2px_2px_0px_#000] active:translate-x-[1px] active:translate-y-[1px] transition-all cursor-pointer"
-              title="Buka Tab Baru"
-              aria-label="Buka Tab Baru"
-            >
-              <ExternalLink size={19} />
-              <span className="font-retro text-[11px] font-bold mt-0.5">Buka</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                onMove(currentPhoto)
-                onClose()
-              }}
-              className="flex flex-col items-center justify-center py-2 px-1 rounded-[4px] bg-[var(--pb-elevated)] text-amber-400 border-[2px] border-[var(--pb-border-strong)] shadow-[2px_2px_0px_#000] active:translate-x-[1px] active:translate-y-[1px] transition-all cursor-pointer"
-              title="Pindahkan Foto"
-              aria-label="Pindahkan Foto"
-            >
-              <FolderInput size={19} />
-              <span className="font-retro text-[11px] font-bold mt-0.5">Pindah</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                onDelete(currentPhoto)
-                onClose()
-              }}
-              className="flex flex-col items-center justify-center py-2 px-1 rounded-[4px] bg-red-600 text-white border-[2px] border-black shadow-[2px_2px_0px_#000] active:translate-x-[1px] active:translate-y-[1px] transition-all cursor-pointer"
-              title="Hapus Foto"
-              aria-label="Hapus Foto"
-            >
-              <Trash2 size={19} />
-              <span className="font-retro text-[11px] font-bold mt-0.5">Hapus</span>
-            </button>
-          </div>
-
-          {/* Desktop & Tablet View (sm+) */}
-          <div className="hidden sm:flex sm:flex-row sm:items-center justify-between gap-3 pt-2 border-t-[2px] border-[var(--pb-border)]">
-            {/* Grup Aksi Utama: Unduh & QR Code */}
-            <div className="flex items-center gap-2.5">
+          {/* Action Bar: 6 Tombol Berukuran Konsisten & Responsif (Mobile: 2 kol, iPad: 3 kol x 2 baris, Laptop/Desktop: 6 kol) */}
+          <div className="pt-3 border-t-[2px] border-[var(--pb-border)]">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 sm:gap-3 w-full">
+              {/* 1. Unduh Foto */}
               <Button
                 variant="primary"
                 size="md"
+                fullWidth
                 onClick={async () => {
                   await downloadFile(
                     currentPhoto.url,
                     currentPhoto.filename || 'pixelbooth-photo.jpg'
                   )
                 }}
-                leftIcon={<Download size={18} />}
+                leftIcon={<Download size={18} className="shrink-0" />}
+                className="!px-2 sm:!px-3 !text-base sm:!text-lg font-bold truncate"
+                title="Unduh Foto"
               >
-                Unduh Foto
+                Unduh
               </Button>
+
+              {/* 2. Print Foto */}
               <Button
                 variant="secondary"
                 size="md"
+                fullWidth
+                onClick={() => setShowPrintModal(true)}
+                leftIcon={<Printer size={18} className="text-[#FFB800] stroke-[2.5] shrink-0" />}
+                className="hover:!border-[#FFB800] !px-2 sm:!px-3 !text-base sm:!text-lg font-bold truncate"
+                title="Print Foto"
+              >
+                Print
+              </Button>
+
+              {/* 3. QR Code */}
+              <Button
+                variant="secondary"
+                size="md"
+                fullWidth
                 onClick={() => {
                   onShowQr(currentPhoto)
                   onClose()
                 }}
-                leftIcon={<QrCode size={18} className="text-[#00FFCC]" />}
+                leftIcon={<QrCode size={18} className="text-[#00FFCC] shrink-0" />}
+                className="hover:!border-[#00FFCC] !px-2 sm:!px-3 !text-base sm:!text-lg font-bold truncate"
+                title="QR Code"
               >
                 QR Code
               </Button>
-            </div>
 
-            {/* Grup Aksi Manajemen: Buka, Pindah, Hapus */}
-            <div className="flex items-center gap-2.5">
+              {/* 4. Buka di Tab Baru */}
               <Button
                 variant="secondary"
                 size="md"
+                fullWidth
                 onClick={() => window.open(getStorageUrl(currentPhoto.url), '_blank')}
-                leftIcon={<ExternalLink size={18} />}
+                leftIcon={<ExternalLink size={18} className="shrink-0" />}
+                className="hover:!border-[#FF5A36] !px-2 sm:!px-3 !text-base sm:!text-lg font-bold truncate"
+                title="Buka Foto di Tab Baru"
               >
                 Buka Tab
               </Button>
+
+              {/* 5. Pindahkan Foto */}
               <Button
                 variant="secondary"
                 size="md"
+                fullWidth
                 onClick={() => {
                   onMove(currentPhoto)
                   onClose()
                 }}
-                leftIcon={<FolderInput size={18} className="text-amber-400" />}
+                leftIcon={<FolderInput size={18} className="text-[var(--pb-yellow)] stroke-[2.5] shrink-0" />}
+                className="hover:!border-[var(--pb-yellow)] !px-2 sm:!px-3 !text-base sm:!text-lg font-bold truncate"
+                title="Pindahkan Foto"
               >
                 Pindah
               </Button>
+
+              {/* 6. Hapus Foto */}
               <Button
                 variant="danger"
                 size="md"
+                fullWidth
                 onClick={() => {
                   onDelete(currentPhoto)
                   onClose()
                 }}
-                leftIcon={<Trash2 size={18} />}
+                leftIcon={<Trash2 size={18} className="shrink-0" />}
+                className="!px-2 sm:!px-3 !text-base sm:!text-lg font-bold truncate"
+                title="Hapus Foto"
               >
                 Hapus
               </Button>
@@ -398,6 +364,20 @@ export const PhotoPreviewModal: React.FC<PhotoPreviewModalProps> = ({
           </div>
         </motion.div>
       </div>
+
+      {/* Modal Print Foto */}
+      {showPrintModal && currentPhoto && (
+        <PrintModal
+          isOpen={showPrintModal}
+          onClose={() => setShowPrintModal(false)}
+          photos={{
+            id: currentPhoto.id,
+            url: currentPhoto.url,
+            title: currentPhoto.filename || 'Foto Galeri',
+          }}
+          title={`Cetak Foto: ${currentPhoto.filename || 'Galeri'}`}
+        />
+      )}
     </AnimatePresence>,
     document.body
   )

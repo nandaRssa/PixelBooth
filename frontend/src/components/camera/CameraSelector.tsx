@@ -61,7 +61,7 @@ export const CameraSelector: React.FC<CameraSelectorProps> = ({
         </div>
         <button
           type="button"
-          onClick={() => refreshDevices(false)}
+          onClick={() => refreshDevices(true)}
           disabled={isLoading || disabled}
           title="Pindai ulang kamera USB"
           className="shrink-0 p-1.5 sm:p-2 bg-[var(--pb-surface)] hover:bg-[var(--pb-elevated)] text-[var(--pb-text-muted)] hover:text-[var(--pb-text)] rounded-[4px] border-[2px] border-[var(--pb-border-strong)] shadow-[2px_2px_0px_#000] active:translate-x-[1px] active:translate-y-[1px] transition-all cursor-pointer"
@@ -81,7 +81,7 @@ export const CameraSelector: React.FC<CameraSelectorProps> = ({
         </label>
         <button
           type="button"
-          onClick={() => refreshDevices(false)}
+          onClick={() => refreshDevices(true)}
           disabled={isLoading || disabled}
           className="inline-flex items-center gap-1.5 px-2.5 py-1 font-pixel text-[9px] sm:text-[10px] text-[var(--pb-text)] bg-[var(--pb-bg)] hover:bg-[var(--pb-elevated)] border-[1.5px] border-[var(--pb-border-strong)] rounded-[3px] shadow-[1px_1px_0px_#000] active:translate-y-[1px] transition-all cursor-pointer shrink-0"
         >

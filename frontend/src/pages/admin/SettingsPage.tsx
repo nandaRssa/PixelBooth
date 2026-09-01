@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { Monitor, Maximize, Camera, Video, VideoOff, Info, CheckCircle2 } from 'lucide-react'
+import { Monitor, Maximize, Camera, Video, VideoOff, Info, CheckCircle2, Printer, Sparkles } from 'lucide-react'
 import { toast } from '@/components/ui/Toast'
 import {
   getSessionDisplayMode,
@@ -9,6 +9,8 @@ import {
 import { CameraSelector } from '@/components/camera/CameraSelector'
 import { createCameraStream, getSelectedCameraId } from '@/utils/cameraManager'
 import { useCameraDevices } from '@/hooks/useCameraDevices'
+import { printQualityTestPage } from '@/utils/printPhoto'
+import { Button } from '@/components/ui/Button'
 
 // ==========================================
 // PIXELBOOTH — Halaman Pengaturan
@@ -44,7 +46,7 @@ const SettingsPage: React.FC = () => {
   )
 
   // Camera preview test states
-  const { selectedDeviceId } = useCameraDevices()
+  const { selectedDeviceId, refreshDevices } = useCameraDevices()
   const [testStream, setTestStream] = useState<MediaStream | null>(null)
   const [isTestingCamera, setIsTestingCamera] = useState(false)
   const [cameraTestError, setCameraTestError] = useState<string | null>(null)
@@ -74,7 +76,7 @@ const SettingsPage: React.FC = () => {
     )
   }
 
-  // Camera testing logic
+  // Camera testing logic — izin kamera hanya diminta saat tombol ini diklik
   const startCameraTest = async (deviceId?: string) => {
     try {
       if (testStream) {
@@ -87,12 +89,15 @@ const SettingsPage: React.FC = () => {
       const { stream } = await createCameraStream(targetId)
       setTestStream(stream)
 
+      // Perbarui label perangkat kamera setelah izin berhasil diberikan
+      refreshDevices(false)
+
       if (videoRef.current) {
         videoRef.current.srcObject = stream
         videoRef.current.play().catch(() => {})
       }
     } catch (err: any) {
-      setCameraTestError(err?.message || 'Gagal menyalakan preview kamera.')
+      setCameraTestError(err?.message || 'Gagal menyalakan preview kamera. Pastikan izin kamera diberikan.')
       setIsTestingCamera(false)
     }
   }
@@ -319,6 +324,66 @@ const SettingsPage: React.FC = () => {
               </button>
             )
           })}
+        </div>
+      </section>
+
+      {/* ===== SECTION 3: Konfigurasi Printer (Epson L3251) ===== */}
+      <section className="bg-[var(--pb-surface)] border-[2px] border-[var(--pb-border-strong)] rounded-[4px] p-5 sm:p-6 lg:p-7 shadow-[4px_4px_0px_#000,8px_8px_0px_var(--pb-shadow-solid)]">
+        <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-[4px] bg-[#FF5A36] border-[2px] border-black flex items-center justify-center text-white shadow-[2px_2px_0px_#000]">
+              <Printer size={20} className="stroke-[2.5]" />
+            </div>
+            <div>
+              <h2 className="font-pixel text-[var(--pb-text)] text-sm sm:text-base lg:text-lg">
+                Konfigurasi Printer Foto (Epson L3251)
+              </h2>
+              <p className="font-retro text-[var(--pb-text-muted)] text-sm sm:text-base mt-0.5">
+                Pengaturan kualitas maksimal, profil kertas 4R / Strip, dan uji cetak kalibrasi.
+              </p>
+            </div>
+          </div>
+
+          <Button
+            variant="primary"
+            size="md"
+            onClick={async () => {
+              try {
+                toast.info('Mempersiapkan halaman uji kualitas cetak...')
+                await printQualityTestPage()
+              } catch {
+                toast.error('Gagal memproses halaman uji cetak.')
+              }
+            }}
+            leftIcon={<Sparkles size={16} className="text-yellow-300" />}
+            className="!bg-[#FFB800] hover:!bg-[#FFC933] !text-black !border-black font-bold shadow-[2px_2px_0px_#000]"
+          >
+            Cetak Halaman Tes Kualitas
+          </Button>
+        </div>
+
+        {/* Panduan Konfigurasi Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-5">
+          <div className="p-4 rounded-[4px] bg-[var(--pb-bg)] border-[2px] border-[var(--pb-border)]">
+            <p className="font-pixel text-xs text-[#FF5A36] uppercase font-bold">1. Pengaturan Driver Windows & Chrome</p>
+            <ul className="mt-2 space-y-1.5 font-retro text-sm text-[var(--pb-text-secondary)]">
+              <li>• <b>Destination</b>: Pilih <code>EPSON L3250 / L3251 Series</code></li>
+              <li>• <b>Paper Size</b>: <code>4 x 6 in / 10 x 15 cm / 4R</code></li>
+              <li>• <b>Media Type</b>: <code>Epson Premium Glossy</code> atau <code>Glossy Photo</code></li>
+              <li>• <b>Quality</b>: <code>High (Tinggi) / 5760x1440 DPI</code></li>
+              <li>• <b>Margins</b>: <code>None / Tanpa Tepi (Borderless)</code></li>
+            </ul>
+          </div>
+
+          <div className="p-4 rounded-[4px] bg-[var(--pb-bg)] border-[2px] border-[var(--pb-border)]">
+            <p className="font-pixel text-xs text-[#00FFCC] uppercase font-bold">2. Cetak Photobooth Strip (2x6")</p>
+            <p className="mt-2 font-retro text-sm text-[var(--pb-text-secondary)] leading-relaxed">
+              Untuk strip 2x6 inch, gunakan fitur <b>"2-Up Strip di 4R"</b> di modal cetak. Sistem akan otomatis menempatkan 2 strip berdampingan pada 1 lembar kertas foto 4R standar tanpa perlu diedit manual.
+            </p>
+            <div className="mt-2.5 p-2 rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-retro font-bold">
+              ✓ 1 Lembar 4R = 2 Strip Foto 2x6" siap potong!
+            </div>
+          </div>
         </div>
       </section>
     </div>

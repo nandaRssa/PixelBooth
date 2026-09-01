@@ -2,12 +2,13 @@ import React, { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { QRCodeSVG } from 'qrcode.react'
-import { Download, Share2, Image as ImageIcon, ArrowLeft } from 'lucide-react'
+import { Download, Share2, Image as ImageIcon, ArrowLeft, Printer } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Spinner } from '@/components/ui/StatusBadge'
 import { customerApi } from '@/api/customer'
 import { getStorageUrl } from '@/api/client'
 import { downloadFile } from '@/utils/download'
+import PrintModal from '@/components/gallery/PrintModal'
 import type { CustomerPhoto } from '@/types'
 
 // ==========================================
@@ -19,6 +20,7 @@ const CustomerPhotoPage: React.FC = () => {
   const [photo, setPhoto] = useState<CustomerPhoto | null>(null)
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [isDownloading, setIsDownloading] = useState<boolean>(false)
+  const [showPrintModal, setShowPrintModal] = useState<boolean>(false)
 
   useEffect(() => {
     if (!token) {
@@ -132,7 +134,7 @@ const CustomerPhotoPage: React.FC = () => {
         </div>
 
         {/* Actions */}
-        <div className="flex items-center justify-center gap-3 w-full">
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-2.5 w-full">
           <Button
             variant="primary"
             size="lg"
@@ -140,7 +142,16 @@ const CustomerPhotoPage: React.FC = () => {
             onClick={handleDownload}
             leftIcon={<Download size={18} />}
           >
-            Unduh Foto
+            Unduh
+          </Button>
+          <Button
+            variant="secondary"
+            size="lg"
+            fullWidth
+            onClick={() => setShowPrintModal(true)}
+            leftIcon={<Printer size={18} className="text-[#FFB800] stroke-[2.5]" />}
+          >
+            Print
           </Button>
           <Button
             variant="secondary"
@@ -153,6 +164,20 @@ const CustomerPhotoPage: React.FC = () => {
           </Button>
         </div>
       </motion.div>
+
+      {/* Modal Print Foto */}
+      {showPrintModal && photo && (photo.photo_url || photo.url) && (
+        <PrintModal
+          isOpen={showPrintModal}
+          onClose={() => setShowPrintModal(false)}
+          photos={{
+            id: photo.id,
+            url: photo.photo_url || photo.url || '',
+            title: photo.filename || 'Foto Photobooth',
+          }}
+          title="Cetak Foto Anda"
+        />
+      )}
     </div>
   )
 }

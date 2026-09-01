@@ -22,6 +22,7 @@ interface ButtonProps {
   className?: string
   id?: string
   form?: string
+  title?: string
 }
 
 const variantStyles: Record<ButtonVariant, string> = {
@@ -53,6 +54,7 @@ export const Button: React.FC<ButtonProps> = ({
   className = '',
   id,
   form,
+  title,
 }) => {
   const isDisabled = disabled || loading
 
@@ -61,6 +63,7 @@ export const Button: React.FC<ButtonProps> = ({
       type={type}
       id={id}
       form={form}
+      title={title}
       onClick={onClick}
       disabled={isDisabled}
       className={`

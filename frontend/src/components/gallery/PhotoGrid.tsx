@@ -1,5 +1,5 @@
 import React from 'react'
-import { CheckSquare, FolderInput, ImageIcon, Square, Trash2, X } from 'lucide-react'
+import { CheckSquare, FolderInput, ImageIcon, Printer, Square, Trash2, X } from 'lucide-react'
 import type { Photo } from '@/types'
 import PhotoCard from './PhotoCard'
 import { Button } from '@/components/ui/Button'
@@ -26,6 +26,7 @@ interface PhotoGridProps {
   onSelectAll: () => void
   onBulkMove: () => void
   onBulkDelete: () => void
+  onBulkPrint?: () => void
   isBulkActionPending: boolean
 }
 
@@ -45,6 +46,7 @@ const PhotoGrid: React.FC<PhotoGridProps> = ({
   onSelectAll,
   onBulkMove,
   onBulkDelete,
+  onBulkPrint,
   isBulkActionPending,
 }) => {
   if (isLoading) {
@@ -100,6 +102,18 @@ const PhotoGrid: React.FC<PhotoGridProps> = ({
 
             {/* Baris 2: Tombol Aksi Massal */}
             <div className="flex items-center gap-2">
+              {onBulkPrint && (
+                <Button
+                  variant="primary"
+                  size="sm"
+                  className="flex-1 sm:flex-initial text-xs !bg-[#FFB800] hover:!bg-[#FFC933] !text-black !border-black font-bold shadow-[2px_2px_0px_#000]"
+                  onClick={onBulkPrint}
+                  disabled={selectedIds.size === 0 || isBulkActionPending}
+                  leftIcon={<Printer size={14} className="stroke-[2.5]" />}
+                >
+                  Print ({selectedIds.size})
+                </Button>
+              )}
               <Button
                 variant="secondary"
                 size="sm"

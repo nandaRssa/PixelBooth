@@ -7,13 +7,13 @@ import {
 } from '@/utils/cameraManager'
 import { toast } from '@/components/ui/Toast'
 
-export function useCameraDevices() {
+export function useCameraDevices(options?: { autoRequestPermission?: boolean }) {
   const [devices, setDevices] = useState<CameraDeviceInfo[]>([])
   const [selectedDeviceId, setSelectedDeviceIdState] = useState<string | null>(() => getSelectedCameraId())
   const [isLoading, setIsLoading] = useState(true)
   const [hasPermission, setHasPermission] = useState<boolean | null>(null)
 
-  const refreshDevices = useCallback(async (notifyOnNew = false) => {
+  const refreshDevices = useCallback(async (requestPermission = false, notifyOnNew = false) => {
     setIsLoading(true)
     try {
       if (!navigator.mediaDevices?.enumerateDevices) {
@@ -25,23 +25,18 @@ export function useCameraDevices() {
 
       let cameraList = await getAvailableCameraDevices()
 
-      // Jika label masih kosong (artinya izin kamera belum diberikan sebelumnya)
-      if (cameraList.length > 0 && cameraList.some((d) => !d.label || d.label.startsWith('Kamera '))) {
+      // Hanya minta izin kamera jika secara eksplisit diminta (misal klik "Pindai USB" atau "Uji Preview")
+      if (requestPermission && cameraList.length > 0 && cameraList.some((d) => !d.label || d.label.startsWith('Kamera '))) {
         try {
-          // Trigger permintaan izin kamera ringan agar label terbaca
           const tempStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false })
           tempStream.getTracks().forEach((track) => track.stop())
-          // Ambil ulang dengan label yang sudah terbuka
           cameraList = await getAvailableCameraDevices()
           setHasPermission(true)
         } catch {
-          // User menolak izin atau kamera sedang dipakai aplikasi lain
           setHasPermission(false)
         }
-      } else if (cameraList.length > 0) {
+      } else if (cameraList.length > 0 && cameraList.some((d) => d.label && !d.label.startsWith('Kamera '))) {
         setHasPermission(true)
-      } else {
-        setHasPermission(false)
       }
 
       setDevices((prev) => {
@@ -59,7 +54,6 @@ export function useCameraDevices() {
       if (currentStored && cameraList.length > 0) {
         const stillExists = cameraList.some((d) => d.deviceId === currentStored)
         if (!stillExists) {
-          // Fallback ke kamera pertama
           setSelectedDeviceIdState(cameraList[0].deviceId)
           saveSelectedCameraId(cameraList[0].deviceId)
         }
@@ -81,11 +75,12 @@ export function useCameraDevices() {
   }, [])
 
   useEffect(() => {
-    refreshDevices()
+    // Pada saat mount: jangan paksa minta izin kamera
+    refreshDevices(options?.autoRequestPermission ?? false)
 
     // Listener otomatis ketika kabel USB dicolok atau dicabut
     const handleDeviceChange = () => {
-      refreshDevices(true)
+      refreshDevices(false, true)
     }
 
     navigator.mediaDevices?.addEventListener?.('devicechange', handleDeviceChange)
@@ -93,7 +88,7 @@ export function useCameraDevices() {
     return () => {
       navigator.mediaDevices?.removeEventListener?.('devicechange', handleDeviceChange)
     }
-  }, [refreshDevices])
+  }, [refreshDevices, options?.autoRequestPermission])
 
   return {
     devices,
