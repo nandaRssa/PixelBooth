@@ -69,16 +69,16 @@ const FolderFormModal: React.FC<FolderFormModalProps> = ({
       title={isEdit ? 'Ubah Nama Folder' : 'Buat Folder Baru'}
       size="sm"
     >
-      <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-4">
+      <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-5">
         <div>
-          <label className="block text-pb-text-secondary text-xs font-medium mb-1.5">
+          <label className="block font-retro text-[var(--pb-text-secondary)] text-base sm:text-lg font-bold mb-2">
             Nama Folder
           </label>
           <div className="relative">
             {isEdit ? (
-              <Pencil size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-pb-text-muted" />
+              <Pencil size={20} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#FF5A36]" />
             ) : (
-              <FolderPlus size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-pb-text-muted" />
+              <FolderPlus size={20} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#FF5A36]" />
             )}
             <input
               {...register('name')}
@@ -86,28 +86,29 @@ const FolderFormModal: React.FC<FolderFormModalProps> = ({
               placeholder="contoh: Pernikahan Andi & Sari"
               autoFocus
               className={`
-                w-full bg-pb-bg border rounded-lg pl-9 pr-4 py-3
-                text-pb-text text-sm placeholder:text-pb-faint
-                focus:outline-none focus:ring-1 transition-colors
+                w-full bg-[var(--pb-bg)] border-[2px] rounded-[4px] pl-11 pr-4 py-3
+                font-retro text-lg sm:text-xl font-bold text-[var(--pb-text)] placeholder:text-[var(--pb-faint)]
+                focus:outline-none focus:border-[#FFB800] shadow-[2px_2px_0px_var(--pb-shadow-solid)] transition-colors
                 ${errors.name
-                  ? 'border-red-500/50 focus:ring-red-500/30'
-                  : 'border-pb-border focus:border-pb-border-strong focus:ring-white/10'
+                  ? 'border-red-500'
+                  : 'border-[var(--pb-border-strong)]'
                 }
               `}
             />
           </div>
           {errors.name && (
-            <p className="text-red-400 text-xs mt-1">{errors.name.message}</p>
+            <p className="font-retro text-red-400 text-sm sm:text-base font-bold mt-1.5">{errors.name.message}</p>
           )}
         </div>
 
         <div className="flex gap-3 pt-2">
-          <Button variant="secondary" fullWidth onClick={onClose} disabled={isSubmitting}>
+          <Button variant="secondary" size="md" fullWidth onClick={onClose} disabled={isSubmitting}>
             Batal
           </Button>
           <Button
             type="submit"
             variant="primary"
+            size="md"
             fullWidth
             loading={isSubmitting}
           >

@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { CheckSquare, ChevronRight, FolderInput, FolderOpen, Home, ImageIcon, Plus, RefreshCw, Square, Trash2, X } from 'lucide-react'
+import { CheckSquare, ChevronRight, FolderInput, FolderOpen, Home, ImageIcon, Plus, Printer, RefreshCw, Square, Trash2, X } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { ConfirmModal } from '@/components/ui/Modal'
 import { EmptyState, Spinner } from '@/components/ui/StatusBadge'
 import { toast } from '@/components/ui/Toast'
 import { folderApi } from '@/api/folders'
+import { photoApi } from '@/api/photos'
 import {
   useFolders,
   useCreateFolder,
@@ -30,6 +31,7 @@ import PhotoQrModal from '@/components/gallery/PhotoQrModal'
 import PhotoPreviewModal from '@/components/gallery/PhotoPreviewModal'
 import MovePhotoModal from '@/components/gallery/MovePhotoModal'
 import MoveFolderModal from '@/components/gallery/MoveFolderModal'
+import PrintModal from '@/components/gallery/PrintModal'
 import type { Folder, Photo } from '@/types'
 
 // ==========================================
@@ -138,6 +140,15 @@ const GalleryPage: React.FC = () => {
   const [moveTarget, setMoveTarget] = useState<Photo | null>(null)
   const [deletePhotoTarget, setDeletePhotoTarget] = useState<Photo | null>(null)
   const [photoQrTarget, setPhotoQrTarget] = useState<Photo | null>(null)
+  const [printModalState, setPrintModalState] = useState<{
+    isOpen: boolean
+    photos: Array<{ id: number; url: string; title?: string }>
+    title: string
+  }>({
+    isOpen: false,
+    photos: [],
+    title: 'Cetak Foto',
+  })
 
   // ===== Seleksi massal Foto =====
   const [selectionMode, setSelectionMode] = useState(false)
@@ -308,29 +319,84 @@ const GalleryPage: React.FC = () => {
   const hasMore = Boolean(photosQuery.hasNextPage)
   const allFoldersSelected = folders.length > 0 && selectedFolderIds.size === folders.length
 
+  // ===== Print Handlers =====
+  const handlePrintBatchSelected = () => {
+    const selected = photos.filter((p) => selectedIds.has(p.id))
+    if (selected.length === 0) return
+    setPrintModalState({
+      isOpen: true,
+      photos: selected.map((p) => ({
+        id: p.id,
+        url: p.url,
+        title: p.filename || `Foto-${p.id}`,
+      })),
+      title: `Cetak ${selected.length} Foto Terpilih`,
+    })
+  }
+
+  const handlePrintAllInFolder = () => {
+    if (photos.length === 0) {
+      toast.info('Belum ada foto untuk dicetak.')
+      return
+    }
+    const currentName = breadcrumb.length > 0 ? breadcrumb[breadcrumb.length - 1].name : 'Galeri'
+    setPrintModalState({
+      isOpen: true,
+      photos: photos.map((p) => ({
+        id: p.id,
+        url: p.url,
+        title: p.filename || `Foto-${p.id}`,
+      })),
+      title: `Cetak Semua Foto (${photos.length}) — ${currentName}`,
+    })
+  }
+
+  const handlePrintFolderCard = async (folder: Folder) => {
+    try {
+      toast.info(`Memuat foto folder "${folder.name}"...`)
+      const res = await photoApi.list({ folder_id: folder.id })
+      const folderPhotos = res.data ?? []
+      if (folderPhotos.length === 0) {
+        toast.info(`Folder "${folder.name}" belum memiliki foto untuk dicetak.`)
+        return
+      }
+      setPrintModalState({
+        isOpen: true,
+        photos: folderPhotos.map((p) => ({
+          id: p.id,
+          url: p.url,
+          title: p.filename || `Foto-${p.id}`,
+        })),
+        title: `Cetak Foto Folder: ${folder.name} (${folderPhotos.length} Foto)`,
+      })
+    } catch {
+      toast.error(`Gagal memuat foto folder "${folder.name}".`)
+    }
+  }
+
   return (
     <div className="flex flex-col w-full pb-12">
       {/* ===== Header ===== */}
-      <div className="flex items-center justify-between flex-wrap gap-3 mb-6 shrink-0">
-        <div className="min-w-0">
-          {/* Breadcrumb */}
-          <div className="flex items-center gap-1.5 text-sm text-pb-text-muted mb-1">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 shrink-0">
+        <div className="min-w-0 flex-1">
+          {/* Breadcrumb — pixel > style */}
+          <div className="flex items-center gap-2 font-retro text-sm sm:text-base text-[var(--pb-text-muted)] mb-1 tracking-wide flex-wrap">
             <button
               type="button"
               onClick={goToRoot}
-              className="flex items-center gap-1 hover:text-pb-text transition-colors"
+              className="flex items-center gap-1 hover:text-[#FF5A36] transition-colors uppercase font-bold"
             >
-              <Home size={14} />
+              <Home size={15} className="text-[#FF5A36]" />
               <span>Galeri</span>
             </button>
             {breadcrumb.map((crumb, index) => (
               <React.Fragment key={crumb.id}>
-                <ChevronRight size={14} className="text-pb-faint" />
+                <span className="text-[#FF5A36] font-pixel text-[9px]">&gt;</span>
                 <button
                   type="button"
                   onClick={() => goToCrumb(index)}
-                  className={`truncate max-w-[160px] hover:text-pb-text transition-colors ${
-                    index === breadcrumb.length - 1 ? 'text-pb-text font-medium' : ''
+                  className={`truncate max-w-[120px] sm:max-w-[180px] hover:text-[#FFB800] transition-colors uppercase font-bold ${
+                    index === breadcrumb.length - 1 ? 'text-[var(--pb-text)]' : ''
                   }`}
                 >
                   {crumb.name}
@@ -339,33 +405,50 @@ const GalleryPage: React.FC = () => {
             ))}
           </div>
 
-          <h1 className="text-pb-text text-2xl font-bold">
+          <h1 className="font-pixel text-[var(--pb-text)] text-base sm:text-lg lg:text-xl leading-relaxed truncate">
             {breadcrumb.length > 0
               ? breadcrumb[breadcrumb.length - 1].name
               : 'Galeri'}
           </h1>
-          <p className="text-pb-text-muted text-sm mt-1">
+          <p className="font-retro text-[var(--pb-text-muted)] text-base sm:text-lg lg:text-xl mt-0.5 tracking-wide">
             {activeFolderId
               ? 'Folder dan foto dalam folder ini'
               : 'Kelola folder dan foto hasil photobooth'}
           </p>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
+        {/* Action Buttons: Responsive Grid di HP (2 kolom) & Flex di Tablet/iPad & Laptop */}
+        <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 sm:gap-2.5 shrink-0 w-full sm:w-auto">
+          {photos.length > 0 && (
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={handlePrintAllInFolder}
+              leftIcon={<Printer size={15} className="text-[#FFB800] stroke-[2.5] shrink-0" />}
+              className="hover:!border-[#FFB800] col-span-2 sm:col-span-1 justify-center !px-3 !py-2 !text-sm sm:!text-base font-bold"
+              title="Print Semua Foto"
+            >
+              Print Semua ({photos.length})
+            </Button>
+          )}
           <Button
             variant="secondary"
-            size="md"
+            size="sm"
             onClick={() => foldersQuery.refetch()}
             disabled={foldersQuery.isFetching}
-            leftIcon={<RefreshCw size={16} />}
+            leftIcon={<RefreshCw size={15} className="shrink-0" />}
+            className="justify-center !px-3 !py-2 !text-sm sm:!text-base font-bold"
+            title="Segarkan Galeri"
           >
             Segarkan
           </Button>
           <Button
             variant="primary"
-            size="md"
+            size="sm"
             onClick={() => setIsCreateOpen(true)}
-            leftIcon={<Plus size={16} />}
+            leftIcon={<Plus size={15} className="shrink-0" />}
+            className="justify-center !px-3 !py-2 !text-sm sm:!text-base font-bold"
+            title="Buat Folder Baru"
           >
             Buat Folder
           </Button>
@@ -384,19 +467,19 @@ const GalleryPage: React.FC = () => {
           {/* Toolbar Sub-folder */}
           <div className="mb-3.5">
             {folderSelectionMode ? (
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 p-3 rounded-2xl bg-pb-surface border border-pb-border shadow-xs w-full">
-                {/* Baris 1: Status & Pilih Semua */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 p-3 rounded-[4px] bg-[var(--pb-surface)] border-[2px] border-[var(--pb-border-strong)] shadow-[3px_3px_0px_var(--pb-shadow-solid)] w-full">
+                {/* Status & Select All */}
                 <div className="flex items-center justify-between sm:justify-start gap-2.5">
                   <button
                     type="button"
                     onClick={handleSelectAllFolders}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-pb-elevated border border-pb-border
-                      text-pb-text text-xs font-semibold hover:bg-pb-border-light transition-colors"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-[4px] bg-[var(--pb-elevated)] border-[2px] border-[var(--pb-border-strong)]
+                      font-retro text-[var(--pb-text)] text-sm uppercase tracking-wide hover:border-[#FFB800] transition-colors shadow-[2px_2px_0px_var(--pb-shadow-solid)]"
                   >
                     {allFoldersSelected ? <CheckSquare size={14} className="text-[#FF5A36]" /> : <Square size={14} />}
                     <span>{allFoldersSelected ? 'Batal Semua' : 'Pilih Semua'}</span>
                   </button>
-                  <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-orange-500/15 text-[#FF5A36] border border-orange-500/30">
+                  <span className="font-retro text-sm px-2.5 py-1 rounded-[3px] bg-[#FF5A36]/15 text-[#FF5A36] border-[2px] border-[#FF5A36]/40">
                     {selectedFolderIds.size} dipilih
                   </span>
                   <button
@@ -419,7 +502,7 @@ const GalleryPage: React.FC = () => {
                     className="flex-1 sm:flex-initial text-xs"
                     onClick={() => setBulkFolderMoveOpen(true)}
                     disabled={selectedFolderIds.size === 0 || bulkMoveFolders.isPending}
-                    leftIcon={<FolderInput size={14} className="text-amber-400" />}
+                    leftIcon={<FolderInput size={14} className="text-[var(--pb-yellow)] stroke-[2.5]" />}
                   >
                     Pindahkan
                   </Button>
@@ -449,17 +532,16 @@ const GalleryPage: React.FC = () => {
               </div>
             ) : (
               <div className="flex items-center justify-between">
-                <h2 className="text-pb-text text-sm font-semibold flex items-center gap-2">
-                  <FolderOpen size={16} className="text-pb-text-secondary" />
-                  <span>Sub-Folder</span>
-                  <span className="text-pb-text-muted font-normal text-xs">({folders.length})</span>
+                <h2 className="font-pixel text-[var(--pb-text)] text-xs sm:text-sm flex items-center gap-2">
+                  <FolderOpen size={18} className="text-[#FFB800]" />
+                  <span>SUB-FOLDER</span>
+                  <span className="font-retro text-[var(--pb-text-muted)] text-base sm:text-lg font-normal">({folders.length})</span>
                 </h2>
                 <Button
                   variant="secondary"
                   size="sm"
-                  className="text-xs font-medium"
                   onClick={() => setFolderSelectionMode(true)}
-                  leftIcon={<CheckSquare size={14} />}
+                  leftIcon={<CheckSquare size={16} />}
                 >
                   Pilih Folder
                 </Button>
@@ -467,7 +549,7 @@ const GalleryPage: React.FC = () => {
             )}
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3.5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 2xl:grid-cols-5 gap-3.5 sm:gap-4 mb-6">
             {folders.map((folder) => (
               <FolderCard
                 key={folder.id}
@@ -476,6 +558,7 @@ const GalleryPage: React.FC = () => {
                 onRename={setRenameTarget}
                 onDelete={setDeleteTarget}
                 onShowQr={setQrTarget}
+                onPrint={handlePrintFolderCard}
                 selectionMode={folderSelectionMode}
                 isSelected={selectedFolderIds.has(folder.id)}
                 onToggleSelect={handleToggleSelectFolder}
@@ -515,11 +598,11 @@ const GalleryPage: React.FC = () => {
 
       {/* ===== Photo grid — semua foto di root, atau foto dalam folder ===== */}
       <div className={activeFolderId ? '' : 'mt-8'}>
-        <h2 className="text-pb-text text-sm font-semibold mb-3 flex items-center gap-2">
-          <ImageIcon size={16} className="text-pb-text-secondary" />
-          {activeFolderId ? 'Foto' : 'Tanpa Folder'}
-          <span className="text-pb-text-muted font-normal">
-            {photosQuery.isLoading ? '' : photos.length}
+        <h2 className="font-pixel text-[var(--pb-text)] text-xs sm:text-sm mb-4 flex items-center gap-2">
+          <ImageIcon size={18} className="text-[#00FFCC]" />
+          <span>{activeFolderId ? 'FOTO' : 'TANPA FOLDER'}</span>
+          <span className="font-retro text-[var(--pb-text-muted)] text-base sm:text-lg font-normal">
+            {photosQuery.isLoading ? '' : `(${photos.length})`}
           </span>
         </h2>
         <PhotoGrid
@@ -538,6 +621,7 @@ const GalleryPage: React.FC = () => {
           onSelectAll={handleSelectAll}
           onBulkMove={() => setBulkMoveOpen(true)}
           onBulkDelete={() => setBulkDeleteOpen(true)}
+          onBulkPrint={handlePrintBatchSelected}
           isBulkActionPending={bulkDeletePhotos.isPending || bulkMovePhotos.isPending}
         />
       </div>
@@ -668,6 +752,16 @@ const GalleryPage: React.FC = () => {
         loading={bulkDeleteFolders.isPending}
         danger
       />
+
+      {/* ===== Print Modal ===== */}
+      {printModalState.isOpen && printModalState.photos.length > 0 && (
+        <PrintModal
+          isOpen={printModalState.isOpen}
+          onClose={() => setPrintModalState((prev) => ({ ...prev, isOpen: false }))}
+          photos={printModalState.photos}
+          title={printModalState.title}
+        />
+      )}
     </div>
   )
 }

@@ -11,13 +11,22 @@ import { getStorageUrl } from '@/api/client'
 const memoryImageCache = new Map<string, HTMLImageElement>()
 const overlayCanvasCache = new Map<string, HTMLCanvasElement>()
 
+/** Preload gambar template ke cache memori agar siap seketika saat render final */
+export function preloadTemplateImage(src: string): void {
+  if (!src || memoryImageCache.has(src)) return
+  void loadImage(src).catch(() => {})
+}
+
 /** Muat gambar dengan in-memory cache, CORS & fallback cepat. */
 export async function loadImage(src: string): Promise<HTMLImageElement> {
   if (!src) throw new Error('Source gambar kosong')
 
   // Check in-memory cache
   if (memoryImageCache.has(src)) {
-    return memoryImageCache.get(src)!
+    const cached = memoryImageCache.get(src)!
+    if (cached.complete && cached.naturalWidth > 0) {
+      return cached
+    }
   }
 
   // 1. Data URI atau Blob URL (Langsung decode tanpa network fetch)
@@ -35,7 +44,22 @@ export async function loadImage(src: string): Promise<HTMLImageElement> {
 
   const url = getStorageUrl(src)
 
-  // 2. Fetch via Blob terlebih dahulu agar 100% bebas SecurityError di iOS Safari / WebKit
+  // 2. Direct Image Load dengan anonymous crossOrigin (paling cepat di browser modern)
+  try {
+    return await new Promise<HTMLImageElement>((resolve, reject) => {
+      const img = new Image()
+      img.crossOrigin = 'anonymous'
+      img.onload = () => {
+        memoryImageCache.set(src, img)
+        resolve(img)
+      }
+      img.onerror = () => reject(new Error('Gagal direct load'))
+      img.src = url
+    })
+  } catch {
+    // Fallback: Fetch via Blob jika direct load diblokir CORS
+  }
+
   try {
     const res = await fetch(url, { mode: 'cors' })
     if (res.ok) {
@@ -47,25 +71,15 @@ export async function loadImage(src: string): Promise<HTMLImageElement> {
           memoryImageCache.set(src, img)
           resolve(img)
         }
-        img.onerror = () => reject(new Error('Gagal memuat blob gambar template'))
+        img.onerror = () => reject(new Error('Gagal memuat blob template'))
         img.src = blobUrl
       })
     }
   } catch {
-    // Fallback ke direct image load jika fetch diblokir
+    // ignore
   }
 
-  // 3. Direct image load dengan crossOrigin anonymous
-  return new Promise((resolve, reject) => {
-    const img = new Image()
-    img.crossOrigin = 'anonymous'
-    img.onload = () => {
-      memoryImageCache.set(src, img)
-      resolve(img)
-    }
-    img.onerror = () => reject(new Error('Gagal memuat gambar template'))
-    img.src = url
-  })
+  throw new Error('Gagal memuat gambar template')
 }
 
 /**
@@ -146,6 +160,10 @@ export async function renderFinalComposite(
   canvas.height = canvasHeight
   const ctx = canvas.getContext('2d')
   if (!ctx) throw new Error('Canvas 2D context tidak tersedia')
+
+  // Render bicubic anti-aliasing berkualitas tinggi untuk hasil cetak profesional
+  ctx.imageSmoothingEnabled = true
+  ctx.imageSmoothingQuality = 'high'
 
   // 1. Muat template dan seluruh foto secara PARALEL
   const loadTasks: Promise<HTMLImageElement | null>[] = []
@@ -229,6 +247,6 @@ export async function renderFinalComposite(
     }
   }
 
-  // Gunakan quality 0.88 (kompresi 65% lebih ringan, 3x lebih cepat tanpa penurunan visual)
-  return canvas.toDataURL('image/jpeg', 0.88)
+  // Gunakan quality 0.96 (standar cetak foto profesional, tajam, tanpa artefak)
+  return canvas.toDataURL('image/jpeg', 0.96)
 }

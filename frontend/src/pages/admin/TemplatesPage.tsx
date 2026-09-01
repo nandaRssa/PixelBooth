@@ -202,9 +202,9 @@ const TemplatesPage: React.FC = () => {
       {/* ===== Header ===== */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 shrink-0">
         <div>
-          <h1 className="text-pb-text text-xl sm:text-2xl font-bold">Kelola Template</h1>
-          <p className="text-pb-text-muted text-xs sm:text-sm mt-1">
-            Upload → Frame Editor → Test Camera → Confirm → Siap dipakai
+          <h1 className="font-pixel text-[var(--pb-text)] text-base sm:text-lg lg:text-xl leading-relaxed">Kelola Template</h1>
+          <p className="font-retro text-[var(--pb-text-muted)] text-lg sm:text-xl mt-1 tracking-wide">
+            Upload &gt;&gt; Frame Editor &gt;&gt; Test Camera &gt;&gt; Confirm &gt;&gt; READY
           </p>
         </div>
 
@@ -271,7 +271,7 @@ const TemplatesPage: React.FC = () => {
       {/* ===== Konten (scroll area) ===== */}
       <div className="flex-1 min-h-0 pb-6">
         {/* ===== Info Cards ===== */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 sm:gap-4 mb-6">
           {[
             { label: "Format yang Didukung", value: "PNG, JPG, WEBP" },
             { label: "Ukuran Canvas", value: "Bebas (pixel based)" },
@@ -279,10 +279,10 @@ const TemplatesPage: React.FC = () => {
           ].map((info) => (
             <div
               key={info.label}
-              className="bg-pb-surface border border-pb-border rounded-xl p-3 sm:p-4 shadow-xs"
+              className="bg-[var(--pb-surface)] border-[2px] border-dashed border-[var(--pb-border-strong)] rounded-[4px] p-4 sm:p-5 shadow-[3px_3px_0px_#000,5px_5px_0px_var(--pb-shadow-solid)]"
             >
-              <p className="text-pb-text-muted text-[11px] sm:text-xs mb-0.5">{info.label}</p>
-              <p className="text-pb-text text-xs sm:text-sm font-semibold">{info.value}</p>
+              <p className="font-retro text-[var(--pb-text-muted)] text-base sm:text-lg mb-1 uppercase tracking-wider font-bold">{info.label}</p>
+              <p className="font-pixel text-[var(--pb-text)] text-[10px] sm:text-xs leading-relaxed">{info.value}</p>
             </div>
           ))}
         </div>
@@ -315,27 +315,25 @@ const TemplatesPage: React.FC = () => {
             {templates.map((template) => {
               const isSelected = selectedIds.has(template.id);
               return (
-                <motion.div
+                <div
                   key={template.id}
-                  initial={{ opacity: 0, scale: 0.97 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  whileHover={{ y: -4, scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  transition={{ type: "spring", stiffness: 350, damping: 25 }}
-                  onClick={
-                    selectionMode
-                      ? () => handleToggleSelect(template.id)
-                      : undefined
-                  }
-                  className={`group relative aspect-[3/4] bg-pb-surface border rounded-xl overflow-hidden shadow-xs hover:shadow-xl transition-colors duration-200 ${
-                    selectionMode ? "cursor-pointer select-none" : ""
-                  } ${
-                    isSelected
-                      ? "border-[#FF5A36] ring-2 ring-[#FF5A36]/50"
-                      : template.status === "draft"
-                        ? "border-amber-500/40"
-                        : "border-pb-border hover:border-pb-border-strong"
-                  }`}
+                  className={`group relative aspect-[3/4] bg-[var(--pb-surface)] overflow-hidden
+                    transition-all
+                    duration-150 ease-out
+                    border-[3px]
+                    rounded-none
+                    shadow-[3px_3px_0px_#000,6px_6px_0px_var(--pb-shadow-solid)]
+                    hover:shadow-[5px_5px_0px_#000,10px_10px_0px_var(--pb-shadow-solid)]
+                    hover:-translate-x-1 hover:-translate-y-1
+                    ${selectionMode ? "cursor-pointer select-none" : ""}
+                    ${
+                      isSelected
+                        ? "border-[#FFB800] shadow-[3px_3px_0px_#000,6px_6px_0px_#FF5A36]"
+                        : template.status === "draft"
+                          ? "border-amber-500/80"
+                          : "border-white hover:border-[#FF5A36]"
+                    }`}
+                  onClick={selectionMode ? () => handleToggleSelect(template.id) : undefined}
                 >
                   {/* Image / Preview */}
                   {template.preview_url ? (
@@ -353,42 +351,50 @@ const TemplatesPage: React.FC = () => {
                       className="absolute inset-0 w-full h-full object-cover"
                     />
                   ) : (
-                    <div className="absolute inset-0 flex items-center justify-center bg-pb-elevated">
-                      <ImageIcon size={20} className="text-pb-faint" />
+                    <div className="absolute inset-0 flex items-center justify-center bg-[var(--pb-elevated)]">
+                      <ImageIcon size={20} className="text-[var(--pb-faint)]" />
                     </div>
                   )}
 
-                  {/* Mode Seleksi: Checkbox / Selection Circle */}
+                  {/* Scanline overlay */}
+                  <div
+                    className="absolute inset-0 pointer-events-none z-[1]"
+                    style={{
+                      background: 'repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(0,0,0,0.07) 3px, rgba(0,0,0,0.07) 4px)',
+                    }}
+                  />
+
+                  {/* Selection checkbox */}
                   {selectionMode ? (
                     <div className="absolute top-1.5 left-1.5 z-10">
                       <div
-                        className={`w-5 h-5 sm:w-6 sm:h-6 rounded-md flex items-center justify-center transition-all ${
+                        className={`w-5 h-5 sm:w-6 sm:h-6 rounded-none flex items-center justify-center border-[2px] transition-all ${
                           isSelected
-                            ? "bg-[#FF5A36] text-white shadow-md"
-                            : "bg-black/60 backdrop-blur-sm border border-white/40 text-white/60"
+                            ? "bg-[#FF5A36] border-black text-white shadow-[2px_2px_0px_#000]"
+                            : "bg-black/70 border-white/60 text-white/60"
                         }`}
                       >
                         {isSelected ? (
-                          <Check size={12} className="stroke-[3]" />
+                          <Check size={11} className="stroke-[3]" />
                         ) : (
-                          <Square size={12} />
+                          <Square size={11} />
                         )}
                       </div>
                     </div>
                   ) : (
-                    /* Tombol Edit Frame, Ubah Nama, & Hapus: SELALU TAMPIL */
-                    <div className="absolute top-1.5 left-1.5 z-10 flex flex-col gap-1">
+                    /* Action buttons */
+                    <div className="absolute top-1 left-1 sm:top-1.5 sm:left-1.5 z-10 flex flex-col gap-0.5 sm:gap-1">
                       <button
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
                           navigate(`/templates/${template.id}/editor`);
                         }}
-                        className="w-6 h-6 sm:w-8 sm:h-8 rounded-md sm:rounded-lg bg-black/80 backdrop-blur-md text-cyan-300 hover:text-cyan-200 border border-white/20 shadow-md active:scale-95 transition-all flex items-center justify-center"
+                        className="template-card-btn-cyan w-5 h-5 sm:w-7 sm:h-7 md:w-8 md:h-8 rounded-none bg-black/90 text-[#00FFCC] border-[1.5px] sm:border-[2px] border-[#00FFCC]/60 shadow-[1px_1px_0px_#000] sm:shadow-[2px_2px_0px_#000] active:translate-x-[1px] active:translate-y-[1px] transition-all flex items-center justify-center cursor-pointer"
                         title="Buka Frame Editor"
                         aria-label="Buka Frame Editor"
                       >
-                        <SlidersHorizontal size={11} className="sm:w-[13px] sm:h-[13px]" />
+                        <SlidersHorizontal size={9} className="sm:w-[13px] sm:h-[13px]" />
                       </button>
                       <button
                         type="button"
@@ -397,11 +403,11 @@ const TemplatesPage: React.FC = () => {
                           setRenameTarget(template);
                           setRenameName(template.name);
                         }}
-                        className="w-6 h-6 sm:w-8 sm:h-8 rounded-md sm:rounded-lg bg-black/80 backdrop-blur-md text-amber-300 hover:text-amber-200 border border-white/20 shadow-md active:scale-95 transition-all flex items-center justify-center"
+                        className="template-card-btn-yellow w-5 h-5 sm:w-7 sm:h-7 md:w-8 md:h-8 rounded-none bg-black/90 text-[#FFB800] border-[1.5px] sm:border-[2px] border-[#FFB800]/60 shadow-[1px_1px_0px_#000] sm:shadow-[2px_2px_0px_#000] active:translate-x-[1px] active:translate-y-[1px] transition-all flex items-center justify-center cursor-pointer"
                         title="Ubah Nama Template"
                         aria-label="Ubah Nama Template"
                       >
-                        <Pencil size={11} className="sm:w-[13px] sm:h-[13px]" />
+                        <Pencil size={9} className="sm:w-[13px] sm:h-[13px]" />
                       </button>
                       <button
                         type="button"
@@ -409,56 +415,55 @@ const TemplatesPage: React.FC = () => {
                           e.stopPropagation();
                           setDeleteTarget(template);
                         }}
-                        className="w-6 h-6 sm:w-8 sm:h-8 rounded-md sm:rounded-lg bg-black/80 backdrop-blur-md text-red-400 hover:text-red-300 border border-white/20 shadow-md active:scale-95 transition-all flex items-center justify-center"
+                        className="w-5 h-5 sm:w-7 sm:h-7 md:w-8 md:h-8 rounded-none bg-black/90 text-red-400 border-[1.5px] sm:border-[2px] border-red-500/60 shadow-[1px_1px_0px_#000] sm:shadow-[2px_2px_0px_#000] active:translate-x-[1px] active:translate-y-[1px] transition-all flex items-center justify-center cursor-pointer"
                         title="Hapus Template"
                         aria-label="Hapus Template"
                       >
-                        <Trash2 size={11} className="sm:w-[13px] sm:h-[13px]" />
+                        <Trash2 size={9} className="sm:w-[13px] sm:h-[13px]" />
                       </button>
                     </div>
                   )}
 
-                  {/* Status badge */}
+                  {/* Draft badge / Frame count badge */}
                   {template.status === "draft" ? (
-                    <span className="absolute top-1.5 right-1.5 flex items-center gap-0.5 px-1 sm:px-1.5 py-0.5 rounded-md bg-amber-500 text-black text-[8px] sm:text-[10px] font-bold shadow-md z-10">
-                      <AlertCircle size={9} />
-                      Draft
+                    <span className="absolute top-1 right-1 sm:top-2 sm:right-2 flex items-center gap-0.5 px-1 py-0.5 sm:px-2 sm:py-1 rounded-none bg-amber-500 text-black text-[6px] sm:text-[8px] md:text-[9px] font-pixel shadow-[1px_1px_0px_#000] sm:shadow-[2px_2px_0px_#000] z-10 border sm:border-[2px] border-black">
+                      !DRAFT
                     </span>
                   ) : (
-                    <span className="absolute top-1.5 right-1.5 px-1 sm:px-1.5 py-0.5 rounded-md bg-black/75 backdrop-blur-md text-white text-[8px] sm:text-[10px] font-medium border border-white/10 shadow-md z-10">
-                      {template.frame_count} f
+                    <span className="absolute top-1 right-1 sm:top-2 sm:right-2 font-pixel text-white text-[7px] sm:text-[9px] md:text-[10px] px-1 py-0.5 sm:px-2 sm:py-1 rounded-none bg-black/90 border border-[#FF5A36] shadow-[1px_1px_0px_#000] sm:shadow-[2px_2px_0px_#000] z-10">
+                      x{template.frame_count}
                     </span>
                   )}
 
-                  {/* Overlay Bawah */}
-                  <div className="absolute bottom-0 left-0 right-0 p-1.5 sm:p-2.5 bg-gradient-to-t from-black/95 via-black/70 to-transparent flex items-end justify-between gap-1">
+                  {/* Bottom overlay — hidden on mobile so it doesn't obstruct the template design, visible on sm+, fades out on hover */}
+                  <div className="hidden sm:flex absolute bottom-0 left-0 right-0 p-2 sm:p-3 bg-black/55 border-t-[2px] border-[#FF5A36] z-[2] items-end justify-between gap-1 transition-opacity duration-150 group-hover:opacity-0">
                     <div className="min-w-0 flex-1">
-                      <p className="text-white text-[11px] sm:text-xs font-semibold truncate leading-tight">
+                      <p className="font-retro text-white text-base sm:text-lg truncate leading-tight font-bold">
                         {template.name}
                       </p>
-                      <p className="text-white/70 text-[9px] sm:text-[10px] mt-0.5">
-                        {template.canvas_width} x {template.canvas_height}
+                      <p className="font-retro pb-size-text font-bold text-sm sm:text-base mt-0.5 drop-shadow-[0_1px_1px_rgba(0,0,0,0.8)]">
+                        {template.canvas_width}x{template.canvas_height} px
                       </p>
                     </div>
                   </div>
-                </motion.div>
+                </div>
               );
             })}
           </div>
         )}
       </div>
 
-      {/* ===== Upload Modal ===== */}
+      {/* ===== Modal Upload Template ===== */}
       <Modal
         isOpen={isUploadOpen}
         onClose={() => setIsUploadOpen(false)}
         title="Upload Template Baru"
         size="lg"
       >
-        <div className="space-y-3.5">
+        <div className="space-y-4">
           {/* Nama Template */}
           <div>
-            <label className="block text-pb-text text-xs font-semibold mb-1.5">
+            <label className="block font-retro text-[var(--pb-text-secondary)] text-base sm:text-lg font-bold mb-2">
               Nama Template <span className="text-red-400">*</span>
             </label>
             <input
@@ -466,15 +471,15 @@ const TemplatesPage: React.FC = () => {
               value={form.name}
               onChange={(e) => setField("name", e.target.value)}
               placeholder="Contoh: Photobooth Strip Retro 3 Frame"
-              className="w-full bg-pb-bg border border-pb-border rounded-xl px-3.5 py-2.5
-                text-pb-text text-xs sm:text-sm placeholder:text-pb-faint
-                focus:outline-none focus:ring-1 focus:border-[#FF5A36] transition-colors"
+              className="w-full bg-[var(--pb-bg)] border-[2px] border-[var(--pb-border-strong)] rounded-[4px] px-4 py-3
+                font-retro text-lg sm:text-xl font-bold text-[var(--pb-text)] placeholder:text-[var(--pb-faint)]
+                focus:outline-none focus:border-[#FFB800] shadow-[2px_2px_0px_var(--pb-shadow-solid)] transition-colors"
             />
           </div>
 
           {/* File Template */}
           <div>
-            <label className="block text-pb-text text-xs font-semibold mb-1.5">
+            <label className="block font-retro text-[var(--pb-text-secondary)] text-base sm:text-lg font-bold mb-2">
               File Template Desain <span className="text-red-400">*</span>
             </label>
             <input
@@ -487,32 +492,32 @@ const TemplatesPage: React.FC = () => {
             <button
               type="button"
               onClick={() => templateInputRef.current?.click()}
-              className={`w-full flex items-center justify-center gap-2.5 border border-dashed rounded-xl px-4 py-5 transition-all text-left ${
+              className={`w-full flex items-center justify-center gap-3 border-[2px] border-dashed rounded-[4px] px-4 py-6 transition-all text-left shadow-[2px_2px_0px_var(--pb-shadow-solid)] cursor-pointer ${
                 templateFile
-                  ? "bg-green-500/10 border-green-500/40 text-green-400"
-                  : "border-pb-border hover:border-pb-border-strong hover:bg-pb-elevated text-pb-text-secondary hover:text-pb-text"
+                  ? "bg-green-500/10 border-green-500 text-green-400"
+                  : "border-[var(--pb-border-strong)] hover:border-[#FFB800] hover:bg-[var(--pb-elevated)] text-[var(--pb-text-secondary)] hover:text-[var(--pb-text)]"
               }`}
             >
               {templateFile ? (
                 <>
-                  <FileImage size={20} className="text-green-400 shrink-0" />
+                  <FileImage size={24} className="text-green-400 shrink-0" />
                   <div className="min-w-0 flex-1">
-                    <p className="text-xs sm:text-sm font-semibold truncate text-pb-text">{templateFile.name}</p>
-                    <p className="text-[11px] text-pb-text-muted">
+                    <p className="font-retro text-base sm:text-lg font-bold truncate text-[var(--pb-text)]">{templateFile.name}</p>
+                    <p className="font-retro text-sm text-[var(--pb-text-muted)]">
                       {(templateFile.size / 1024 / 1024).toFixed(1)} MB · Siap diunggah
                     </p>
                   </div>
-                  <span className="text-xs text-green-400 font-semibold px-2 py-1 bg-green-500/20 rounded-lg shrink-0">
+                  <span className="font-retro text-sm text-green-400 font-bold px-3 py-1 bg-green-500/20 rounded-[3px] border border-green-500/40 shrink-0">
                     Ganti
                   </span>
                 </>
               ) : (
                 <div className="flex flex-col items-center justify-center text-center">
-                  <Upload size={22} className="text-[#FF5A36] mb-1.5" />
-                  <p className="text-xs sm:text-sm font-semibold text-pb-text">
+                  <Upload size={26} className="text-[#FF5A36] mb-1.5" />
+                  <p className="font-retro text-base sm:text-lg font-bold text-[var(--pb-text)]">
                     Pilih File Template Gambar
                   </p>
-                  <p className="text-[11px] text-pb-text-muted mt-0.5">
+                  <p className="font-retro text-sm text-[var(--pb-text-muted)] mt-0.5">
                     Format PNG, JPG, WEBP (maks. 20 MB)
                   </p>
                 </div>
@@ -522,7 +527,7 @@ const TemplatesPage: React.FC = () => {
 
           {/* File Preview (opsional) */}
           <div>
-            <label className="block text-pb-text text-xs font-semibold mb-1.5">
+            <label className="block font-retro text-[var(--pb-text-secondary)] text-base sm:text-lg font-bold mb-2">
               Gambar Preview Katalog (opsional)
             </label>
             <input
@@ -535,28 +540,28 @@ const TemplatesPage: React.FC = () => {
             <button
               type="button"
               onClick={() => previewInputRef.current?.click()}
-              className="w-full flex items-center gap-2.5 border border-pb-border rounded-xl px-3.5 py-2.5
-                text-pb-text-secondary hover:text-pb-text hover:border-pb-border-strong hover:bg-pb-elevated transition-colors"
+              className="w-full flex items-center gap-3 border-[2px] border-[var(--pb-border-strong)] rounded-[4px] px-4 py-3 bg-[var(--pb-bg)]
+                text-[var(--pb-text-secondary)] hover:text-[var(--pb-text)] hover:border-[#FFB800] hover:bg-[var(--pb-elevated)] shadow-[2px_2px_0px_var(--pb-shadow-solid)] transition-colors cursor-pointer"
             >
               {previewFile ? (
                 <>
-                  <FileImage size={16} className="text-green-400 shrink-0" />
-                  <span className="text-xs sm:text-sm truncate text-pb-text flex-1 text-left">{previewFile.name}</span>
+                  <FileImage size={20} className="text-green-400 shrink-0" />
+                  <span className="font-retro text-base sm:text-lg font-bold truncate text-[var(--pb-text)] flex-1 text-left">{previewFile.name}</span>
                   <span
                     onClick={(e) => {
                       e.stopPropagation();
                       setPreviewFile(null);
                     }}
-                    className="p-1 rounded-lg text-pb-text-muted hover:text-red-400 hover:bg-red-500/10"
+                    className="p-1 rounded-[3px] text-[var(--pb-text-muted)] hover:text-red-400 hover:bg-red-500/10"
                     title="Hapus file preview"
                   >
-                    <X size={14} />
+                    <X size={16} />
                   </span>
                 </>
               ) : (
                 <>
-                  <ImageIcon size={16} className="text-pb-text-muted shrink-0" />
-                  <span className="text-xs sm:text-sm text-pb-text-muted">Pilih thumbnail preview (opsional)</span>
+                  <ImageIcon size={20} className="text-[var(--pb-text-muted)] shrink-0" />
+                  <span className="font-retro text-base text-[var(--pb-text-muted)]">Pilih thumbnail preview (opsional)</span>
                 </>
               )}
             </button>
@@ -565,7 +570,7 @@ const TemplatesPage: React.FC = () => {
           {/* Dimensi */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-pb-text text-xs font-semibold mb-1.5">
+              <label className="block font-retro text-[var(--pb-text-secondary)] text-base sm:text-lg font-bold mb-1.5">
                 Lebar Canvas (px)
               </label>
               <input
@@ -573,12 +578,12 @@ const TemplatesPage: React.FC = () => {
                 value={form.canvas_width}
                 onChange={(e) => setField("canvas_width", e.target.value)}
                 min={100}
-                className="w-full bg-pb-bg border border-pb-border rounded-xl px-3.5 py-2.5
-                  text-pb-text text-xs sm:text-sm focus:outline-none focus:ring-1 focus:border-[#FF5A36]"
+                className="w-full bg-[var(--pb-bg)] border-[2px] border-[var(--pb-border-strong)] rounded-[4px] px-4 py-2.5
+                  font-retro text-base sm:text-lg font-bold text-[var(--pb-text)] focus:outline-none focus:border-[#FFB800] shadow-[2px_2px_0px_var(--pb-shadow-solid)]"
               />
             </div>
             <div>
-              <label className="block text-pb-text text-xs font-semibold mb-1.5">
+              <label className="block font-retro text-[var(--pb-text-secondary)] text-base sm:text-lg font-bold mb-1.5">
                 Tinggi Canvas (px)
               </label>
               <input
@@ -586,34 +591,33 @@ const TemplatesPage: React.FC = () => {
                 value={form.canvas_height}
                 onChange={(e) => setField("canvas_height", e.target.value)}
                 min={100}
-                className="w-full bg-pb-bg border border-pb-border rounded-xl px-3.5 py-2.5
-                  text-pb-text text-xs sm:text-sm focus:outline-none focus:ring-1 focus:border-[#FF5A36]"
+                className="w-full bg-[var(--pb-bg)] border-[2px] border-[var(--pb-border-strong)] rounded-[4px] px-4 py-2.5
+                  font-retro text-base sm:text-lg font-bold text-[var(--pb-text)] focus:outline-none focus:border-[#FFB800] shadow-[2px_2px_0px_var(--pb-shadow-solid)]"
               />
             </div>
           </div>
 
-          <div className="flex items-start gap-2.5 bg-pb-elevated/70 border border-pb-border rounded-xl p-3">
+          <div className="flex items-start gap-3 bg-[var(--pb-elevated)] border-[2px] border-[var(--pb-border-strong)] rounded-[4px] p-3.5 shadow-[2px_2px_0px_var(--pb-shadow-solid)]">
             <SlidersHorizontal
-              size={15}
+              size={18}
               className="text-[#FF5A36] mt-0.5 shrink-0"
             />
-            <p className="text-pb-text-muted text-[11px] sm:text-xs leading-relaxed">
+            <p className="font-retro text-[var(--pb-text-muted)] text-sm sm:text-base leading-relaxed">
               Setelah upload, Anda otomatis diarahkan ke{" "}
-              <span className="text-pb-text font-semibold">Frame Editor</span>{" "}
+              <span className="text-[var(--pb-text)] font-bold">Frame Editor</span>{" "}
               untuk mengatur lubang kamera, lalu tekan{" "}
-              <span className="text-pb-text font-semibold">Confirm Template</span>.
+              <span className="text-[var(--pb-text)] font-bold">Confirm Template</span>.
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2.5 mt-5">
+        <div className="flex items-center gap-3 mt-6 pt-3 border-t-[2px] border-[var(--pb-border)]">
           <Button
             variant="secondary"
             size="md"
             fullWidth
             onClick={() => setIsUploadOpen(false)}
             disabled={createTemplate.isPending}
-            className="text-xs sm:text-sm font-medium"
           >
             Batal
           </Button>
@@ -623,7 +627,6 @@ const TemplatesPage: React.FC = () => {
             fullWidth
             onClick={handleUpload}
             loading={createTemplate.isPending}
-            className="text-xs sm:text-sm font-semibold"
           >
             {createTemplate.isPending
               ? "Mengunggah..."
@@ -683,8 +686,8 @@ const TemplatesPage: React.FC = () => {
             }
           }}
         >
-          <div className="mb-4">
-            <label className="block text-pb-text text-sm font-medium mb-1.5">
+          <div className="mb-5">
+            <label className="block font-retro text-[var(--pb-text-secondary)] text-base sm:text-lg font-bold mb-2">
               Nama Template
             </label>
             <input
@@ -694,13 +697,13 @@ const TemplatesPage: React.FC = () => {
               placeholder="Masukkan nama template..."
               required
               autoFocus
-              className="w-full bg-pb-bg border border-pb-border rounded-xl px-3.5 py-2.5
-                text-pb-text text-sm placeholder:text-pb-faint
-                focus:outline-none focus:ring-1 focus:border-[#FF5A36] transition-colors"
+              className="w-full bg-[var(--pb-bg)] border-[2px] border-[var(--pb-border-strong)] rounded-[4px] px-4 py-3
+                font-retro text-lg sm:text-xl font-bold text-[var(--pb-text)] placeholder:text-[var(--pb-faint)]
+                focus:outline-none focus:border-[#FFB800] shadow-[2px_2px_0px_var(--pb-shadow-solid)] transition-colors"
             />
           </div>
 
-          <div className="flex justify-end gap-2 pt-3 border-t border-pb-border">
+          <div className="flex justify-end gap-3 pt-3 border-t-[2px] border-[var(--pb-border)]">
             <Button
               type="button"
               variant="secondary"

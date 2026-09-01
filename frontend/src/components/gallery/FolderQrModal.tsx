@@ -2,7 +2,6 @@ import React from 'react'
 import { Download, Folder as FolderIcon, Share2 } from 'lucide-react'
 import { QRCodeCanvas } from 'qrcode.react'
 import { Modal } from '@/components/ui/Modal'
-import { Button } from '@/components/ui/Button'
 import { toast } from '@/components/ui/Toast'
 import { downloadQrCardPng } from '@/utils/downloadQr'
 import type { Folder } from '@/types'
@@ -54,68 +53,66 @@ const FolderQrModal: React.FC<FolderQrModalProps> = ({ isOpen, onClose, folder }
   }
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="QR Code Folder" size="sm">
+    <Modal isOpen={isOpen} onClose={onClose} title="QR Code Folder" size="md">
       <div className="flex flex-col items-center text-center">
         {/* Nama Folder Pill */}
-        <div className="inline-flex items-center gap-1.5 text-pb-text text-xs font-semibold px-3 py-1 rounded-full bg-pb-elevated border border-pb-border mb-3 max-w-full">
-          <FolderIcon size={13} className="text-[#FF5A36] shrink-0" />
-          <span className="truncate max-w-[190px] sm:max-w-[230px]">{folder.name}</span>
+        <div className="inline-flex items-center gap-2 text-[var(--pb-text)] font-retro text-base sm:text-lg font-bold px-4 py-1.5 rounded-[4px] bg-[var(--pb-elevated)] border-[2px] border-[var(--pb-border-strong)] mb-4 max-w-full shadow-[2px_2px_0px_var(--pb-shadow-solid)]">
+          <FolderIcon size={18} className="text-[#FF5A36] shrink-0" />
+          <span className="truncate max-w-[220px] sm:max-w-[280px]">{folder.name}</span>
         </div>
 
-        {/* ===== CARD DESIGN SESUAI MOCKUP (COMPACT & BALANCED) ===== */}
-        <div className="w-[260px] sm:w-[280px] max-w-full rounded-2xl overflow-hidden shadow-2xl border border-pb-border bg-white mb-3.5 transition-transform hover:scale-[1.01]">
+        {/* ===== CARD DESIGN SESUAI MOCKUP ===== */}
+        <div className="w-full max-w-[280px] sm:max-w-[380px] md:max-w-[410px] rounded-[6px] overflow-hidden border-[3px] border-black shadow-[4px_4px_0px_#000,8px_8px_0px_var(--pb-shadow-solid)] bg-white mb-5 transition-transform hover:scale-[1.01]">
           {/* Header Hitam */}
-          <div className="bg-[#141416] px-3 pt-3 pb-2.5 text-center select-none">
-            <p className="text-zinc-400 text-[8px] font-bold tracking-[0.3em] uppercase">
+          <div className="bg-[#141416] px-4 pt-3.5 pb-3 text-center select-none overflow-hidden">
+            <p className="text-zinc-400 font-pixel text-[8px] tracking-[0.18em] uppercase font-bold">
               F O L D E R
             </p>
-            <h3 className="text-white text-sm sm:text-base font-black tracking-[0.2em] uppercase leading-tight mt-0.5">
-              P I X E L B O O T H
+            <h3 className="text-white font-pixel text-sm font-bold tracking-[0.1em] uppercase leading-tight mt-1 truncate">
+              PIXELBOOTH
             </h3>
-            <p className="text-zinc-400 text-[7px] font-medium tracking-[0.2em] uppercase mt-0.5">
-              P H O T O B O O T H
+            <p className="text-zinc-400 font-retro text-[10px] font-bold tracking-[0.1em] uppercase mt-0.5">
+              PHOTOBOOTH
             </p>
           </div>
 
           {/* Body Putih dengan QR */}
-          <div className="px-3 pt-3 pb-2.5 bg-white flex flex-col items-center justify-center">
-            <div className="w-full flex items-center justify-center mb-1.5">
+          <div className="px-5 pt-5 pb-4 bg-white flex flex-col items-center justify-center">
+            <div className="w-full flex items-center justify-center mb-2.5">
               <QRCodeCanvas
                 id="folder-qr-canvas"
                 value={folderUrl}
-                size={240}
+                size={280}
                 level="H"
                 bgColor="#FFFFFF"
                 fgColor="#000000"
                 includeMargin={false}
-                className="w-36 h-36 sm:w-40 sm:h-40 aspect-square block"
+                className="w-full max-w-[200px] sm:max-w-[240px] aspect-square block border-[2px] border-black"
               />
             </div>
 
-            {/* Garis Pembatas Halus */}
-            <div className="w-16 h-[1px] bg-zinc-200 my-1.5" />
+            <div className="w-28 h-[2px] bg-zinc-300 my-2.5" />
 
-            {/* Keterangan Bawah */}
-            <p className="text-zinc-600 text-[10px] font-medium leading-tight text-center max-w-[210px]">
+            <p className="font-retro text-zinc-700 text-sm sm:text-base font-bold leading-tight text-center max-w-[280px]">
               Scan untuk melihat galeri folder Anda
             </p>
-            <p className="text-zinc-400 text-[7px] font-bold tracking-[0.2em] uppercase text-center mt-1">
-              P I X E L B O O T H
+            <p className="font-pixel text-zinc-500 text-[9px] font-bold tracking-[0.1em] uppercase text-center mt-1.5">
+              PIXELBOOTH
             </p>
           </div>
         </div>
 
-        {/* Tombol Aksi: Bagikan & Unduh Desain (Icon-only on Mobile & iPad, Icon+Text on Desktop) */}
-        <div className="w-[260px] sm:w-[280px] max-w-full grid grid-cols-2 gap-2.5">
+        {/* Tombol Aksi: Bagikan & Unduh Desain */}
+        <div className="w-full max-w-[280px] sm:max-w-[380px] md:max-w-[410px] grid grid-cols-2 gap-3">
           <button
             type="button"
             title="Bagikan Link Folder"
             aria-label="Bagikan"
             onClick={handleShare}
-            className="h-11 w-full rounded-xl bg-pb-surface-hover hover:bg-pb-border text-pb-text border border-pb-border flex items-center justify-center gap-2 text-xs font-semibold transition-all active:scale-95 cursor-pointer shadow-xs whitespace-nowrap"
+            className="h-12 w-full rounded-[4px] bg-[var(--pb-elevated)] hover:bg-[var(--pb-border)] text-[var(--pb-text)] border-[2px] border-[var(--pb-border-strong)] flex items-center justify-center gap-2 font-retro text-base sm:text-lg font-bold uppercase transition-all active:translate-x-[2px] active:translate-y-[2px] cursor-pointer shadow-[3px_3px_0px_var(--pb-shadow-solid)] whitespace-nowrap"
           >
-            <Share2 size={18} className="shrink-0 text-pb-text-secondary" />
-            <span className="hidden lg:inline">Bagikan</span>
+            <Share2 size={20} className="shrink-0 text-[#FF5A36]" />
+            <span>Bagikan</span>
           </button>
 
           <button
@@ -123,10 +120,10 @@ const FolderQrModal: React.FC<FolderQrModalProps> = ({ isOpen, onClose, folder }
             title="Unduh QR Code"
             aria-label="Unduh QR"
             onClick={handleDownloadQr}
-            className="h-11 w-full rounded-xl bg-gradient-to-r from-[#FF5A36] via-[#FF7836] to-[#FF9836] hover:brightness-105 shadow-md shadow-orange-500/20 text-white flex items-center justify-center gap-2 text-xs font-semibold transition-all active:scale-95 cursor-pointer whitespace-nowrap"
+            className="h-12 w-full rounded-[4px] bg-[#FF5A36] hover:bg-[#FF7040] shadow-[3px_3px_0px_#000] border-[2px] border-black text-white flex items-center justify-center gap-2 font-retro text-base sm:text-lg font-bold uppercase transition-all active:translate-x-[2px] active:translate-y-[2px] cursor-pointer whitespace-nowrap"
           >
-            <Download size={18} className="shrink-0 text-white" />
-            <span className="hidden lg:inline">Unduh QR</span>
+            <Download size={20} className="shrink-0 text-white" />
+            <span>Unduh QR</span>
           </button>
         </div>
       </div>

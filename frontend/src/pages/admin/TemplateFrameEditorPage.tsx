@@ -37,6 +37,7 @@ import {
   useTemplate,
   useUpdateTemplate,
 } from "@/hooks/useTemplates";
+import { createCameraStream } from "@/utils/cameraManager";
 import {
   normalizeFrame,
   computeHoleMask,
@@ -704,14 +705,8 @@ const TemplateFrameEditorPage: React.FC = () => {
       try {
         let stream: MediaStream;
         try {
-          stream = await navigator.mediaDevices.getUserMedia({
-            video: {
-              facingMode: "user",
-              width: { ideal: 1280 },
-              height: { ideal: 720 },
-            },
-            audio: false,
-          });
+          const res = await createCameraStream();
+          stream = res.stream;
         } catch {
           // Fallback ke kamera default jika facingMode/resolusi gagal
           stream = await navigator.mediaDevices.getUserMedia({
@@ -1629,8 +1624,11 @@ const TemplateFrameEditorPage: React.FC = () => {
   // ===== Loading / error =====
   if (templateQuery.isLoading || !template) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <Spinner size="lg" className="text-pb-text" />
+      <div className="w-full min-h-[70vh] flex flex-col items-center justify-center gap-3">
+        <Spinner size="lg" className="text-[#FF5A36]" />
+        <p className="font-retro text-[var(--pb-text-muted)] text-lg sm:text-xl font-bold">
+          Memuat Frame Editor...
+        </p>
       </div>
     );
   }
@@ -1641,14 +1639,14 @@ const TemplateFrameEditorPage: React.FC = () => {
     onChange: (v: number) => void,
   ) => (
     <div>
-      <label className="block text-pb-text-muted text-[11px] font-medium mb-1">
+      <label className="block font-retro text-[var(--pb-text-secondary)] text-sm sm:text-base font-bold mb-1">
         {label}
       </label>
       <input
         type="number"
         value={Math.round(value)}
         onChange={(e) => onChange(Number(e.target.value))}
-        className="w-full bg-pb-bg border border-pb-border rounded-lg px-2 py-1.5 text-pb-text text-xs focus:outline-none focus:border-pb-border-strong"
+        className="w-full bg-[var(--pb-bg)] border-[2px] border-[var(--pb-border-strong)] rounded-[4px] px-2.5 py-2 font-retro text-[var(--pb-text)] text-base sm:text-lg font-bold text-center focus:outline-none focus:border-[#FFB800] shadow-[2px_2px_0px_var(--pb-shadow-solid)]"
       />
     </div>
   );
@@ -1671,12 +1669,12 @@ const TemplateFrameEditorPage: React.FC = () => {
     suffix: string,
   ) =>
     selected && (
-      <div key={key}>
-        <div className="flex items-center justify-between mb-1">
-          <label className="text-pb-text-secondary text-xs font-medium">
+      <div key={key} className="space-y-1.5">
+        <div className="flex items-center justify-between">
+          <label className="font-retro text-[var(--pb-text-secondary)] text-base sm:text-lg font-bold">
             {label}
           </label>
-          <span className="text-pb-text text-xs tabular-nums">
+          <span className="font-retro text-[var(--pb-text)] text-base sm:text-lg font-bold tabular-nums">
             {Number.isInteger(selected[key])
               ? selected[key]
               : Number(selected[key].toFixed(1))}
@@ -1694,75 +1692,42 @@ const TemplateFrameEditorPage: React.FC = () => {
               [key]: Number(e.target.value),
             } as Partial<CameraFrame>)
           }
-          className="w-full accent-cyan-400"
+          className="w-full accent-[#FF5A36] h-2.5 bg-[var(--pb-bg)] rounded-lg cursor-pointer"
         />
       </div>
     );
 
   return (
-    <div className="flex flex-col min-h-[calc(100vh-5rem)] lg:h-[calc(100vh-4rem)]">
-      {/* ===== Header ===== */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4 shrink-0">
-        <div className="flex items-center gap-3 min-w-0">
+    <div className="flex flex-col w-full min-h-full pb-6">
+      {/* ===== Header Bar (Tier 1: Nav & Confirmation) ===== */}
+      <div className="flex items-center justify-between gap-3 mb-3 shrink-0 bg-[var(--pb-surface)] border-[2px] border-[var(--pb-border-strong)] rounded-[4px] p-3 sm:p-4 shadow-[3px_3px_0px_#000,5px_5px_0px_var(--pb-shadow-solid)]">
+        <div className="flex items-center gap-2.5 sm:gap-3.5 min-w-0">
           <Button
-            variant="ghost"
+            variant="secondary"
             size="sm"
             onClick={() => navigate("/templates")}
             leftIcon={<ArrowLeft size={16} />}
           >
             Kembali
           </Button>
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <h1 className="text-pb-text text-lg sm:text-xl font-bold leading-tight truncate">
-                Frame Editor
-              </h1>
-              <span
-                className="px-2 py-0.5 rounded-md bg-amber-500/15 border border-amber-500/30
-                  text-amber-400 text-[11px] font-medium shrink-0"
-                title="Confirm template agar bisa dipakai sesi"
-              >
-                Draft
-              </span>
-            </div>
-            <p className="text-pb-text-muted text-xs mt-0.5 truncate">
-              {template.name}
-            </p>
+          <div className="min-w-0 flex items-center gap-2 sm:gap-2.5">
+            <h1 className="font-pixel text-[var(--pb-text)] text-sm sm:text-base lg:text-lg leading-tight truncate">
+              Frame Editor
+            </h1>
+            <span
+              className="pb-draft-badge text-amber-300 font-pixel px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-[3px] bg-amber-500/20 border-[2px] border-amber-500/40 text-[9px] sm:text-[10px] font-bold shrink-0 shadow-[2px_2px_0px_#000]"
+              title="Confirm template agar bisa dipakai sesi"
+            >
+              Draft
+            </span>
+            <span className="hidden md:inline-block font-retro text-[var(--pb-text-muted)] text-sm sm:text-base font-bold truncate max-w-[160px] lg:max-w-[220px]">
+              · {template.name}
+            </span>
           </div>
         </div>
 
-        {/* ===== Actions Bar ===== */}
-        <div className="flex items-center gap-2 shrink-0 flex-wrap">
-          {/* Mode Manual / Auto Render */}
-          <div className="flex rounded-xl border border-pb-border overflow-hidden bg-pb-bg p-0.5 gap-0.5">
-            <button
-              type="button"
-              onClick={() => switchFrameMode("manual")}
-              disabled={detecting}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all disabled:opacity-50 ${
-                frameMode === "manual"
-                  ? "bg-cyan-100 text-cyan-900 border border-cyan-300/70 dark:bg-cyan-950/80 dark:text-cyan-200 dark:border-cyan-500/30 shadow-xs"
-                  : "text-pb-text-secondary hover:text-pb-text hover:bg-pb-surface"
-              }`}
-            >
-              <MousePointer2 size={14} />
-              Manual
-            </button>
-            <button
-              type="button"
-              onClick={() => switchFrameMode("auto")}
-              disabled={detecting}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all disabled:opacity-50 ${
-                frameMode === "auto"
-                  ? "bg-violet-100 text-violet-950 border border-violet-300/70 dark:bg-violet-950/80 dark:text-violet-200 dark:border-violet-500/30 shadow-xs"
-                  : "text-pb-text-secondary hover:text-pb-text hover:bg-pb-surface"
-              }`}
-            >
-              <Wand2 size={14} />
-              Auto Render
-            </button>
-          </div>
-
+        {/* Action Buttons: Test Camera & Confirm */}
+        <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
           <Button
             variant={testCamera ? "primary" : "secondary"}
             size="sm"
@@ -1776,9 +1741,10 @@ const TemplateFrameEditorPage: React.FC = () => {
                 setTestCamera(true);
               }
             }}
-            leftIcon={testCamera ? <VideoOff size={15} /> : <Video size={15} />}
+            leftIcon={testCamera ? <VideoOff size={16} /> : <Video size={16} />}
           >
-            {testCamera ? "Stop" : "Test Camera"}
+            <span className="hidden sm:inline">{testCamera ? "Stop Test" : "Test Camera"}</span>
+            <span className="sm:hidden">{testCamera ? "Stop" : "Test"}</span>
           </Button>
           <Button
             variant="primary"
@@ -1786,10 +1752,53 @@ const TemplateFrameEditorPage: React.FC = () => {
             onClick={handleConfirm}
             loading={updateTemplate.isPending}
             disabled={frames.length === 0}
-            leftIcon={<Check size={15} />}
+            leftIcon={<Check size={16} />}
           >
             Confirm
           </Button>
+        </div>
+      </div>
+
+      {/* ===== Toolbar (Tier 2: Manual / Auto Render Mode Switcher) ===== */}
+      <div className="flex items-center justify-between gap-3 mb-4 shrink-0 bg-[var(--pb-surface)] border-[2px] border-[var(--pb-border-strong)] rounded-[4px] px-3 py-2 sm:px-4 sm:py-2.5 shadow-[2px_2px_0px_#000]">
+        <div className="flex items-center gap-2">
+          <span className="font-retro text-[var(--pb-text-secondary)] text-sm sm:text-base font-bold uppercase tracking-wider hidden sm:inline">
+            Mode Penentuan Frame:
+          </span>
+          <div className="flex rounded-[4px] border-[2px] border-[var(--pb-border-strong)] overflow-hidden bg-[var(--pb-bg)] p-0.5 gap-0.5 sm:gap-1 shadow-[1px_1px_0px_#000]">
+            <button
+              type="button"
+              onClick={() => switchFrameMode("manual")}
+              disabled={detecting}
+              className={`flex items-center gap-1.5 px-3 py-1 sm:px-4 sm:py-1.5 rounded-[3px] font-retro text-sm sm:text-base font-bold transition-all disabled:opacity-50 cursor-pointer ${
+                frameMode === "manual"
+                  ? "bg-[#FF5A36] text-white border-[2px] border-black shadow-[2px_2px_0px_#000]"
+                  : "text-[var(--pb-text-secondary)] hover:text-[var(--pb-text)] hover:bg-[var(--pb-surface)]"
+              }`}
+            >
+              <MousePointer2 size={14} />
+              <span>Manual</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => switchFrameMode("auto")}
+              disabled={detecting}
+              className={`flex items-center gap-1.5 px-3 py-1 sm:px-4 sm:py-1.5 rounded-[3px] font-retro text-sm sm:text-base font-bold transition-all disabled:opacity-50 cursor-pointer ${
+                frameMode === "auto"
+                  ? "bg-[#FFB800] text-black border-[2px] border-black shadow-[2px_2px_0px_#000]"
+                  : "text-[var(--pb-text-secondary)] hover:text-[var(--pb-text)] hover:bg-[var(--pb-surface)]"
+              }`}
+            >
+              <Wand2 size={14} />
+              <span>Auto Render</span>
+            </button>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <span className="font-retro text-[var(--pb-text-muted)] text-sm sm:text-base font-bold">
+            {frames.length} Frame
+          </span>
         </div>
       </div>
 
@@ -1803,7 +1812,7 @@ const TemplateFrameEditorPage: React.FC = () => {
         {/* ===== Canvas ===== */}
         <div
           ref={containerRef}
-          className="relative w-full h-[52vh] sm:h-[60vh] lg:h-auto lg:flex-1 bg-pb-bg border border-pb-border rounded-2xl overflow-hidden shrink-0 lg:shrink min-h-[300px]"
+          className="relative w-full h-[50vh] sm:h-[58vh] lg:h-auto lg:flex-1 bg-[var(--pb-surface)] border-[2px] border-[var(--pb-border-strong)] rounded-[4px] shadow-[3px_3px_0px_#000,5px_5px_0px_var(--pb-shadow-solid)] overflow-hidden shrink-0 lg:shrink min-h-[320px]"
         >
           {/* Video element tersembunyi untuk fallback capture stream */}
           <video
@@ -1917,21 +1926,22 @@ const TemplateFrameEditorPage: React.FC = () => {
           </div>
         </div>
 
-        {/* ===== Sidebar ===== */}
-        <div className="w-full lg:w-80 shrink-0 overflow-y-visible lg:overflow-y-auto pr-0 lg:pr-1 space-y-4 pb-8 lg:pb-0">
-          {/* Frames */}
-          <section className="bg-pb-surface border border-pb-border rounded-xl p-4">
-            <h3 className="text-pb-text text-sm font-semibold mb-2">
-              Camera Frames ({frames.length})
+        {/* ===== Sidebar Controls ===== */}
+        <div className="w-full lg:w-96 shrink-0 overflow-y-visible lg:overflow-y-auto pr-0 lg:pr-1 space-y-4 pb-8 lg:pb-0">
+          {/* Frames Section */}
+          <section className="bg-[var(--pb-surface)] border-[2px] border-[var(--pb-border-strong)] rounded-[4px] p-4 sm:p-5 shadow-[3px_3px_0px_#000,5px_5px_0px_var(--pb-shadow-solid)]">
+            <h3 className="font-pixel text-[var(--pb-text)] text-xs sm:text-sm font-bold mb-3 flex items-center gap-2">
+              <Layers size={16} className="text-[#FF5A36]" />
+              <span>Camera Frames ({frames.length})</span>
             </h3>
-            <div className="grid grid-cols-3 gap-1.5 mb-2">
+            <div className="grid grid-cols-3 gap-2 mb-3">
               <Button
                 variant="outline"
                 size="sm"
                 fullWidth
                 onClick={undo}
                 disabled={historyRef.current.length === 0}
-                leftIcon={<Undo2 size={14} />}
+                leftIcon={<Undo2 size={15} />}
               >
                 Undo
               </Button>
@@ -1941,7 +1951,7 @@ const TemplateFrameEditorPage: React.FC = () => {
                 fullWidth
                 onClick={redo}
                 disabled={redoRef.current.length === 0}
-                leftIcon={<Redo2 size={14} />}
+                leftIcon={<Redo2 size={15} />}
               >
                 Redo
               </Button>
@@ -1950,16 +1960,15 @@ const TemplateFrameEditorPage: React.FC = () => {
                 size="sm"
                 fullWidth
                 onClick={addFrame}
-                leftIcon={<Plus size={14} />}
+                leftIcon={<Plus size={15} />}
               >
                 Add
               </Button>
             </div>
-            <p className="text-[10px] text-pb-text-muted mb-2 leading-relaxed">
-              Ctrl+Z undo · Ctrl+Y redo · Ctrl+C copy · Ctrl+V paste · Ctrl+D
-              duplikat · Backspace hapus
+            <p className="font-retro text-xs sm:text-sm text-[var(--pb-text-muted)] mb-3 leading-relaxed">
+              Ctrl+Z undo · Ctrl+Y redo · Ctrl+C copy · Ctrl+V paste · Ctrl+D duplikat · Backspace hapus
             </p>
-            <div className="space-y-1.5 max-h-36 overflow-y-auto">
+            <div className="space-y-2 max-h-48 overflow-y-auto">
               {frames.map((f, i) => (
                 <button
                   key={f.id}
@@ -1968,31 +1977,31 @@ const TemplateFrameEditorPage: React.FC = () => {
                     setSelectedId(f.id);
                     setMode("select");
                   }}
-                  className={`w-full flex items-center justify-between rounded-lg px-3 py-2 text-left text-sm transition-colors ${
+                  className={`w-full flex items-center justify-between rounded-[4px] px-3.5 py-2.5 text-left font-retro text-base sm:text-lg font-bold transition-all border-[2px] ${
                     f.id === selectedId
-                      ? "bg-cyan-500/15 border border-cyan-500/40 text-pb-text"
-                      : "bg-pb-bg border border-pb-border text-pb-text-secondary hover:text-pb-text"
+                      ? "bg-[#FF5A36] text-white border-black shadow-[2px_2px_0px_#000]"
+                      : "bg-[var(--pb-bg)] border-[var(--pb-border-strong)] text-[var(--pb-text-secondary)] hover:text-[var(--pb-text)] hover:border-[#FFB800]"
                   }`}
                 >
                   <span>Frame {i + 1}</span>
-                  <span className="text-[11px] text-pb-text-muted tabular-nums">
+                  <span className="text-sm sm:text-base opacity-90 tabular-nums">
                     {Math.round(f.width)}×{Math.round(f.height)}
                     {f.rotation !== 0 ? ` · ${f.rotation}°` : ""}
-                    {f.flip_h || f.flip_v ? " · flipped" : ""}
+                    {f.flip_h || f.flip_v ? " · flip" : ""}
                   </span>
                 </button>
               ))}
               {frames.length === 0 && (
-                <p className="text-pb-text-muted text-xs">Belum ada frame.</p>
+                <p className="font-retro text-[var(--pb-text-muted)] text-base py-2">Belum ada frame.</p>
               )}
             </div>
             {selected && (
-              <div className="grid grid-cols-2 gap-2 mt-3">
+              <div className="grid grid-cols-2 gap-2 mt-3.5 pt-3 border-t-[2px] border-dashed border-[var(--pb-border)]">
                 <Button
                   variant="secondary"
                   size="sm"
                   onClick={duplicateFrame}
-                  leftIcon={<Copy size={14} />}
+                  leftIcon={<Copy size={15} />}
                 >
                   Duplicate
                 </Button>
@@ -2000,7 +2009,7 @@ const TemplateFrameEditorPage: React.FC = () => {
                   variant="danger"
                   size="sm"
                   onClick={deleteFrame}
-                  leftIcon={<Trash2 size={14} />}
+                  leftIcon={<Trash2 size={15} />}
                 >
                   Delete
                 </Button>
@@ -2010,39 +2019,39 @@ const TemplateFrameEditorPage: React.FC = () => {
 
           {/* Transform */}
           {selected && (
-            <section className="bg-pb-surface border border-pb-border rounded-xl p-4">
-              <h3 className="text-pb-text text-sm font-semibold mb-3">
+            <section className="bg-[var(--pb-surface)] border-[2px] border-[var(--pb-border-strong)] rounded-[4px] p-4 sm:p-5 shadow-[3px_3px_0px_#000,5px_5px_0px_var(--pb-shadow-solid)] space-y-4">
+              <h3 className="font-pixel text-[var(--pb-text)] text-xs sm:text-sm font-bold">
                 Transformasi Frame
               </h3>
 
               {/* Pilihan Bentuk Frame (Rectangle, Ellipse, Flexible Polygon) */}
-              <div className="mb-4">
-                <label className="text-pb-text-secondary text-xs font-medium block mb-1.5">
+              <div>
+                <label className="font-retro text-[var(--pb-text-secondary)] text-sm sm:text-base font-bold block mb-1.5">
                   Bentuk Frame
                 </label>
-                <div className="grid grid-cols-3 gap-1.5 p-1 bg-pb-bg border border-pb-border rounded-xl">
+                <div className="grid grid-cols-3 gap-1.5 p-1 bg-[var(--pb-bg)] border-[2px] border-[var(--pb-border-strong)] rounded-[4px]">
                   <button
                     type="button"
                     onClick={() => updateFrame(selected.id, { shape: "rectangle" })}
-                    className={`flex flex-col items-center gap-1 py-2 px-1 rounded-lg text-xs font-medium transition-all ${
+                    className={`flex flex-col items-center gap-1.5 py-2.5 px-1 rounded-[3px] font-retro text-sm sm:text-base font-bold transition-all ${
                       selected.shape === "rectangle" || !selected.shape
-                        ? "bg-cyan-500/20 text-cyan-400 border border-cyan-500/40 shadow-sm font-semibold"
-                        : "text-pb-text-secondary hover:text-pb-text"
+                        ? "bg-[#FF5A36] text-white border-[2px] border-black shadow-[2px_2px_0px_#000]"
+                        : "text-[var(--pb-text-secondary)] hover:text-[var(--pb-text)] hover:bg-[var(--pb-surface)]"
                     }`}
                   >
-                    <Square size={16} />
+                    <Square size={18} />
                     <span>Persegi</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => updateFrame(selected.id, { shape: "ellipse" })}
-                    className={`flex flex-col items-center gap-1 py-2 px-1 rounded-lg text-xs font-medium transition-all ${
+                    className={`flex flex-col items-center gap-1.5 py-2.5 px-1 rounded-[3px] font-retro text-sm sm:text-base font-bold transition-all ${
                       selected.shape === "ellipse"
-                        ? "bg-cyan-500/20 text-cyan-400 border border-cyan-500/40 shadow-sm font-semibold"
-                        : "text-pb-text-secondary hover:text-pb-text"
+                        ? "bg-[#FF5A36] text-white border-[2px] border-black shadow-[2px_2px_0px_#000]"
+                        : "text-[var(--pb-text-secondary)] hover:text-[var(--pb-text)] hover:bg-[var(--pb-surface)]"
                     }`}
                   >
-                    <Circle size={16} />
+                    <Circle size={18} />
                     <span>Elips</span>
                   </button>
                   <button
@@ -2054,53 +2063,19 @@ const TemplateFrameEditorPage: React.FC = () => {
                           : generateDefaultPolygon(selected.width, selected.height, 8);
                       updateFrame(selected.id, { shape: "polygon", polygon_points: pts });
                     }}
-                    className={`flex flex-col items-center gap-1 py-2 px-1 rounded-lg text-xs font-medium transition-all ${
+                    className={`flex flex-col items-center gap-1.5 py-2.5 px-1 rounded-[3px] font-retro text-sm sm:text-base font-bold transition-all ${
                       selected.shape === "polygon"
-                        ? "bg-cyan-500/20 text-cyan-400 border border-cyan-500/40 shadow-sm font-semibold"
-                        : "text-pb-text-secondary hover:text-pb-text"
+                        ? "bg-[#FF5A36] text-white border-[2px] border-black shadow-[2px_2px_0px_#000]"
+                        : "text-[var(--pb-text-secondary)] hover:text-[var(--pb-text)] hover:bg-[var(--pb-surface)]"
                     }`}
                   >
-                    <Spline size={16} />
+                    <Spline size={18} />
                     <span>Fleksibel</span>
                   </button>
                 </div>
-
-                {selected.shape === "polygon" && (
-                  <div className="mt-2.5 p-2.5 rounded-lg bg-cyan-500/10 border border-cyan-500/20 text-[11px] text-cyan-300 space-y-2">
-                    <div className="flex items-start gap-1.5">
-                      <Sparkles size={14} className="shrink-0 mt-0.5 text-cyan-400" />
-                      <div>
-                        <p className="font-semibold text-cyan-200">Mode Poligon Fleksibel:</p>
-                        <p className="text-cyan-300/90 mt-0.5">
-                          Tarik titik oranye <span className="font-bold">(1..N)</span> ke segala arah. Klik tombol <span className="font-bold text-cyan-200">[+]</span> di antara garis untuk menambah titik sudut baru.
-                        </p>
-                      </div>
-                    </div>
-                    {Array.isArray(selected.polygon_points) && selected.polygon_points.length > 3 && (
-                      <div className="pt-1 flex items-center justify-between">
-                        <span className="text-[10px] text-cyan-400/80 font-mono">
-                          {selected.polygon_points.length} Titik Sudut
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const pts = [...(selected.polygon_points || [])];
-                            if (pts.length > 3) {
-                              pts.pop();
-                              updateFrame(selected.id, { polygon_points: pts });
-                            }
-                          }}
-                          className="text-[10px] px-2 py-0.5 rounded bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/30 transition-colors"
-                        >
-                          Hapus Titik Terakhir
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                )}
               </div>
 
-              <div className="grid grid-cols-4 gap-2 mb-3">
+              <div className="grid grid-cols-4 gap-2">
                 {numInput("X", selected.x, (v) =>
                   updateFrame(selected.id, { x: v }),
                 )}
@@ -2115,10 +2090,10 @@ const TemplateFrameEditorPage: React.FC = () => {
                 )}
               </div>
 
-              {/* Rotation slider kontinu: tengah = 0° */}
-              <div className="mb-3">
-                <div className="flex items-center justify-between mb-1">
-                  <label className="text-pb-text-secondary text-xs font-medium">
+              {/* Rotation slider kontinu */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="font-retro text-[var(--pb-text-secondary)] text-base sm:text-lg font-bold">
                     Rotation / Tilt
                   </label>
                   <div className="flex items-center gap-1.5">
@@ -2134,9 +2109,9 @@ const TemplateFrameEditorPage: React.FC = () => {
                         v = Math.max(-180, Math.min(180, v));
                         updateFrame(selected.id, { rotation: v });
                       }}
-                      className="w-16 bg-pb-bg border border-pb-border rounded-md px-1.5 py-0.5 text-pb-text text-xs text-right tabular-nums focus:outline-none focus:border-pb-border-strong"
+                      className="w-20 bg-[var(--pb-bg)] border-[2px] border-[var(--pb-border-strong)] rounded-[4px] px-2 py-1 font-retro text-[var(--pb-text)] text-base font-bold text-right tabular-nums focus:outline-none focus:border-[#FFB800]"
                     />
-                    <span className="text-pb-text-muted text-xs">°</span>
+                    <span className="font-retro text-[var(--pb-text-muted)] text-base font-bold">°</span>
                   </div>
                 </div>
                 <input
@@ -2150,28 +2125,28 @@ const TemplateFrameEditorPage: React.FC = () => {
                       rotation: Number(e.target.value),
                     })
                   }
-                  className="w-full accent-cyan-400"
+                  className="w-full accent-[#FF5A36] h-2.5 bg-[var(--pb-bg)] rounded-lg cursor-pointer"
                 />
-                <div className="flex justify-between text-[10px] text-pb-text-muted mt-0.5">
+                <div className="flex justify-between font-retro text-xs sm:text-sm text-[var(--pb-text-muted)] font-bold">
                   <span>-180°</span>
                   <span>0°</span>
                   <span>+180°</span>
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 gap-2 pt-1">
                 <button
                   type="button"
                   onClick={() =>
                     updateFrame(selected.id, { flip_h: !selected.flip_h })
                   }
-                  className={`flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium transition-colors ${
+                  className={`flex items-center justify-center gap-2 rounded-[4px] px-3.5 py-2.5 font-retro text-base font-bold transition-all border-[2px] ${
                     selected.flip_h
-                      ? "bg-cyan-500/20 border border-cyan-500/50 text-cyan-300"
-                      : "bg-pb-bg border border-pb-border text-pb-text-secondary hover:text-pb-text"
+                      ? "bg-[#FF5A36] text-white border-black shadow-[2px_2px_0px_#000]"
+                      : "bg-[var(--pb-bg)] border-[var(--pb-border-strong)] text-[var(--pb-text-secondary)] hover:text-[var(--pb-text)]"
                   }`}
                 >
-                  <FlipHorizontal size={14} />
+                  <FlipHorizontal size={16} />
                   Flip H
                 </button>
                 <button
@@ -2179,13 +2154,13 @@ const TemplateFrameEditorPage: React.FC = () => {
                   onClick={() =>
                     updateFrame(selected.id, { flip_v: !selected.flip_v })
                   }
-                  className={`flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium transition-colors ${
+                  className={`flex items-center justify-center gap-2 rounded-[4px] px-3.5 py-2.5 font-retro text-base font-bold transition-all border-[2px] ${
                     selected.flip_v
-                      ? "bg-cyan-500/20 border border-cyan-500/50 text-cyan-300"
-                      : "bg-pb-bg border border-pb-border text-pb-text-secondary hover:text-pb-text"
+                      ? "bg-[#FF5A36] text-white border-black shadow-[2px_2px_0px_#000]"
+                      : "bg-[var(--pb-bg)] border-[var(--pb-border-strong)] text-[var(--pb-text-secondary)] hover:text-[var(--pb-text)]"
                   }`}
                 >
-                  <FlipVertical size={14} />
+                  <FlipVertical size={16} />
                   Flip V
                 </button>
               </div>
@@ -2194,14 +2169,14 @@ const TemplateFrameEditorPage: React.FC = () => {
 
           {/* Fine Tune Remove */}
           {selected && (
-            <section className="bg-pb-surface border border-pb-border rounded-xl p-4 space-y-3">
-              <h3 className="text-pb-text text-sm font-semibold">
+            <section className="bg-[var(--pb-surface)] border-[2px] border-[var(--pb-border-strong)] rounded-[4px] p-4 sm:p-5 shadow-[3px_3px_0px_#000,5px_5px_0px_var(--pb-shadow-solid)] space-y-4">
+              <h3 className="font-pixel text-[var(--pb-text)] text-xs sm:text-sm font-bold">
                 Fine Tune Remove
               </h3>
-              <label className="flex items-center justify-between cursor-pointer">
-                <span className="text-pb-text-secondary text-xs font-medium flex items-center gap-1.5">
+              <label className="flex items-center justify-between cursor-pointer p-2.5 bg-[var(--pb-bg)] border-[2px] border-[var(--pb-border-strong)] rounded-[4px]">
+                <span className="font-retro text-[var(--pb-text)] text-base sm:text-lg font-bold flex items-center gap-2">
                   Full Clear
-                  <span className="text-pb-text-muted text-[10px] normal-case">
+                  <span className="font-retro text-[var(--pb-text-muted)] text-sm font-normal">
                     (bolong 1 frame penuh)
                   </span>
                 </span>
@@ -2213,7 +2188,7 @@ const TemplateFrameEditorPage: React.FC = () => {
                       clear_zone: e.target.checked ? 100 : 60,
                     })
                   }
-                  className="accent-cyan-400 w-4 h-4"
+                  className="accent-[#FF5A36] w-5 h-5 cursor-pointer"
                 />
               </label>
               {slider("Center Clear Priority", "clear_zone", 5, 100, 0.2, "%")}
@@ -2242,82 +2217,80 @@ const TemplateFrameEditorPage: React.FC = () => {
 
           {/* Manual Protect / Remove / Restore — Brush Region */}
           {selected && (
-            <section className="bg-pb-surface border border-pb-border rounded-xl p-4">
-              <h3 className="text-pb-text text-sm font-semibold mb-3">
+            <section className="bg-[var(--pb-surface)] border-[2px] border-[var(--pb-border-strong)] rounded-[4px] p-4 sm:p-5 shadow-[3px_3px_0px_#000,5px_5px_0px_var(--pb-shadow-solid)]">
+              <h3 className="font-pixel text-[var(--pb-text)] text-xs sm:text-sm font-bold mb-3">
                 Brush Area
               </h3>
-              <div className="grid grid-cols-4 gap-1.5 mb-3">
+              <div className="grid grid-cols-4 gap-2 mb-3.5">
                 <button
                   type="button"
                   onClick={() => setMode("select")}
-                  className={`flex flex-col items-center gap-1 rounded-lg px-1 py-2 text-[10px] font-medium transition-colors ${
+                  className={`flex flex-col items-center gap-1.5 rounded-[4px] px-1.5 py-2.5 font-retro text-xs sm:text-sm font-bold transition-all border-[2px] ${
                     mode === "select"
-                      ? "bg-white/10 border border-white/30 text-pb-text"
-                      : "bg-pb-bg border border-pb-border text-pb-text-secondary"
+                      ? "bg-[#FF5A36] text-white border-black shadow-[2px_2px_0px_#000]"
+                      : "bg-[var(--pb-bg)] border-[var(--pb-border-strong)] text-[var(--pb-text-secondary)]"
                   }`}
                 >
-                  <MousePointer2 size={14} />
+                  <MousePointer2 size={16} />
                   Select
                 </button>
                 <button
                   type="button"
                   onClick={() => setMode("remove")}
-                  className={`flex flex-col items-center gap-1 rounded-lg px-1 py-2 text-[10px] font-medium transition-colors ${
+                  className={`flex flex-col items-center gap-1.5 rounded-[4px] px-1.5 py-2.5 font-retro text-xs sm:text-sm font-bold transition-all border-[2px] ${
                     mode === "remove"
-                      ? "bg-red-500/20 border border-red-500/50 text-red-300"
-                      : "bg-pb-bg border border-pb-border text-pb-text-secondary"
+                      ? "bg-red-600 text-white border-black shadow-[2px_2px_0px_#000]"
+                      : "bg-[var(--pb-bg)] border-[var(--pb-border-strong)] text-red-400"
                   }`}
                 >
-                  <Eraser size={14} />
+                  <Eraser size={16} />
                   Remove
                 </button>
                 <button
                   type="button"
                   onClick={() => setMode("protect")}
-                  className={`flex flex-col items-center gap-1 rounded-lg px-1 py-2 text-[10px] font-medium transition-colors ${
+                  className={`flex flex-col items-center gap-1.5 rounded-[4px] px-1.5 py-2.5 font-retro text-xs sm:text-sm font-bold transition-all border-[2px] ${
                     mode === "protect"
-                      ? "bg-amber-500/20 border border-amber-500/50 text-amber-300"
-                      : "bg-pb-bg border border-pb-border text-pb-text-secondary"
+                      ? "bg-amber-500 text-black border-black shadow-[2px_2px_0px_#000]"
+                      : "bg-[var(--pb-bg)] border-[var(--pb-border-strong)] text-amber-400"
                   }`}
                 >
-                  <Shield size={14} />
+                  <Shield size={16} />
                   Protect
                 </button>
                 <button
                   type="button"
                   onClick={() => setMode("restore")}
-                  className={`flex flex-col items-center gap-1 rounded-lg px-1 py-2 text-[10px] font-medium transition-colors ${
+                  className={`flex flex-col items-center gap-1.5 rounded-[4px] px-1.5 py-2.5 font-retro text-xs sm:text-sm font-bold transition-all border-[2px] ${
                     mode === "restore"
-                      ? "bg-green-500/20 border border-green-500/50 text-green-300"
-                      : "bg-pb-bg border border-pb-border text-pb-text-secondary"
+                      ? "bg-green-600 text-white border-black shadow-[2px_2px_0px_#000]"
+                      : "bg-[var(--pb-bg)] border-[var(--pb-border-strong)] text-green-400"
                   }`}
                 >
-                  <Undo2 size={14} />
+                  <Undo2 size={16} />
                   Keep
                 </button>
               </div>
               {mode !== "select" && (
-                <>
-                  <div className="mb-2">
-                    <div className="flex items-center justify-between mb-1">
-                      <label className="text-pb-text-secondary text-xs font-medium">
-                        Brush Size
-                      </label>
-                      <span className="text-pb-text text-xs tabular-nums">
-                        {brushSize}px
-                      </span>
-                    </div>
-                    <input
-                      type="range"
-                      min={6}
-                      max={96}
-                      step={0.2}
-                      value={brushSize}
-                      onChange={(e) => setBrushSize(Number(e.target.value))}
-                      className="w-full accent-cyan-400"
-                    />
+                <div className="space-y-2 mb-3">
+                  <div className="flex items-center justify-between">
+                    <label className="font-retro text-[var(--pb-text-secondary)] text-base font-bold">
+                      Brush Size
+                    </label>
+                    <span className="font-retro text-[var(--pb-text)] text-base font-bold tabular-nums">
+                      {brushSize}px
+                    </span>
                   </div>
-                  <p className="text-pb-text-muted text-[11px] leading-relaxed mb-2">
+                  <input
+                    type="range"
+                    min={6}
+                    max={96}
+                    step={0.2}
+                    value={brushSize}
+                    onChange={(e) => setBrushSize(Number(e.target.value))}
+                    className="w-full accent-[#FF5A36] h-2.5 bg-[var(--pb-bg)] rounded-lg cursor-pointer"
+                  />
+                  <p className="font-retro text-[var(--pb-text-muted)] text-xs sm:text-sm leading-relaxed mt-2">
                     {mode === "remove" &&
                       "Usap area yang ingin dijadikan kamera — seluruh region terhubung ikut terhapus sampai batas warna berbeda."}
                     {mode === "protect" &&
@@ -2326,7 +2299,7 @@ const TemplateFrameEditorPage: React.FC = () => {
                       "Usap desain yang terlanjur ter-clear — seluruh region-nya dikembalikan tampil."}{" "}
                     Alt+klik untuk menghapus sapuan.
                   </p>
-                </>
+                </div>
               )}
               {(selected.protected_areas.length > 0 ||
                 selected.remove_areas.length > 0 ||
@@ -2354,20 +2327,20 @@ const TemplateFrameEditorPage: React.FC = () => {
           )}
 
           {/* Preview */}
-          <section className="bg-pb-surface border border-pb-border rounded-xl p-4">
+          <section className="bg-[var(--pb-surface)] border-[2px] border-[var(--pb-border-strong)] rounded-[4px] p-4 sm:p-5 shadow-[3px_3px_0px_#000,5px_5px_0px_var(--pb-shadow-solid)]">
             <label className="flex items-center justify-between cursor-pointer">
-              <span className="text-pb-text-secondary text-xs font-medium flex items-center gap-1.5">
-                <Eye size={14} />
+              <span className="font-retro text-[var(--pb-text)] text-base sm:text-lg font-bold flex items-center gap-2">
+                <Eye size={18} className="text-[#00FFCC]" />
                 Preview Mask Real-time
               </span>
               <input
                 type="checkbox"
                 checked={previewMask}
                 onChange={(e) => setPreviewMask(e.target.checked)}
-                className="accent-cyan-400 w-4 h-4"
+                className="accent-[#FF5A36] w-5 h-5 cursor-pointer"
               />
             </label>
-            <p className="text-pb-text-muted text-[11px] mt-2 leading-relaxed">
+            <p className="font-retro text-[var(--pb-text-muted)] text-xs sm:text-sm mt-2 leading-relaxed">
               Desain selalu berada DI ATAS kamera. Elemen desain di luar Hard
               Clear Zone otomatis dipertahankan kamera di-mask di bawahnya.
             </p>

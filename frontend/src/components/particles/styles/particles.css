@@ -1,0 +1,43 @@
+/* ==========================================
+   Retro Arcade Background Particles Styles
+   ========================================== */
+
+/* 1. Background Particle Canvas (strictly z-index: 0, behind cards and content) */
+#particleBgCanvas {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 0;
+  pointer-events: none;
+  display: block;
+}
+
+/* 2. CRT Scanline & Vignette Effect Overlays (z-index: 1) */
+.retro-crt-overlay {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  background: 
+    radial-gradient(ellipse at center, transparent 65%, rgba(0, 0, 0, 0.35) 100%),
+    repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(0, 0, 0, 0.04) 3px, rgba(0, 0, 0, 0.04) 4px);
+}
+
+/* 3. Mobile fallback */
+@media (max-width: 768px) {
+  #particleBgCanvas {
+    opacity: 0.6;
+  }
+}
+
+/* 4. Standard native interactive cursors */
+button,
+a,
+select,
+[role="button"],
+.btn-arcade,
+.card-retro-interactive {
+  cursor: pointer;
+}

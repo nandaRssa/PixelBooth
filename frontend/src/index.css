@@ -1,77 +1,154 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
 @import "tailwindcss";
 
 /* ==========================================
-   PIXELBOOTH — Design System
+   PIXELBOOTH — Retro Arcade Design System
    ========================================== */
 
 /* ==========================================
-   THEME PALETTE (runtime switchable)
-   Default: gelap. html.light = mode siang.
-   Token Tailwind pb-* merujuk variabel ini,
-   jadi seluruh utility ikut berganti saat toggle.
+   THEME PALETTE — Retro Dark (default) / Retro Light
    ========================================== */
 
 :root {
   color-scheme: dark;
-  --pb-bg: #0a0a0a;
-  --pb-surface: #141414;
-  --pb-elevated: #1e1e1e;
-  --pb-border: #2a2a2a;
-  --pb-border-light: #333333;
-  --pb-border-strong: #454545;
-  --pb-text: #ffffff;
-  --pb-text-secondary: #d4d4d8;
-  --pb-text-muted: #a1a1aa;
-  --pb-faint: #71717a;
-  --pb-accent: #ff5a36;
-  --pb-on-accent: #ffffff;
+  /* Core backgrounds */
+  --pb-bg:               #0a0500;
+  --pb-surface:          #140a00;
+  --pb-elevated:         #221200;
+  /* Borders */
+  --pb-border:           #4d2600;
+  --pb-border-light:     #663300;
+  --pb-border-strong:    #FF5E00;
+  /* Text — High Contrast (no blending into dark bg) */
+  --pb-text:             #FFF8E7;
+  --pb-text-secondary:   #FFDE99;
+  --pb-text-muted:       #FFD080;
+  --pb-faint:            #D4A050;
+  /* Brand */
+  --pb-accent:           #FF5A36;
+  --pb-on-accent:        #ffffff;
+  /* Retro extras */
+  --pb-yellow:           #FFB800;
+  --pb-cyan:             #00FFCC;
+  --pb-neon-border:      #FF5E00;
+  /* 3D Shadows — Contrasting Warm Neon Arcade Depth (NOT black) */
+  --pb-shadow-solid:     #FF5E00;
+  --pb-shadow-3d:        4px 4px 0px #FF5E00;
+  --pb-shadow-3d-hover:  6px 6px 0px #FFB800;
+  --pb-shadow-3d-active: 2px 2px 0px #FF5E00;
 }
 
 html.light {
   color-scheme: light;
-  --pb-bg: #fafafa;
-  --pb-surface: #ffffff;
-  --pb-elevated: #f4f4f5;
-  --pb-border: #cbd5e1;
-  --pb-border-light: #94a3b8;
-  --pb-border-strong: #64748b;
-  --pb-text: #0f172a;
-  --pb-text-secondary: #334155;
-  --pb-text-muted: #475569;
-  --pb-faint: #64748b;
-  --pb-accent: #ff5a36;
-  --pb-on-accent: #ffffff;
+  --pb-bg:               #F5E8C8;
+  --pb-surface:          #EDD9A0;
+  --pb-elevated:         #E3C870;
+  --pb-border:           #C8A050;
+  --pb-border-light:     #B08030;
+  --pb-border-strong:    #FF5E00;
+  --pb-text:             #1a0800;
+  --pb-text-secondary:   #3d1800;
+  --pb-text-muted:       #6e3505;
+  --pb-faint:            #8c4a10;
+  --pb-accent:           #FF5A36;
+  --pb-on-accent:        #ffffff;
+  --pb-yellow:           #8F4F00; /* Deep contrasting dark golden-amber */
+  --pb-cyan:             #005A44; /* Deep contrasting dark emerald-cyan */
+  --pb-neon-border:      #FF5E00;
+  --pb-shadow-solid:     #3d1800;
+  --pb-shadow-3d:        4px 4px 0px #3d1800;
+  --pb-shadow-3d-hover:  6px 6px 0px #FF5E00;
+  --pb-shadow-3d-active: 2px 2px 0px #3d1800;
+}
+
+/* Light mode overrides for neon colors so text & borders on light bg remain dark and easily readable */
+html.light :not([class*="bg-black"]):not([class*="bg-[#141416]"]):not([class*="bg-[#0a0500]"]).text-\[\#00FFCC\],
+html.light :not([class*="bg-black"]):not([class*="bg-[#141416]"]):not([class*="bg-[#0a0500]"])[class*="text-[#00FFCC]"] {
+  color: #005A44 !important;
+}
+
+html.light :not([class*="bg-black"]):not([class*="bg-[#141416]"]):not([class*="bg-[#0a0500]"]).text-\[\#FFB800\],
+html.light :not([class*="bg-black"]):not([class*="bg-[#141416]"]):not([class*="bg-[#0a0500]"])[class*="text-[#FFB800]"] {
+  color: #8F4F00 !important;
+}
+
+html.light :not([class*="bg-black"]):not([class*="bg-[#141416]"]):not([class*="bg-[#0a0500]"]).border-\[\#00FFCC\],
+html.light :not([class*="bg-black"]):not([class*="bg-[#141416]"]):not([class*="bg-[#0a0500]"])[class*="border-[#00FFCC]"] {
+  border-color: #005A44 !important;
+}
+
+html.light :not([class*="bg-black"]):not([class*="bg-[#141416]"]):not([class*="bg-[#0a0500]"]).border-\[\#FFB800\],
+html.light :not([class*="bg-black"]):not([class*="bg-[#141416]"]):not([class*="bg-[#0a0500]"])[class*="border-[#FFB800]"] {
+  border-color: #8F4F00 !important;
+}
+
+html.light :not([class*="bg-black"]):not([class*="bg-[#141416]"]):not([class*="bg-[#0a0500]"]).text-amber-400,
+html.light :not([class*="bg-black"]):not([class*="bg-[#141416]"]):not([class*="bg-[#0a0500]"]).text-amber-300,
+html.light :not([class*="bg-black"]):not([class*="bg-[#141416]"]):not([class*="bg-[#0a0500]"]).text-amber-500,
+html.light :not([class*="bg-black"]):not([class*="bg-[#141416]"]):not([class*="bg-[#0a0500]"])[class*="text-amber-400"],
+html.light :not([class*="bg-black"]):not([class*="bg-[#141416]"]):not([class*="bg-[#0a0500]"])[class*="text-amber-300"],
+html.light :not([class*="bg-black"]):not([class*="bg-[#141416]"]):not([class*="bg-[#0a0500]"])[class*="text-amber-500"] {
+  color: #78350F !important;
+}
+
+/* Explicit high-visibility neon colors for buttons on black/dark card backgrounds */
+html.light [class*="bg-black"].text-\[\#00FFCC\],
+html.light [class*="bg-black"] .text-\[\#00FFCC\],
+html.light .template-card-btn-cyan {
+  color: #00FFCC !important;
+  border-color: rgba(0, 255, 204, 0.8) !important;
+}
+
+html.light [class*="bg-black"].text-\[\#FFB800\],
+html.light [class*="bg-black"] .text-\[\#FFB800\],
+html.light .template-card-btn-yellow {
+  color: #FFB800 !important;
+  border-color: rgba(255, 184, 0, 0.8) !important;
+}
+
+html.light .bg-\[\#00FFCC\],
+html.light [class*="bg-[#00FFCC]"] {
+  background-color: #005A44 !important;
+  color: #ffffff !important;
+}
+
+html.light .bg-\[\#FFB800\],
+html.light [class*="bg-[#FFB800]"] {
+  background-color: #8F4F00 !important;
+  color: #ffffff !important;
 }
 
 @theme {
   /* === Color Palette === */
-  --color-pb-bg: var(--pb-bg);
-  --color-pb-surface: var(--pb-surface);
-  --color-pb-elevated: var(--pb-elevated);
-  --color-pb-border: var(--pb-border);
-  --color-pb-border-light: var(--pb-border-light);
-  --color-pb-border-strong: var(--pb-border-strong);
-  --color-pb-text: var(--pb-text);
-  --color-pb-text-secondary: var(--pb-text-secondary);
-  --color-pb-text-muted: var(--pb-text-muted);
-  --color-pb-faint: var(--pb-faint);
-  --color-pb-accent: var(--pb-accent);
-  --color-pb-on-accent: var(--pb-on-accent);
-  --color-pb-danger: #EF4444;
-  --color-pb-success: #22C55E;
-  --color-pb-warning: #F59E0B;
+  --color-pb-bg:               var(--pb-bg);
+  --color-pb-surface:          var(--pb-surface);
+  --color-pb-elevated:         var(--pb-elevated);
+  --color-pb-border:           var(--pb-border);
+  --color-pb-border-light:     var(--pb-border-light);
+  --color-pb-border-strong:    var(--pb-border-strong);
+  --color-pb-text:             var(--pb-text);
+  --color-pb-text-secondary:   var(--pb-text-secondary);
+  --color-pb-text-muted:       var(--pb-text-muted);
+  --color-pb-faint:            var(--pb-faint);
+  --color-pb-accent:           var(--pb-accent);
+  --color-pb-on-accent:        var(--pb-on-accent);
+  --color-pb-yellow:           var(--pb-yellow);
+  --color-pb-cyan:             var(--pb-cyan);
+  --color-pb-danger:           #EF4444;
+  --color-pb-success:          #22C55E;
+  --color-pb-warning:          #F59E0B;
 
   /* === Typography === */
-  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-sans:    'VT323', 'Courier Prime', monospace;
+  --font-pixel:   'Press Start 2P', monospace;
+  --font-mono:    'Courier Prime', monospace;
 
   /* === Spacing === */
-  --spacing-touch: 44px; /* minimum touch target */
+  --spacing-touch: 44px;
 
-  /* === Border Radius === */
-  --radius-card: 12px;
-  --radius-btn: 8px;
-  --radius-input: 8px;
+  /* === Border Radius (retro = minimal) === */
+  --radius-card:  4px;
+  --radius-btn:   4px;
+  --radius-input: 4px;
 }
 
 /* ==========================================
@@ -84,11 +161,28 @@ html.light {
 }
 
 html {
+  font-size: 75%;
   font-family: var(--font-sans);
   background-color: var(--pb-bg);
   color: var(--pb-text);
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  -webkit-font-smoothing: none;
+  -moz-osx-font-smoothing: unset;
+  image-rendering: pixelated;
+  overscroll-behavior: none;
+  height: 100%;
+}
+
+/* Layar iPad & HP (< lg = 1024px): perbesar konten & teks 20% dari 75% -> 90% */
+@media (max-width: 1023.98px) {
+  html {
+    font-size: 90%;
+  }
+  /* Ikon navbar mobile (top header & bottom nav) diperbesar tambahan 20% */
+  header.fixed .lucide,
+  nav.fixed .lucide {
+    width: 0.9em !important;
+    height: 0.9em !important;
+  }
 }
 
 body {
@@ -98,7 +192,43 @@ body {
   background-color: var(--pb-bg);
   color: var(--pb-text);
   overflow-x: hidden;
-  transition: background-color 0.2s ease, color 0.2s ease;
+  overscroll-behavior: none;
+  transition: background-color 0.15s steps(4), color 0.15s steps(4);
+  /* Subtle noise texture overlay */
+  position: relative;
+}
+
+/* Ikon ikut mengecil 25% seragam dengan ukuran teks sekitarnya */
+.lucide {
+  width: 0.75em !important;
+  height: 0.75em !important;
+}
+
+/* Keterangan ukuran pada card template — selalu oranye menyala di mode gelap & terang */
+.pb-size-text {
+  color: #FFB800;
+}
+
+/* Badge Draft di Frame Editor — kontras di mode gelap & terang */
+.pb-draft-badge {
+  color: #FFD166;
+}
+html.light .pb-draft-badge {
+  color: #8B5E00;
+  background-color: rgba(255, 217, 79, 0.45);
+  border-color: #B8860B;
+}
+
+/* Global noise overlay */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='4' height='4'%3E%3Crect width='1' height='1' x='0' y='0' fill='%23fff' fill-opacity='0.03'/%3E%3Crect width='1' height='1' x='2' y='2' fill='%23fff' fill-opacity='0.03'/%3E%3C/svg%3E");
+  background-size: 4px 4px;
+  pointer-events: none;
+  z-index: 9998;
 }
 
 #root {
@@ -108,40 +238,215 @@ body {
 }
 
 /* ==========================================
-   SCROLLBAR — Custom minimal dark scrollbar
+   SCROLLBAR — Retro chunky orange bar
    ========================================== */
 
 ::-webkit-scrollbar {
-  width: 4px;
-  height: 4px;
+  width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: transparent;
+  background: var(--pb-bg);
+  border-left: 1px solid var(--pb-border);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--pb-border-light);
-  border-radius: 100px;
+  background: var(--pb-accent);
+  border-radius: 0px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--pb-border-strong);
+  background: var(--pb-yellow);
 }
 
 /* ==========================================
-   UTILITY CLASSES
+   TYPOGRAPHY UTILITIES
    ========================================== */
 
-/* Glassmorphism surface */
-.glass {
-  background: rgba(255, 255, 255, 0.04);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+.font-pixel {
+  font-family: 'Press Start 2P', monospace;
+  line-height: 1.8;
+  letter-spacing: 0.05em;
 }
 
-/* Touch-friendly click/tap */
+.font-retro {
+  font-family: 'VT323', monospace;
+  letter-spacing: 0.03em;
+}
+
+/* ==========================================
+   ARCADE BUTTON — 3D bevel push effect
+   ========================================== */
+
+.btn-arcade {
+  background: var(--pb-accent);
+  color: #fff;
+  border: 3px solid #000;
+  box-shadow: 4px 4px 0px var(--pb-shadow-solid);
+  border-radius: 4px;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition:
+    transform 0.05s steps(2),
+    box-shadow 0.05s steps(2);
+  user-select: none;
+}
+
+.btn-arcade:hover {
+  background: #FF7040;
+}
+
+.btn-arcade:active {
+  transform: translate(3px, 3px);
+  box-shadow: 1px 1px 0px var(--pb-shadow-solid);
+}
+
+.btn-arcade:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: 4px 4px 0px var(--pb-shadow-solid);
+}
+
+/* ==========================================
+   CARD RETRO — Double border + solid shadow
+   ========================================== */
+
+.card-retro {
+  background-color: var(--pb-surface);
+  border: 2px solid var(--pb-border-strong);
+  border-radius: 4px;
+  box-shadow: var(--pb-shadow-3d);
+  transition: transform 100ms ease, box-shadow 100ms ease, border-color 100ms ease;
+}
+.card-retro:hover {
+  border-color: #FFB800;
+  box-shadow: var(--pb-shadow-3d-hover);
+  transform: translate(-2px, -2px);
+}
+.card-retro:active {
+  box-shadow: var(--pb-shadow-3d-active);
+  transform: translate(2px, 2px);
+}
+
+.card-retro-interactive {
+  position: relative;
+  background-color: var(--pb-surface);
+  border: 2px solid var(--pb-border-strong);
+  border-radius: 4px;
+  box-shadow: var(--pb-shadow-3d);
+  transition: transform 120ms cubic-bezier(0.2, 0, 0, 1), box-shadow 120ms cubic-bezier(0.2, 0, 0, 1), border-color 120ms ease;
+  overflow: hidden;
+}
+.card-retro-interactive:hover {
+  border-color: #FFB800;
+  box-shadow: var(--pb-shadow-3d-hover);
+  transform: translate(-3px, -3px);
+}
+.card-retro-interactive:active {
+  box-shadow: var(--pb-shadow-3d-active);
+  transform: translate(3px, 3px);
+}
+.card-retro-interactive::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #FF5A36, #FFB800, #00FFCC);
+  opacity: 0.8;
+}
+
+/* ==========================================
+   PIXEL BORDER — Border putus-putus retro
+   ========================================== */
+
+.pixel-border {
+  border: 2px dashed var(--pb-border-strong);
+  border-radius: 0px;
+}
+
+/* ==========================================
+   SCANLINE — CRT scanline overlay
+   ========================================== */
+
+.scanline {
+  position: relative;
+  overflow: hidden;
+}
+
+.scanline::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 3px,
+    rgba(0, 0, 0, 0.08) 3px,
+    rgba(0, 0, 0, 0.08) 4px
+  );
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* ==========================================
+   CARD HOVER — Push down effect (retro)
+   ========================================== */
+
+.card-hover {
+  transition:
+    transform 0.06s steps(2),
+    box-shadow 0.06s steps(2),
+    border-color 0.1s ease;
+  cursor: pointer;
+}
+
+.card-hover:hover {
+  border-color: var(--pb-border-strong);
+}
+
+.card-hover:active {
+  transform: translate(3px, 3px);
+  box-shadow: 1px 1px 0px var(--pb-shadow-solid) !important;
+}
+
+/* ==========================================
+   STATUS INDICATORS — LED style
+   ========================================== */
+
+.status-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 2px solid #000;
+}
+
+.status-dot.connected {
+  background-color: #22C55E;
+  box-shadow: 0 0 0 2px #22C55E, 0 0 8px #22C55E;
+}
+
+.status-dot.disconnected {
+  background-color: #444;
+  box-shadow: none;
+}
+
+.status-dot.error {
+  background-color: #EF4444;
+  box-shadow: 0 0 0 2px #EF4444, 0 0 8px #EF4444;
+}
+
+/* ==========================================
+   TOUCH TARGET
+   ========================================== */
+
 .touch-target {
   min-height: 44px;
   min-width: 44px;
@@ -150,89 +455,127 @@ body {
   justify-content: center;
 }
 
-/* Smooth transitions */
-.transition-all-smooth {
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-}
+/* ==========================================
+   PHOTOBOOTH MODE (fullscreen kiosk)
+   ========================================== */
 
-/* Fade in animation */
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes fadeInScale {
-  from { opacity: 0; transform: scale(0.96); }
-  to { opacity: 1; transform: scale(1); }
-}
-
-@keyframes pulse-ring {
-  0% { transform: scale(1); opacity: 0.8; }
-  100% { transform: scale(1.4); opacity: 0; }
-}
-
-@keyframes countdown {
-  0% { transform: scale(1.2); opacity: 0; }
-  20% { transform: scale(1); opacity: 1; }
-  80% { transform: scale(1); opacity: 1; }
-  100% { transform: scale(0.8); opacity: 0; }
-}
-
-.animate-fade-in {
-  animation: fadeIn 0.3s ease-out forwards;
-}
-
-.animate-fade-in-scale {
-  animation: fadeInScale 0.25s ease-out forwards;
-}
-
-.animate-countdown {
-  animation: countdown 1s ease-out forwards;
-}
-
-/* Status indicator */
-.status-dot {
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-}
-
-.status-dot.connected {
-  background-color: #22C55E;
-  box-shadow: 0 0 6px #22C55E80;
-}
-
-.status-dot.disconnected {
-  background-color: #606060;
-}
-
-.status-dot.error {
-  background-color: #EF4444;
-  box-shadow: 0 0 6px #EF444480;
-}
-
-/* Card hover effect */
-.card-hover {
-  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.25s ease;
-  cursor: pointer;
-}
-
-.card-hover:hover {
-  border-color: var(--pb-border-strong);
-  background-color: var(--pb-elevated);
-  transform: translateY(-5px) scale(1.015);
-  box-shadow: 0 12px 24px -8px rgba(0, 0, 0, 0.3);
-}
-
-.card-hover:active {
-  transform: translateY(-1px) scale(0.99);
-}
-
-/* Full-screen photobooth mode */
 .photobooth-mode {
   position: fixed;
   inset: 0;
   background: #000;
   z-index: 100;
+}
+
+/* ==========================================
+   KEYFRAME ANIMATIONS — Retro / Step-based
+   ========================================== */
+
+/* Blink — scoreboard style */
+@keyframes blink {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+
+/* Pixel pop — element appears with pixel effect */
+@keyframes pixelPop {
+  0%   { transform: scale(0); opacity: 0; }
+  40%  { transform: scale(1.15); opacity: 1; }
+  70%  { transform: scale(0.95); }
+  100% { transform: scale(1); }
+}
+
+/* Pixel fade in — step-based instead of smooth */
+@keyframes pixelFadeIn {
+  0%   { opacity: 0; }
+  50%  { opacity: 0.6; }
+  100% { opacity: 1; }
+}
+
+/* CRT scanline flicker */
+@keyframes crtFlicker {
+  0%   { opacity: 1; }
+  92%  { opacity: 1; }
+  93%  { opacity: 0.94; }
+  95%  { opacity: 1; }
+  97%  { opacity: 0.97; }
+  100% { opacity: 1; }
+}
+
+/* Countdown — retro scale */
+@keyframes countdown {
+  0%   { transform: scale(1.4); opacity: 0; }
+  15%  { transform: scale(1);   opacity: 1; }
+  80%  { transform: scale(1);   opacity: 1; }
+  100% { transform: scale(0.7); opacity: 0; }
+}
+
+/* Slide in from bottom (for modals/panels) */
+@keyframes slideUp {
+  from { transform: translateY(40px); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+
+/* LED pulse */
+@keyframes ledPulse {
+  0%, 100% { box-shadow: 0 0 4px currentColor; }
+  50%       { box-shadow: 0 0 12px currentColor, 0 0 24px currentColor; }
+}
+
+/* ==========================================
+   ANIMATION UTILITY CLASSES
+   ========================================== */
+
+.animate-blink {
+  animation: blink 1s steps(1) infinite;
+}
+
+.animate-blink-slow {
+  animation: blink 1.5s steps(1) infinite;
+}
+
+.animate-pixel-pop {
+  animation: pixelPop 0.3s steps(4) forwards;
+}
+
+.animate-pixel-fade-in {
+  animation: pixelFadeIn 0.4s steps(3) forwards;
+}
+
+.animate-crt-flicker {
+  animation: crtFlicker 6s steps(1) infinite;
+}
+
+.animate-countdown {
+  animation: countdown 1s steps(5) forwards;
+}
+
+.animate-slide-up {
+  animation: slideUp 0.25s steps(4) forwards;
+}
+
+.animate-led-pulse {
+  animation: ledPulse 2s ease-in-out infinite;
+}
+
+/* Legacy aliases — dipakai di beberapa page */
+.animate-fade-in {
+  animation: pixelFadeIn 0.4s steps(3) forwards;
+}
+
+.animate-fade-in-scale {
+  animation: pixelPop 0.3s steps(4) forwards;
+}
+
+/* ==========================================
+   FORM INPUTS — Retro style
+   ========================================== */
+
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="number"],
+textarea,
+select {
+  font-family: 'VT323', monospace;
+  letter-spacing: 0.03em;
 }

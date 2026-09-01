@@ -1,25 +1,29 @@
 import React, { useEffect, useState, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import {
   ChevronLeft,
   ChevronRight,
   Download,
   ExternalLink,
   FolderInput,
+  Printer,
   QrCode,
   Trash2,
   X,
+  ImageIcon,
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Button } from '@/components/ui/Button'
 import { getStorageUrl } from '@/api/client'
 import { downloadFile } from '@/utils/download'
+import PrintModal from '@/components/gallery/PrintModal'
 import type { Photo } from '@/types'
-
 import type { Variants } from 'framer-motion'
 
 // ==========================================
-// Photo Preview Modal — Preview foto fullscreen dengan fitur slide / swipe
-// Selaras 100% dengan Design System (Light & Dark Theme)
+// Photo Preview Modal — Retro Arcade Style
+// Large typography, prominent filename, sharp badges,
+// and high-impact action buttons.
 // ==========================================
 
 interface PhotoPreviewModalProps {
@@ -34,31 +38,28 @@ interface PhotoPreviewModalProps {
 
 const slideVariants: Variants = {
   enter: (direction: number) => ({
-    x: direction > 0 ? 160 : -160,
+    x: direction > 0 ? 80 : -80,
     opacity: 0,
-    scale: 0.96,
   }),
   center: {
     x: 0,
     opacity: 1,
-    scale: 1,
     transition: {
-      x: { type: 'spring', stiffness: 350, damping: 30 },
-      opacity: { duration: 0.2 },
+      x: { type: 'tween', duration: 0.18, ease: 'easeOut' },
+      opacity: { duration: 0.12 },
     },
   },
   exit: (direction: number) => ({
-    x: direction > 0 ? -160 : 160,
+    x: direction > 0 ? -80 : 80,
     opacity: 0,
-    scale: 0.96,
     transition: {
-      x: { type: 'spring', stiffness: 350, damping: 30 },
-      opacity: { duration: 0.15 },
+      x: { type: 'tween', duration: 0.14, ease: 'easeIn' },
+      opacity: { duration: 0.1 },
     },
   }),
 }
 
-const PhotoPreviewModal: React.FC<PhotoPreviewModalProps> = ({
+export const PhotoPreviewModal: React.FC<PhotoPreviewModalProps> = ({
   photo,
   photos = [],
   onSelectPhoto,
@@ -69,8 +70,8 @@ const PhotoPreviewModal: React.FC<PhotoPreviewModalProps> = ({
 }) => {
   const [direction, setDirection] = useState(0)
   const [touchStartX, setTouchStartX] = useState<number | null>(null)
+  const [showPrintModal, setShowPrintModal] = useState<boolean>(false)
 
-  // Gunakan list photos jika ada, fallback ke [photo]
   const photoList = photos.length > 0 ? photos : photo ? [photo] : []
   const activeIndex = photo ? photoList.findIndex((p) => p.id === photo.id) : -1
   const currentPhoto = activeIndex >= 0 ? photoList[activeIndex] : photo
@@ -96,7 +97,7 @@ const PhotoPreviewModal: React.FC<PhotoPreviewModalProps> = ({
     }
   }, [hasNext, photoList, activeIndex, onSelectPhoto])
 
-  // Keyboard navigation: Panah Kiri, Panah Kanan, Escape
+  // Keyboard navigation
   useEffect(() => {
     if (!photo) return
 
@@ -126,7 +127,7 @@ const PhotoPreviewModal: React.FC<PhotoPreviewModalProps> = ({
     if (touchStartX === null) return
     const touchEndX = e.changedTouches[0].clientX
     const diff = touchEndX - touchStartX
-    const minSwipeDistance = 50 // px threshold
+    const minSwipeDistance = 50
 
     if (diff > minSwipeDistance) {
       handlePrev()
@@ -136,203 +137,249 @@ const PhotoPreviewModal: React.FC<PhotoPreviewModalProps> = ({
     setTouchStartX(null)
   }
 
-  return (
+  if (!currentPhoto || typeof document === 'undefined') return null
+
+  return createPortal(
     <AnimatePresence>
-      {currentPhoto && (
-        <>
-          {/* Backdrop Overlay */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50"
-            onClick={onClose}
-          />
+      <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
+        {/* Backdrop Overlay */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 bg-black/85 backdrop-blur-md"
+          onClick={onClose}
+        />
 
-          {/* Modal Container */}
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: 10 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 10 }}
-            transition={{ duration: 0.2 }}
-            className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50
-              w-[calc(100vw-2rem)] max-w-3xl max-h-[92vh] bg-pb-surface border border-pb-border
-              rounded-2xl shadow-2xl p-4 sm:p-5 flex flex-col gap-3 sm:gap-4 select-none"
-          >
-            {/* Header */}
-            <div className="flex items-center justify-between pb-3 border-b border-pb-border gap-2">
-              <div className="min-w-0 flex-1 flex items-center gap-2">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-pb-text font-semibold text-sm sm:text-base truncate max-w-[200px] sm:max-w-md">
-                      {currentPhoto.filename}
-                    </h3>
-                    {photoList.length > 1 && (
-                      <span className="text-[10px] sm:text-xs font-semibold px-2 py-0.5 rounded-full bg-pb-elevated text-[#FF5A36] border border-pb-border shrink-0">
-                        {activeIndex + 1} / {photoList.length}
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-pb-text-muted text-xs mt-0.5">
-                    {photoList.length > 1
-                      ? 'Geser atau gunakan tombol panah untuk melihat foto lainnya'
-                      : 'Preview Foto Photobooth'}
-                  </p>
-                </div>
+        {/* Modal Container */}
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95, y: 15 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.95, y: 15 }}
+          transition={{ duration: 0.18, ease: 'easeOut' }}
+          className="relative z-10 w-full max-w-4xl max-h-[94vh]
+            bg-[var(--pb-surface)]
+            border-[3px] border-[var(--pb-border-strong)]
+            rounded-[4px]
+            shadow-[4px_4px_0px_#000000,8px_8px_0px_var(--pb-shadow-solid)]
+            p-5 sm:p-7 flex flex-col gap-4 sm:gap-5 select-none"
+        >
+          {/* Header */}
+          <div className="flex items-start justify-between pb-4 border-b-[2px] border-[var(--pb-border)] gap-4">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center flex-wrap gap-2.5 sm:gap-3 mb-1">
+                <h3 className="font-pixel text-[var(--pb-text)] text-lg sm:text-xl lg:text-2xl tracking-wide truncate max-w-[280px] sm:max-w-xl">
+                  {currentPhoto.filename}
+                </h3>
+                {photoList.length > 1 && (
+                  <span className="font-pixel text-xs sm:text-sm px-3 py-1 rounded-[3px] bg-[#FF5A36] text-white border-[2px] border-black shadow-[2px_2px_0px_#000] shrink-0 font-bold">
+                    {activeIndex + 1} / {photoList.length}
+                  </span>
+                )}
               </div>
+              <p className="font-retro text-[var(--pb-text-secondary)] text-base sm:text-lg font-bold">
+                {photoList.length > 1
+                  ? 'Gunakan tombol panah atau tombol slide untuk navigasi'
+                  : 'Preview Hasil Foto Photobooth'}
+              </p>
+            </div>
 
+            <button
+              type="button"
+              onClick={onClose}
+              className="w-10 h-10 sm:w-11 sm:h-11 rounded-[4px] bg-[var(--pb-elevated)] border-[2px] border-[var(--pb-border-strong)] hover:border-[#FF5A36] text-[var(--pb-text-secondary)] hover:text-[var(--pb-text)] flex items-center justify-center transition-all shrink-0 cursor-pointer shadow-[2px_2px_0px_var(--pb-shadow-solid)] active:translate-x-[1px] active:translate-y-[1px]"
+              title="Tutup Preview (Esc)"
+              aria-label="Tutup Preview"
+            >
+              <X size={20} />
+            </button>
+          </div>
+
+          {/* Image Preview Container with Slide Navigation */}
+          <div
+            className="relative flex-1 min-h-[48vh] max-h-[60vh] bg-[var(--pb-bg)] border-[2px] border-[var(--pb-border-strong)] rounded-[4px] overflow-hidden flex items-center justify-center p-3 touch-pan-y shadow-[inset_0_2px_10px_rgba(0,0,0,0.6)]"
+            onTouchStart={handleTouchStart}
+            onTouchEnd={handleTouchEnd}
+          >
+            {/* Navigasi Kiri */}
+            {hasPrev && (
               <button
                 type="button"
-                onClick={onClose}
-                className="w-8 h-8 rounded-lg bg-pb-elevated border border-pb-border hover:border-pb-border-strong text-pb-text-secondary hover:text-pb-text flex items-center justify-center transition-colors shrink-0 ml-auto cursor-pointer"
-                title="Tutup Preview"
-                aria-label="Tutup Preview"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  handlePrev()
+                }}
+                className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 z-20
+                  w-11 h-11 sm:w-13 sm:h-13 rounded-[4px] bg-black/80 hover:bg-[#FF5A36] text-white
+                  border-[2px] border-white/60 shadow-[3px_3px_0px_#000] flex items-center justify-center
+                  transition-all active:translate-x-[1px] active:translate-y-[1px] cursor-pointer hover:border-black"
+                title="Foto Sebelumnya"
+                aria-label="Sebelumnya"
               >
-                <X size={16} />
+                <ChevronLeft size={28} className="shrink-0 stroke-[2.5]" />
               </button>
+            )}
+
+            {/* Navigasi Kanan */}
+            {hasNext && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  handleNext()
+                }}
+                className="absolute right-3 sm:right-4 top-1/2 -translate-y-1/2 z-20
+                  w-11 h-11 sm:w-13 sm:h-13 rounded-[4px] bg-black/80 hover:bg-[#FF5A36] text-white
+                  border-[2px] border-white/60 shadow-[3px_3px_0px_#000] flex items-center justify-center
+                  transition-all active:translate-x-[1px] active:translate-y-[1px] cursor-pointer hover:border-black"
+                title="Foto Selanjutnya"
+                aria-label="Selanjutnya"
+              >
+                <ChevronRight size={28} className="shrink-0 stroke-[2.5]" />
+              </button>
+            )}
+
+            {/* Foto dengan Slide Transition */}
+            <AnimatePresence initial={false} custom={direction} mode="popLayout">
+              <motion.div
+                key={currentPhoto.id}
+                custom={direction}
+                variants={slideVariants}
+                initial="enter"
+                animate="center"
+                exit="exit"
+                className="w-full h-full flex items-center justify-center"
+              >
+                {currentPhoto.url ? (
+                  <img
+                    src={getStorageUrl(currentPhoto.url)}
+                    alt={currentPhoto.filename}
+                    className="max-w-full max-h-[56vh] object-contain rounded-none border-[2px] border-white shadow-[4px_4px_0px_#000] select-none pointer-events-none"
+                  />
+                ) : (
+                  <div className="flex flex-col items-center justify-center gap-2 py-12">
+                    <ImageIcon size={44} className="text-[var(--pb-faint)]" />
+                    <p className="font-retro text-[var(--pb-text-muted)] text-lg">Gambar tidak tersedia</p>
+                  </div>
+                )}
+              </motion.div>
+            </AnimatePresence>
+          </div>
+
+          {/* Action Bar: 6 Tombol Berukuran Konsisten & Responsif (Mobile: 2 kol, iPad: 3 kol x 2 baris, Laptop/Desktop: 6 kol) */}
+          <div className="pt-3 border-t-[2px] border-[var(--pb-border)]">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 sm:gap-3 w-full">
+              {/* 1. Unduh Foto */}
+              <Button
+                variant="primary"
+                size="md"
+                fullWidth
+                onClick={async () => {
+                  await downloadFile(
+                    currentPhoto.url,
+                    currentPhoto.filename || 'pixelbooth-photo.jpg'
+                  )
+                }}
+                leftIcon={<Download size={18} className="shrink-0" />}
+                className="!px-2 sm:!px-3 !text-base sm:!text-lg font-bold truncate"
+                title="Unduh Foto"
+              >
+                Unduh
+              </Button>
+
+              {/* 2. Print Foto */}
+              <Button
+                variant="secondary"
+                size="md"
+                fullWidth
+                onClick={() => setShowPrintModal(true)}
+                leftIcon={<Printer size={18} className="text-[#FFB800] stroke-[2.5] shrink-0" />}
+                className="hover:!border-[#FFB800] !px-2 sm:!px-3 !text-base sm:!text-lg font-bold truncate"
+                title="Print Foto"
+              >
+                Print
+              </Button>
+
+              {/* 3. QR Code */}
+              <Button
+                variant="secondary"
+                size="md"
+                fullWidth
+                onClick={() => {
+                  onShowQr(currentPhoto)
+                  onClose()
+                }}
+                leftIcon={<QrCode size={18} className="text-[#00FFCC] shrink-0" />}
+                className="hover:!border-[#00FFCC] !px-2 sm:!px-3 !text-base sm:!text-lg font-bold truncate"
+                title="QR Code"
+              >
+                QR Code
+              </Button>
+
+              {/* 4. Buka di Tab Baru */}
+              <Button
+                variant="secondary"
+                size="md"
+                fullWidth
+                onClick={() => window.open(getStorageUrl(currentPhoto.url), '_blank')}
+                leftIcon={<ExternalLink size={18} className="shrink-0" />}
+                className="hover:!border-[#FF5A36] !px-2 sm:!px-3 !text-base sm:!text-lg font-bold truncate"
+                title="Buka Foto di Tab Baru"
+              >
+                Buka Tab
+              </Button>
+
+              {/* 5. Pindahkan Foto */}
+              <Button
+                variant="secondary"
+                size="md"
+                fullWidth
+                onClick={() => {
+                  onMove(currentPhoto)
+                  onClose()
+                }}
+                leftIcon={<FolderInput size={18} className="text-[var(--pb-yellow)] stroke-[2.5] shrink-0" />}
+                className="hover:!border-[var(--pb-yellow)] !px-2 sm:!px-3 !text-base sm:!text-lg font-bold truncate"
+                title="Pindahkan Foto"
+              >
+                Pindah
+              </Button>
+
+              {/* 6. Hapus Foto */}
+              <Button
+                variant="danger"
+                size="md"
+                fullWidth
+                onClick={() => {
+                  onDelete(currentPhoto)
+                  onClose()
+                }}
+                leftIcon={<Trash2 size={18} className="shrink-0" />}
+                className="!px-2 sm:!px-3 !text-base sm:!text-lg font-bold truncate"
+                title="Hapus Foto"
+              >
+                Hapus
+              </Button>
             </div>
+          </div>
+        </motion.div>
+      </div>
 
-            {/* Image Preview Container with Slide Navigation */}
-            <div
-              className="relative flex-1 min-h-[45vh] max-h-[62vh] bg-pb-bg border border-pb-border rounded-xl overflow-hidden flex items-center justify-center p-2 touch-pan-y"
-              onTouchStart={handleTouchStart}
-              onTouchEnd={handleTouchEnd}
-            >
-              {/* Tombol Navigasi Slide Kiri (Previous) */}
-              {hasPrev && (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    handlePrev()
-                  }}
-                  className="absolute left-2.5 sm:left-3.5 top-1/2 -translate-y-1/2 z-20
-                    w-9 h-9 sm:w-11 sm:h-11 rounded-full bg-black/60 hover:bg-black/85 text-white
-                    border border-white/20 backdrop-blur-md shadow-xl flex items-center justify-center
-                    transition-all active:scale-95 cursor-pointer hover:scale-105"
-                  title="Foto Sebelumnya (Panah Kiri)"
-                  aria-label="Sebelumnya"
-                >
-                  <ChevronLeft size={22} className="shrink-0" />
-                </button>
-              )}
-
-              {/* Tombol Navigasi Slide Kanan (Next) */}
-              {hasNext && (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    handleNext()
-                  }}
-                  className="absolute right-2.5 sm:right-3.5 top-1/2 -translate-y-1/2 z-20
-                    w-9 h-9 sm:w-11 sm:h-11 rounded-full bg-black/60 hover:bg-black/85 text-white
-                    border border-white/20 backdrop-blur-md shadow-xl flex items-center justify-center
-                    transition-all active:scale-95 cursor-pointer hover:scale-105"
-                  title="Foto Selanjutnya (Panah Kanan)"
-                  aria-label="Selanjutnya"
-                >
-                  <ChevronRight size={22} className="shrink-0" />
-                </button>
-              )}
-
-              {/* Foto Animasi dengan Slide Transition */}
-              <AnimatePresence initial={false} custom={direction} mode="wait">
-                <motion.div
-                  key={currentPhoto.id}
-                  custom={direction}
-                  variants={slideVariants}
-                  initial="enter"
-                  animate="center"
-                  exit="exit"
-                  className="w-full h-full flex items-center justify-center"
-                >
-                  {currentPhoto.url ? (
-                    <img
-                      src={getStorageUrl(currentPhoto.url)}
-                      alt={currentPhoto.filename}
-                      className="max-w-full max-h-[58vh] object-contain rounded-lg shadow-md select-none pointer-events-none"
-                    />
-                  ) : (
-                    <p className="text-pb-text-muted text-sm py-12">Gambar tidak tersedia</p>
-                  )}
-                </motion.div>
-              </AnimatePresence>
-            </div>
-
-            {/* Actions Bar — Terstruktur & Responsif */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pt-2 border-t border-pb-border/60">
-              {/* Grup Aksi Utama: Unduh & QR Code */}
-              <div className="grid grid-cols-2 sm:flex items-center gap-2">
-                <Button
-                  variant="primary"
-                  size="sm"
-                  onClick={async () => {
-                    await downloadFile(
-                      currentPhoto.url,
-                      currentPhoto.filename || 'pixelbooth-photo.jpg'
-                    )
-                  }}
-                  leftIcon={<Download size={15} />}
-                  className="text-xs font-semibold py-2"
-                >
-                  Unduh Foto
-                </Button>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => {
-                    onShowQr(currentPhoto)
-                    onClose()
-                  }}
-                  leftIcon={<QrCode size={15} className="text-cyan-400" />}
-                  className="text-xs font-medium py-2"
-                >
-                  QR Code
-                </Button>
-              </div>
-
-              {/* Grup Aksi Manajemen: Buka, Pindah, Hapus */}
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => window.open(getStorageUrl(currentPhoto.url), '_blank')}
-                  leftIcon={<ExternalLink size={14} />}
-                  className="flex-1 sm:flex-initial text-xs py-2"
-                >
-                  Buka Tab
-                </Button>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => {
-                    onMove(currentPhoto)
-                    onClose()
-                  }}
-                  leftIcon={<FolderInput size={14} className="text-amber-400" />}
-                  className="flex-1 sm:flex-initial text-xs py-2"
-                >
-                  Pindah
-                </Button>
-                <Button
-                  variant="danger"
-                  size="sm"
-                  onClick={() => {
-                    onDelete(currentPhoto)
-                    onClose()
-                  }}
-                  leftIcon={<Trash2 size={14} />}
-                  className="text-xs py-2 px-3 shrink-0"
-                >
-                  Hapus
-                </Button>
-              </div>
-            </div>
-          </motion.div>
-        </>
+      {/* Modal Print Foto */}
+      {showPrintModal && currentPhoto && (
+        <PrintModal
+          isOpen={showPrintModal}
+          onClose={() => setShowPrintModal(false)}
+          photos={{
+            id: currentPhoto.id,
+            url: currentPhoto.url,
+            title: currentPhoto.filename || 'Foto Galeri',
+          }}
+          title={`Cetak Foto: ${currentPhoto.filename || 'Galeri'}`}
+        />
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   )
 }
 

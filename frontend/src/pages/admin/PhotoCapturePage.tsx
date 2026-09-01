@@ -3,13 +3,16 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
+  AlertTriangle,
   ArrowLeft,
   Camera as CameraIcon,
   Check,
+  CheckCircle2,
   Download,
   ExternalLink,
   FolderPlus,
   ImageIcon,
+  Printer,
   QrCode,
   RotateCcw,
   Share2,
@@ -25,9 +28,11 @@ import { toast } from '@/components/ui/Toast'
 import { sessionApi } from '@/api/sessions'
 import { useFolders } from '@/hooks/useFolders'
 import { resolvePreviewSlots } from '@/utils/previewSlots'
-import { buildTemplateOverlay, renderFinalComposite } from '@/utils/templateOverlay'
+import { buildTemplateOverlay, renderFinalComposite, preloadTemplateImage } from '@/utils/templateOverlay'
 import { getStorageUrl } from '@/api/client'
 import { downloadFile } from '@/utils/download'
+import { createCameraStream, getSelectedCameraId } from '@/utils/cameraManager'
+import PrintModal from '@/components/gallery/PrintModal'
 import type { PhotoSession } from '@/types'
 import type { PreviewSlot } from '@/utils/previewSlots'
 
@@ -63,7 +68,11 @@ const PhotoCapturePage: React.FC = () => {
     unique_token?: string
     filename?: string
   } | null>(null)
+  const [syncStatus, setSyncStatus] = useState<'syncing' | 'saved' | 'error'>('saved')
+  const [isNavigating, setIsNavigating] = useState(false)
+  const syncPromiseRef = useRef<Promise<boolean> | null>(null)
   const [showQrModal, setShowQrModal] = useState(false)
+  const [showPrintModal, setShowPrintModal] = useState(false)
   const [showRetakeOptions, setShowRetakeOptions] = useState(false)
 
   // ===== Folder tujuan penyimpanan =====
@@ -131,6 +140,9 @@ const PhotoCapturePage: React.FC = () => {
     const tpl = session?.template
     if (!tpl || !tpl.template_url || previewSlots.length === 0) return
 
+    // Preload gambar template ke cache agar render final instan
+    preloadTemplateImage(tpl.template_url)
+
     let cancelled = false
     buildTemplateOverlay(
       tpl.template_url,
@@ -184,17 +196,14 @@ const PhotoCapturePage: React.FC = () => {
   }, [id])
 
   // ===== Mulai webcam =====
-  const startCamera = async () => {
+  const startCamera = async (preferredDeviceId?: string) => {
     try {
       // Hentikan stream lama (jika ada) sebelum membuat yang baru
       if (streamRef.current) {
         streamRef.current.getTracks().forEach((track) => track.stop())
       }
 
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } },
-        audio: false,
-      })
+      const { stream } = await createCameraStream(preferredDeviceId)
       streamRef.current = stream
       setCameraActive(true)
       setCameraError(null)
@@ -322,17 +331,21 @@ const PhotoCapturePage: React.FC = () => {
     try {
       const video = videoRef.current
       const canvas = document.createElement('canvas')
-      canvas.width = video.videoWidth || 1280
-      canvas.height = video.videoHeight || 720
+      // Gunakan resolusi native sensor penuh kamera
+      canvas.width = video.videoWidth || 1920
+      canvas.height = video.videoHeight || 1080
       const ctx = canvas.getContext('2d')
       if (!ctx) throw new Error('Canvas tidak tersedia')
+
+      ctx.imageSmoothingEnabled = true
+      ctx.imageSmoothingQuality = 'high'
 
       // Mirror untuk selfie dengan tone natural kamera
       ctx.translate(canvas.width, 0)
       ctx.scale(-1, 1)
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
 
-      const base64 = canvas.toDataURL('image/jpeg', 0.85)
+      const base64 = canvas.toDataURL('image/jpeg', 0.95)
       const currentFrameNum = session.current_frame || 1
       localCapturesRef.current[currentFrameNum] = base64
 
@@ -455,57 +468,160 @@ const PhotoCapturePage: React.FC = () => {
     }
   }
 
-  // ===== Selesaikan sesi (render final) =====
+  // ===== Selesaikan sesi (render final instan & background sync) =====
   const handleComplete = async () => {
     if (!session || !template) return
-    setIsCapturing(true)
+
+    // 1. Render composite instan di client side (< 15ms)
+    let finalImageBase64: string | undefined = undefined
     try {
-      // Tunggu semua capture frame di background selesai
-      if (pendingCapturesRef.current.length > 0) {
-        await Promise.allSettled(pendingCapturesRef.current)
+      if (template.template_url) {
+        finalImageBase64 = await renderFinalComposite(
+          template.template_url,
+          previewSlots,
+          frameImages,
+          template.canvas_width,
+          template.canvas_height
+        )
       }
+    } catch (e) {
+      console.warn('Client render final composite fallback:', e)
+    }
 
-      let finalImageBase64: string | undefined = undefined
+    const uniqueToken = session.session_token || String(session.id)
+    const initialQrLink = `${window.location.origin}/photo/${uniqueToken}`
+
+    // 2. INSTANT OPTIMISTIC DISPLAY: Langsung tampilkan foto final seketika (0 ms delay)!
+    if (finalImageBase64) {
+      setResultPhoto({
+        id: undefined,
+        url: finalImageBase64,
+        qr_url: undefined,
+        qr_link: initialQrLink,
+        unique_token: uniqueToken,
+        filename: `PixelBooth-${(template.name || 'Photo').replace(/[^A-Za-z0-9]/g, '')}.jpg`,
+      })
+      setIsCapturing(false) // Hilangkan loading spinner secara instan
+    } else {
+      setIsCapturing(true)
+    }
+
+    setSyncStatus('syncing')
+
+    // 3. Simpan di server di background (asynchronous) dengan auto-retry
+    const syncTask = async (): Promise<boolean> => {
       try {
-        if (template.template_url) {
-          finalImageBase64 = await renderFinalComposite(
-            template.template_url,
-            previewSlots,
-            frameImages,
-            template.canvas_width,
-            template.canvas_height
-          )
+        if (pendingCapturesRef.current.length > 0) {
+          await Promise.allSettled(pendingCapturesRef.current)
         }
-      } catch (e) {
-        console.warn('Client render final composite fallback:', e)
-      }
 
+        let result: any = null
+        let lastError: any = null
+        for (let attempt = 1; attempt <= 2; attempt++) {
+          try {
+            result = await sessionApi.complete(session.id, {
+              final_image_base64: finalImageBase64,
+            })
+            if (result) break
+          } catch (e) {
+            lastError = e
+            if (attempt < 2) await new Promise((r) => setTimeout(r, 400))
+          }
+        }
+
+        if (!result) throw lastError || new Error('Gagal menyimpan foto final ke server.')
+
+        const photoData = (result.photo || {}) as any
+        const finalToken = photoData.unique_token || uniqueToken
+        let qrLink = photoData.qr_link || `${window.location.origin}/photo/${finalToken}`
+        if (!qrLink.startsWith('http://') && !qrLink.startsWith('https://')) {
+          qrLink = `${window.location.origin}${qrLink.startsWith('/') ? '' : '/'}${qrLink}`
+        }
+
+        // Update data permanen dari server tanpa mengganggu tampilan foto
+        setResultPhoto({
+          id: photoData.id,
+          url: photoData.url || photoData.photo_url || photoData.storage_path || finalImageBase64,
+          qr_url: photoData.qr_url || photoData.qr_path || 'ready',
+          qr_link: qrLink,
+          unique_token: finalToken,
+          filename: photoData.filename,
+        })
+        setSyncStatus('saved')
+        queryClient.invalidateQueries({ queryKey: ['folders'] })
+        queryClient.invalidateQueries({ queryKey: ['photos'] })
+        return true
+      } catch (err: unknown) {
+        console.error('Background complete sync error:', err)
+        setSyncStatus('error')
+        toast.error('Gagal mengunggah foto ke galeri. Klik Coba Lagi.')
+        return false
+      } finally {
+        setIsCapturing(false)
+      }
+    }
+
+    syncPromiseRef.current = syncTask()
+  }
+
+  // ===== Coba lagi sinkronisasi jika gagal =====
+  const handleRetrySync = async () => {
+    if (!session || !resultPhoto) return
+    setSyncStatus('syncing')
+    toast.info('Mencoba menyimpan ulang foto ke galeri...')
+    try {
       const result = await sessionApi.complete(session.id, {
-        final_image_base64: finalImageBase64,
+        final_image_base64: resultPhoto.url,
       })
       const photoData = (result.photo || {}) as any
-      const uniqueToken = photoData.unique_token || session.session_token || String(session.id)
-      let qrLink = photoData.qr_link || `${window.location.origin}/photo/${uniqueToken}`
-      if (!qrLink.startsWith('http://') && !qrLink.startsWith('https://')) {
+      const finalToken = photoData.unique_token || resultPhoto.unique_token
+      let qrLink = photoData.qr_link || resultPhoto.qr_link
+      if (qrLink && !qrLink.startsWith('http://') && !qrLink.startsWith('https://')) {
         qrLink = `${window.location.origin}${qrLink.startsWith('/') ? '' : '/'}${qrLink}`
       }
-      setResultPhoto({
-        id: photoData.id,
-        url: photoData.url || photoData.photo_url || photoData.storage_path,
-        qr_url: photoData.qr_url || photoData.qr_path,
-        qr_link: qrLink,
-        unique_token: uniqueToken,
-        filename: photoData.filename,
-      })
+
+      setResultPhoto((prev) =>
+        prev
+          ? {
+              ...prev,
+              id: photoData.id,
+              qr_url: photoData.qr_url || photoData.qr_path || 'ready',
+              qr_link: qrLink,
+            }
+          : prev
+      )
+      setSyncStatus('saved')
       queryClient.invalidateQueries({ queryKey: ['folders'] })
       queryClient.invalidateQueries({ queryKey: ['photos'] })
-      toast.success('Sesi selesai. Foto tersimpan di galeri.')
-    } catch (err: unknown) {
-      const error = err as { response?: { data?: { message?: string } } }
-      toast.error(error.response?.data?.message || 'Gagal menyelesaikan sesi.')
-    } finally {
-      setIsCapturing(false)
+      toast.success('Foto berhasil tersimpan ke galeri!')
+    } catch {
+      setSyncStatus('error')
+      toast.error('Masih gagal menyimpan foto. Silakan cek koneksi/server.')
     }
+  }
+
+  // ===== Navigasi pintar ke Galeri (tunggu sync tuntas jika sedang proses) =====
+  const handleGoToGallery = async () => {
+    if (syncStatus === 'syncing' && syncPromiseRef.current) {
+      setIsNavigating(true)
+      toast.info('Menyelesaikan penyimpanan foto ke galeri...')
+      await syncPromiseRef.current
+      setIsNavigating(false)
+    }
+    queryClient.invalidateQueries({ queryKey: ['photos'] })
+    queryClient.invalidateQueries({ queryKey: ['folders'] })
+    navigate(folderId ? `/gallery?folder_id=${folderId}` : '/gallery')
+  }
+
+  // ===== Navigasi Selesai (tunggu sync jika masih proses) =====
+  const handleFinishSession = async () => {
+    if (syncStatus === 'syncing' && syncPromiseRef.current) {
+      setIsNavigating(true)
+      toast.info('Menyelesaikan penyimpanan foto...')
+      await syncPromiseRef.current
+      setIsNavigating(false)
+    }
+    navigate('/photo')
   }
 
   // ===== Ubah folder tujuan penyimpanan =====
@@ -542,7 +658,7 @@ const PhotoCapturePage: React.FC = () => {
   // ===== Loading =====
   if (status === 'loading') {
     return (
-      <div className="flex items-center justify-center py-20">
+      <div className="flex items-center justify-center min-h-[60vh]">
         <Spinner size="lg" className="text-pb-text" />
       </div>
     )
@@ -567,64 +683,73 @@ const PhotoCapturePage: React.FC = () => {
   // ===== Hasil akhir =====
   if (resultPhoto) {
     return (
-      <div>
+      <div className="max-w-4xl mx-auto pb-12">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-pb-text text-2xl font-bold">Sesi Selesai</h1>
-            <p className="text-pb-text-muted text-sm mt-1">Foto tersimpan di galeri.</p>
+            <h1 className="font-pixel text-[var(--pb-text)] text-2xl sm:text-3xl lg:text-4xl font-bold leading-relaxed">
+              Sesi Selesai!
+            </h1>
+            <p className="font-retro text-[var(--pb-text-muted)] text-lg sm:text-xl font-bold mt-1">
+              Foto berhasil di-generate dan tersimpan di galeri.
+            </p>
           </div>
         </div>
 
-        <div className="bg-pb-surface border border-pb-border rounded-2xl p-8 flex flex-col items-center text-center">
+        <div className="bg-[var(--pb-surface)] border-[3px] border-[var(--pb-border-strong)] rounded-[4px] p-6 sm:p-8 flex flex-col items-center text-center shadow-[4px_4px_0px_#000,7px_7px_0px_var(--pb-shadow-solid)]">
           {resultPhoto.url ? (
             <img
               src={getStorageUrl(resultPhoto.url)}
               alt="Foto final"
-              className="max-h-80 w-auto max-w-full rounded-xl mb-5 border border-pb-border shadow-xl"
+              className="max-h-[56vh] sm:max-h-[70vh] w-auto max-w-full rounded-none mb-6 border-[3px] border-white shadow-[4px_4px_0px_#000]"
             />
           ) : (
-            <div className="w-20 h-20 bg-green-500/10 border border-green-500/20 rounded-2xl flex items-center justify-center mb-4">
-              <Check size={36} className="text-green-400" />
+            <div className="w-24 h-24 bg-green-500/20 border-[3px] border-green-500 rounded-[4px] flex items-center justify-center mb-5 shadow-[3px_3px_0px_#000]">
+              <Check size={44} className="text-green-400 stroke-[3]" />
             </div>
           )}
-          <h2 className="text-pb-text font-semibold text-lg mb-1">Sesi Selesai!</h2>
-          <p className="text-pb-text-secondary text-sm mb-6 max-w-sm">
-            {totalFrames} frame telah diambil. Foto final disimpan di galeri{folderName ? ` dalam folder "${folderName}"` : ''} dan siap dibagikan via QR.
+
+          <h2 className="font-pixel text-[var(--pb-text)] text-xl sm:text-2xl font-bold mb-2">
+            Foto Final Berhasil Digenerate
+          </h2>
+          <p className="font-retro text-[var(--pb-text-secondary)] text-lg sm:text-xl font-bold mb-8 max-w-md">
+            {totalFrames} frame telah selesai diambil. Foto tersimpan di galeri{folderName ? ` dalam folder "${folderName}"` : ''} dan siap dibagikan via QR.
           </p>
 
           {/* Opsi Ulangi Frame jika diaktifkan */}
           {showRetakeOptions && (
-            <div className="mb-6 border border-amber-500/20 bg-amber-500/5 rounded-2xl p-5 w-full max-w-md animate-in fade-in zoom-in-95">
+            <div className="mb-8 border-[2px] border-amber-500 bg-amber-500/10 rounded-[4px] p-5 sm:p-6 w-full max-w-lg shadow-[3px_3px_0px_#000] animate-in fade-in zoom-in-95">
               <div className="flex items-center justify-between gap-2 mb-3">
-                <p className="text-amber-300 text-xs font-semibold uppercase tracking-wider">Opsi Pengulangan Foto</p>
+                <p className="font-pixel text-amber-300 text-xs sm:text-sm font-bold uppercase tracking-wider">
+                  Opsi Pengulangan Foto
+                </p>
               </div>
 
               {/* Tombol Ulangi dari Awal (Semua Frame) */}
               <button
                 type="button"
                 onClick={handleRestartSession}
-                className="w-full flex items-center justify-center gap-2 py-2.5 px-4 mb-3 rounded-xl
-                  bg-amber-500/20 hover:bg-amber-500/30 active:bg-amber-500/40 text-amber-300 border border-amber-500/40
-                  text-sm font-semibold transition-colors shadow-sm"
+                className="w-full flex items-center justify-center gap-2.5 py-3 px-5 mb-4 rounded-[4px]
+                  bg-amber-500 hover:bg-amber-400 active:translate-x-[1px] active:translate-y-[1px] text-black border-[2px] border-black
+                  font-retro text-lg sm:text-xl font-bold uppercase tracking-wide transition-all shadow-[3px_3px_0px_#000] cursor-pointer"
               >
-                <RotateCcw size={16} />
+                <RotateCcw size={20} className="stroke-[2.5]" />
                 Ulangi dari Awal (Semua Foto)
               </button>
 
-              <div className="relative flex py-1.5 items-center mb-2.5">
-                <div className="flex-grow border-t border-amber-500/20"></div>
-                <span className="flex-shrink mx-2 text-[11px] text-amber-400/60 font-medium">atau pilih foto tertentu</span>
-                <div className="flex-grow border-t border-amber-500/20"></div>
+              <div className="relative flex py-2 items-center mb-3">
+                <div className="flex-grow border-t-[2px] border-amber-500/40"></div>
+                <span className="flex-shrink mx-3 font-retro text-sm sm:text-base text-amber-300 font-bold">atau pilih foto tertentu</span>
+                <div className="flex-grow border-t-[2px] border-amber-500/40"></div>
               </div>
 
-              <div className="flex items-center justify-center gap-2 flex-wrap">
+              <div className="flex items-center justify-center gap-2.5 flex-wrap">
                 {Array.from({ length: totalFrames }, (_, i) => (
                   <Button
                     key={i}
                     variant="secondary"
-                    size="sm"
+                    size="md"
                     onClick={() => handleRetakeFrame(i)}
-                    leftIcon={<RotateCcw size={13} />}
+                    leftIcon={<RotateCcw size={16} />}
                   >
                     Foto {i + 1}
                   </Button>
@@ -633,113 +758,150 @@ const PhotoCapturePage: React.FC = () => {
             </div>
           )}
 
-          {/* 5 Tombol Aksi Utama: Unduh Foto, Scan QR, Buka Galeri, Ulangi, Selesai (Presisi di HP & Laptop) */}
-          <div className="w-full max-w-sm sm:max-w-xl mx-auto flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-center sm:gap-3">
-            {/* Baris 1: Unduh & QR (Di HP 2 Kolom Sejajar) */}
-            <div className="grid grid-cols-2 gap-2 w-full sm:w-auto sm:contents">
-              {resultPhoto.url && (
-                <Button
-                  variant="primary"
-                  size="md"
-                  onClick={() =>
-                    downloadFile(resultPhoto.url!, `pixelbooth-${session?.id ?? 'final'}.jpg`)
-                  }
-                  leftIcon={<Download size={15} className="shrink-0" />}
-                  className="px-3 py-2 sm:px-5 sm:py-3 text-xs sm:text-sm min-h-[38px] sm:min-h-[48px] justify-center"
+          {/* Status Badge Sinkronisasi */}
+          <div className="mb-6">
+            {syncStatus === 'syncing' && (
+              <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-amber-500/15 border border-amber-500/40 text-amber-300 font-retro text-sm sm:text-base font-bold shadow-[2px_2px_0px_#000]">
+                <Spinner size="sm" className="text-amber-400" />
+                <span>Memproses & menyimpan ke galeri...</span>
+              </div>
+            )}
+            {syncStatus === 'saved' && (
+              <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-500/15 border border-emerald-500/40 text-emerald-400 font-retro text-sm sm:text-base font-bold shadow-[2px_2px_0px_#000]">
+                <CheckCircle2 size={18} className="text-emerald-400 stroke-[2.5]" />
+                <span>Foto 100% Tersimpan di Galeri</span>
+              </div>
+            )}
+            {syncStatus === 'error' && (
+              <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-red-500/15 border border-red-500/40 text-red-400 font-retro text-sm sm:text-base font-bold shadow-[2px_2px_0px_#000]">
+                <AlertTriangle size={18} className="text-red-400 stroke-[2.5]" />
+                <span>Gagal menyimpan ke galeri server</span>
+                <button
+                  type="button"
+                  onClick={handleRetrySync}
+                  className="underline hover:text-white ml-2 font-bold cursor-pointer"
                 >
-                  Unduh Foto
-                </Button>
-              )}
-              {resultPhoto.qr_url && (
-                <Button
-                  variant="primary"
-                  size="md"
-                  onClick={() => setShowQrModal(true)}
-                  leftIcon={<QrCode size={15} className="shrink-0" />}
-                  className="bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-2 sm:px-5 sm:py-3 text-xs sm:text-sm min-h-[38px] sm:min-h-[48px] justify-center"
-                >
-                  Scan QR
-                </Button>
-              )}
-            </div>
+                  Coba Lagi
+                </button>
+              </div>
+            )}
+          </div>
 
-            {/* Baris 2: Galeri, Ulangi, Selesai (Di HP 3 Kolom Sejajar) */}
-            <div className="grid grid-cols-3 gap-2 w-full sm:w-auto sm:contents">
+          {/* 6 Tombol Aksi Utama: Unduh Foto, Print Foto, Scan QR, Buka Galeri, Ulangi, Selesai */}
+          <div className="w-full max-w-3xl mx-auto flex flex-col sm:flex-row sm:flex-wrap sm:items-center sm:justify-center gap-2.5 sm:gap-4">
+            {resultPhoto.url && (
               <Button
-                variant="secondary"
-                size="md"
-                onClick={() => {
-                  queryClient.invalidateQueries({ queryKey: ['photos'] })
-                  queryClient.invalidateQueries({ queryKey: ['folders'] })
-                  navigate(folderId ? `/gallery?folder_id=${folderId}` : '/gallery')
-                }}
-                leftIcon={<ExternalLink size={15} className="shrink-0" />}
-                className="px-2 sm:px-5 py-2 sm:py-3 text-xs sm:text-sm min-h-[38px] sm:min-h-[48px] justify-center"
+                variant="primary"
+                size="lg"
+                onClick={() =>
+                  downloadFile(resultPhoto.url!, resultPhoto.filename || `pixelbooth-${session?.id ?? 'final'}.jpg`)
+                }
+                leftIcon={<Download size={18} className="shrink-0" />}
+                className="!min-h-[44px] !py-2 !px-4 !text-base sm:!min-h-[54px] sm:!py-3 sm:!px-6 sm:!text-xl"
               >
-                <span className="truncate">Galeri</span>
+                Unduh Foto
               </Button>
+            )}
+            {resultPhoto.url && (
               <Button
-                variant="secondary"
-                size="md"
-                onClick={() => setShowRetakeOptions((prev) => !prev)}
-                leftIcon={<RotateCcw size={15} className="shrink-0" />}
-                className={`px-2 sm:px-5 py-2 sm:py-3 text-xs sm:text-sm min-h-[38px] sm:min-h-[48px] justify-center ${
-                  showRetakeOptions ? 'border-amber-500 text-amber-400 bg-amber-500/10' : ''
-                }`}
+                variant="primary"
+                size="lg"
+                onClick={() => setShowPrintModal(true)}
+                leftIcon={<Printer size={18} className="shrink-0 stroke-[2.5]" />}
+                className="!bg-[#FF5A36] hover:!bg-[#FF7040] text-white shadow-[2px_2px_0px_#000] !min-h-[44px] !py-2 !px-4 !text-base sm:!min-h-[54px] sm:!py-3 sm:!px-6 sm:!text-xl font-bold"
               >
-                Ulangi
+                Print Foto
               </Button>
-              <Button
-                variant="secondary"
-                size="md"
-                onClick={() => navigate('/photo')}
-                leftIcon={<Check size={15} className="shrink-0" />}
-                className="px-2 sm:px-5 py-2 sm:py-3 text-xs sm:text-sm min-h-[38px] sm:min-h-[48px] justify-center"
-              >
-                Selesai
-              </Button>
-            </div>
+            )}
+            <Button
+              variant="primary"
+              size="lg"
+              onClick={() => setShowQrModal(true)}
+              leftIcon={<QrCode size={18} className="shrink-0" />}
+              className="bg-emerald-600 hover:bg-emerald-500 text-white !min-h-[44px] !py-2 !px-4 !text-base sm:!min-h-[54px] sm:!py-3 sm:!px-6 sm:!text-xl"
+            >
+              Scan QR
+            </Button>
+            <Button
+              variant="secondary"
+              size="lg"
+              disabled={isNavigating}
+              onClick={handleGoToGallery}
+              leftIcon={
+                isNavigating ? (
+                  <Spinner size="sm" className="text-[var(--pb-text)] shrink-0" />
+                ) : (
+                  <ExternalLink size={18} className="shrink-0" />
+                )
+              }
+              className="!min-h-[44px] !py-2 !px-4 !text-base sm:!min-h-[54px] sm:!py-3 sm:!px-6 sm:!text-xl"
+            >
+              {isNavigating ? 'Menyimpan...' : 'Galeri'}
+            </Button>
+            <Button
+              variant="secondary"
+              size="lg"
+              onClick={() => setShowRetakeOptions((prev) => !prev)}
+              leftIcon={<RotateCcw size={18} className="shrink-0" />}
+              className={showRetakeOptions ? 'border-amber-500 text-amber-400 bg-amber-500/10 !min-h-[44px] !py-2 !px-4 !text-base sm:!min-h-[54px] sm:!py-3 sm:!px-6 sm:!text-xl' : '!min-h-[44px] !py-2 !px-4 !text-base sm:!min-h-[54px] sm:!py-3 sm:!px-6 sm:!text-xl'}
+            >
+              Ulangi
+            </Button>
+            <Button
+              variant="secondary"
+              size="lg"
+              disabled={isNavigating}
+              onClick={handleFinishSession}
+              leftIcon={
+                isNavigating ? (
+                  <Spinner size="sm" className="text-[var(--pb-text)] shrink-0" />
+                ) : (
+                  <Check size={18} className="shrink-0" />
+                )
+              }
+              className="!min-h-[44px] !py-2 !px-4 !text-base sm:!min-h-[54px] sm:!py-3 sm:!px-6 sm:!text-xl"
+            >
+              Selesai
+            </Button>
           </div>
         </div>
 
         {/* Modal QR Code */}
         {showQrModal && resultPhoto && (
-          <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3.5 sm:p-4 animate-in fade-in">
-            <div className="bg-pb-surface border border-pb-border rounded-3xl p-5 sm:p-7 max-w-sm sm:max-w-md w-full text-center flex flex-col items-center relative shadow-2xl animate-in zoom-in-95">
+          <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in">
+            <div className="bg-[var(--pb-surface)] border-[3px] border-[var(--pb-border-strong)] rounded-[4px] p-6 sm:p-8 max-w-xl w-full text-center flex flex-col items-center relative shadow-[6px_6px_0px_var(--pb-shadow-solid)] animate-in zoom-in-95">
               <button
                 type="button"
                 onClick={() => setShowQrModal(false)}
-                className="absolute top-4 right-4 text-pb-text-muted hover:text-pb-text transition-colors p-1.5 rounded-xl hover:bg-pb-surface-hover"
+                className="absolute top-4 right-4 w-9 h-9 rounded-[4px] bg-[var(--pb-elevated)] border-[2px] border-[var(--pb-border-strong)] text-[var(--pb-text)] hover:text-white hover:bg-[#FF5A36] flex items-center justify-center transition-colors cursor-pointer"
               >
-                <X size={20} />
+                <X size={18} />
               </button>
 
               {/* Header Title */}
-              <div className="mb-3.5">
-                <h3 className="text-pb-text font-bold text-lg sm:text-xl">QR Code Foto</h3>
-                <p className="text-pb-text-secondary text-xs mt-1">
+              <div className="mb-4">
+                <h3 className="font-pixel text-[var(--pb-text)] font-bold text-lg sm:text-xl">QR Code Foto</h3>
+                <p className="font-retro text-[var(--pb-text-secondary)] text-base font-bold mt-1">
                   Scan untuk melihat dan mengunduh foto Anda
                 </p>
               </div>
 
-              {/* Event Card Mockup (Compact & Balanced) */}
-              <div className="w-[250px] sm:w-[270px] max-w-full rounded-2xl overflow-hidden shadow-2xl border border-pb-border bg-white mb-3.5 transition-transform hover:scale-[1.01]">
-                {/* Header Hitam */}
-                <div className="bg-[#141416] px-3 pt-3 pb-2 text-center select-none">
-                  <p className="text-zinc-400 text-[8px] font-bold tracking-[0.3em] uppercase">
+              {/* Event Card Mockup */}
+              <div className="w-[320px] sm:w-[380px] max-w-full rounded-[6px] overflow-hidden border-[3px] border-black shadow-[4px_4px_0px_#000,8px_8px_0px_var(--pb-shadow-solid)] bg-white mb-5 transition-transform hover:scale-[1.01]">
+                <div className="bg-[#141416] px-4 pt-3.5 pb-3 text-center select-none overflow-hidden">
+                  <p className="text-zinc-400 font-pixel text-[8px] tracking-[0.18em] uppercase font-bold">
                     F O T O
                   </p>
-                  <h4 className="text-white text-sm sm:text-base font-black tracking-[0.2em] uppercase leading-tight mt-0.5">
-                    P I X E L B O O T H
+                  <h4 className="text-white font-pixel text-sm font-bold tracking-[0.1em] uppercase leading-tight mt-1 truncate">
+                    PIXELBOOTH
                   </h4>
-                  <p className="text-zinc-400 text-[7px] font-medium tracking-[0.2em] uppercase mt-0.5">
-                    P H O T O B O O T H
+                  <p className="text-zinc-400 font-retro text-[10px] font-bold tracking-[0.1em] uppercase mt-0.5">
+                    PHOTOBOOTH
                   </p>
                 </div>
 
-                {/* Body Putih dengan QR Canvas */}
-                <div className="px-3 pt-3 pb-2.5 bg-white flex flex-col items-center justify-center">
-                  <div className="w-full flex items-center justify-center mb-1.5">
+                <div className="px-5 pt-5 pb-4 bg-white flex flex-col items-center justify-center">
+                  <div className="w-full flex items-center justify-center mb-2.5">
                     <QRCodeCanvas
                       id="capture-session-qr-canvas"
                       value={
@@ -747,28 +909,28 @@ const PhotoCapturePage: React.FC = () => {
                           ? resultPhoto.qr_link
                           : `${window.location.origin}/photo/${resultPhoto.unique_token || ''}`
                       }
-                      size={240}
+                      size={280}
                       level="H"
                       bgColor="#FFFFFF"
                       fgColor="#000000"
                       includeMargin={false}
-                      className="w-36 h-36 sm:w-40 sm:h-40 aspect-square block"
+                      className="w-48 h-48 sm:w-60 sm:h-60 aspect-square block border-[2px] border-black"
                     />
                   </div>
 
-                  <div className="w-16 h-[1px] bg-zinc-200 my-1.5" />
+                  <div className="w-28 h-[2px] bg-zinc-300 my-2.5" />
 
-                  <p className="text-zinc-600 text-[10px] font-medium leading-tight text-center max-w-[210px]">
+                  <p className="font-retro text-zinc-700 text-sm sm:text-base font-bold leading-tight text-center max-w-[280px]">
                     Scan untuk melihat foto Anda
                   </p>
-                  <p className="text-zinc-400 text-[7px] font-bold tracking-[0.2em] uppercase text-center mt-1">
-                    P I X E L B O O T H
+                  <p className="font-pixel text-zinc-500 text-[9px] font-bold tracking-[0.1em] uppercase text-center mt-1.5">
+                    PIXELBOOTH
                   </p>
                 </div>
               </div>
 
-              {/* Action Buttons: Bagikan & Unduh Desain (Icon-only on Mobile & iPad, Icon+Text on Desktop) */}
-              <div className="w-[260px] sm:w-[280px] max-w-full grid grid-cols-2 gap-2.5 mb-2">
+              {/* Action Buttons: Bagikan & Unduh Desain */}
+              <div className="w-full grid grid-cols-2 gap-3 mb-3">
                 <button
                   type="button"
                   title="Bagikan Link Foto"
@@ -789,10 +951,10 @@ const PhotoCapturePage: React.FC = () => {
                       toast.success('Link foto disalin ke clipboard.')
                     }
                   }}
-                  className="h-11 w-full rounded-xl bg-pb-surface-hover hover:bg-pb-border text-pb-text border border-pb-border flex items-center justify-center gap-2 text-xs font-semibold transition-all active:scale-95 cursor-pointer shadow-xs whitespace-nowrap"
+                  className="h-12 w-full rounded-[4px] bg-[var(--pb-elevated)] hover:bg-[var(--pb-border)] text-[var(--pb-text)] border-[2px] border-[var(--pb-border-strong)] flex items-center justify-center gap-2 font-retro text-base font-bold uppercase transition-all cursor-pointer shadow-[2px_2px_0px_var(--pb-shadow-solid)]"
                 >
-                  <Share2 size={18} className="shrink-0 text-pb-text-secondary" />
-                  <span className="hidden lg:inline">Bagikan</span>
+                  <Share2 size={18} className="shrink-0 text-[#FF5A36]" />
+                  <span>Bagikan</span>
                 </button>
 
                 <button
@@ -812,22 +974,37 @@ const PhotoCapturePage: React.FC = () => {
                       toast.error('Gagal mengunduh QR.')
                     }
                   }}
-                  className="h-11 w-full rounded-xl bg-gradient-to-r from-[#FF5A36] via-[#FF7836] to-[#FF9836] hover:brightness-105 shadow-md shadow-orange-500/20 text-white flex items-center justify-center gap-2 text-xs font-semibold transition-all active:scale-95 cursor-pointer whitespace-nowrap"
+                  className="h-12 w-full rounded-[4px] bg-[#FF5A36] hover:bg-[#FF7040] shadow-[2px_2px_0px_#000] border-[2px] border-black text-white flex items-center justify-center gap-2 font-retro text-base font-bold uppercase transition-all cursor-pointer"
                 >
                   <Download size={18} className="shrink-0 text-white" />
-                  <span className="hidden lg:inline">Unduh QR</span>
+                  <span>Unduh QR</span>
                 </button>
               </div>
 
-              <button
-                type="button"
+              <Button
+                variant="secondary"
+                size="md"
+                fullWidth
                 onClick={() => setShowQrModal(false)}
-                className="w-[260px] sm:w-[280px] max-w-full py-2.5 rounded-xl bg-pb-surface-hover text-pb-text-secondary text-xs font-semibold hover:text-pb-text transition-colors cursor-pointer"
               >
                 Tutup
-              </button>
+              </Button>
             </div>
           </div>
+        )}
+
+        {/* Modal Print Foto */}
+        {showPrintModal && resultPhoto?.url && (
+          <PrintModal
+            isOpen={showPrintModal}
+            onClose={() => setShowPrintModal(false)}
+            photos={{
+              id: resultPhoto.id,
+              url: resultPhoto.url,
+              title: resultPhoto.filename || 'Hasil Sesi Foto',
+            }}
+            title="Cetak Foto Hasil Sesi"
+          />
         )}
       </div>
     )
@@ -858,38 +1035,40 @@ const PhotoCapturePage: React.FC = () => {
   }
 
   return (
-    <div className="max-w-6xl mx-auto pb-8">
+    <div className="max-w-6xl mx-auto pb-12">
       {/* ===== Header ===== */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-5">
         <div>
-          <h1 className="text-pb-text text-xl sm:text-2xl font-bold">Sesi Foto</h1>
-          <p className="text-pb-text-muted text-xs sm:text-sm mt-0.5">
-            {template?.name ?? 'Template'} · {totalFrames} frame
+          <h1 className="font-pixel text-[var(--pb-text)] text-xl sm:text-2xl lg:text-3xl font-bold">
+            Sesi Foto
+          </h1>
+          <p className="font-retro text-[var(--pb-text-muted)] text-base sm:text-lg font-bold mt-1">
+            {template?.name ?? 'Template'} · {totalFrames} frame foto
           </p>
         </div>
-        <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
+        <div className="flex items-center gap-3 self-start sm:self-auto flex-wrap">
           {cameraActive ? (
             <CameraStatusBadge status="connected" />
           ) : (
             <CameraStatusBadge status="disconnected" />
           )}
-          <Button variant="secondary" size="sm" onClick={handleCancel} leftIcon={<X size={15} />}>
+          <Button variant="secondary" size="md" onClick={handleCancel} leftIcon={<X size={18} />}>
             Batalkan Sesi
           </Button>
         </div>
       </div>
 
       {/* ===== Progress frame ===== */}
-      <div className="flex items-center gap-3 mb-5">
-        <div className="flex-1 h-2 bg-pb-elevated rounded-full overflow-hidden">
+      <div className="flex items-center gap-4 mb-6">
+        <div className="flex-1 h-3 bg-[var(--pb-elevated)] border-[2px] border-[var(--pb-border-strong)] rounded-full overflow-hidden shadow-[inset_0_1px_3px_rgba(0,0,0,0.5)]">
           <div
-            className="h-full bg-pb-accent rounded-full transition-all duration-300"
+            className="h-full bg-gradient-to-r from-[#FF5A36] to-[#FFB800] rounded-full transition-all duration-300"
             style={{
               width: `${(allDone ? totalFrames : completedCount) / totalFrames * 100}%`,
             }}
           />
         </div>
-        <span className="text-pb-text-secondary text-xs sm:text-sm whitespace-nowrap font-medium">
+        <span className="font-pixel text-[var(--pb-text)] text-xs sm:text-sm whitespace-nowrap font-bold">
           Foto {allDone ? totalFrames : activeFrameIndex + 1} / {totalFrames}
         </span>
       </div>
@@ -899,7 +1078,7 @@ const PhotoCapturePage: React.FC = () => {
         {/* Camera View Area */}
         <div className="lg:col-span-7 xl:col-span-8 flex items-center justify-center min-h-[50vh] p-1 sm:p-2">
           <div
-            className="relative bg-black rounded-2xl overflow-hidden shadow-2xl mx-auto flex items-center justify-center"
+            className="relative bg-black rounded-[4px] border-[3px] border-black overflow-hidden shadow-[4px_4px_0px_#000,8px_8px_0px_var(--pb-shadow-solid)] mx-auto flex items-center justify-center"
             style={{
               aspectRatio: template
                 ? `${template.canvas_width} / ${template.canvas_height}`
@@ -914,8 +1093,7 @@ const PhotoCapturePage: React.FC = () => {
                 : 'auto',
             }}
           >
-            {/* Video utama: sumber capture — selalu tersembunyi.
-                Kamera selama sesi hanya tampil di dalam bingkai frame aktif. */}
+            {/* Video utama: sumber capture */}
             <video
               ref={videoRef}
               playsInline
@@ -960,7 +1138,7 @@ const PhotoCapturePage: React.FC = () => {
               </div>
             )}
 
-            {/* Template Desain: DI DEPAN KAMERA (z-10) — Kamera otomatis berada DI BELAKANG DESAIN */}
+            {/* Template Desain */}
             {template && template.template_url && (
               <img
                 src={overlayUrl || getStorageUrl(template.template_url)}
@@ -976,43 +1154,29 @@ const PhotoCapturePage: React.FC = () => {
                 className="absolute pointer-events-none z-10"
                 style={slotPosition(activeSlot)}
               >
-                <div className="absolute inset-0 border-2 border-white/80 rounded-lg shadow-[0_0_24px_rgba(255,255,255,0.35)]" />
+                <div className="absolute inset-0 border-[3px] border-[#00FFCC] rounded-none shadow-[0_0_24px_rgba(0,255,204,0.5)] animate-pulse" />
                 <span
-                  className="absolute -top-3 left-2 bg-white text-black text-[10px] font-bold
-                    px-2 py-0.5 rounded-md shadow"
+                  className="absolute -top-3.5 left-2 bg-[#00FFCC] text-black font-pixel text-xs font-bold
+                    px-2.5 py-1 rounded-[2px] shadow-[2px_2px_0px_#000]"
                 >
                   Foto {activeFrameIndex + 1}
                 </span>
               </div>
             )}
 
-            {/* Fallback darurat tanpa template: kamera penuh + bingkai */}
-            {previewSlots.length === 0 && (
-              <>
-                <div className="absolute inset-4 border-2 border-white/20 rounded-xl pointer-events-none" />
-                {frameImages[0] && (
-                  <img
-                    src={frameImages[0]}
-                    alt="Frame terakhir"
-                    className="absolute inset-0 w-full h-full object-cover"
-                  />
-                )}
-              </>
-            )}
-
             {/* Kamera tidak aktif */}
             {!cameraActive && !allDone && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-6 z-20">
-                <VideoOff size={36} className="text-white/60 mb-3" />
-                <p className="text-white/80 text-sm mb-4 font-medium">Kamera tidak aktif</p>
-                {cameraError && <p className="text-red-400 text-xs max-w-xs mb-4">{cameraError}</p>}
-                <Button variant="secondary" size="md" onClick={startCamera} leftIcon={<Video size={16} />}>
+              <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-6 z-20 bg-black/80">
+                <VideoOff size={44} className="text-white/60 mb-3" />
+                <p className="font-retro text-white text-lg sm:text-xl mb-4 font-bold">Kamera tidak aktif</p>
+                {cameraError && <p className="font-retro text-red-400 text-sm max-w-xs mb-4 font-bold">{cameraError}</p>}
+                <Button variant="primary" size="md" onClick={() => startCamera()} leftIcon={<Video size={18} />}>
                   Aktifkan Kamera
                 </Button>
               </div>
             )}
 
-            {/* Countdown di dalam bingkai frame yang sedang diambil (teks putih kontras) */}
+            {/* Countdown di dalam bingkai frame */}
             <AnimatePresence>
               {phase === 'countdown' && countdown !== null && countdown > 0 && activeSlot && template && (
                 <motion.div
@@ -1026,20 +1190,20 @@ const PhotoCapturePage: React.FC = () => {
                     key={countdown}
                     initial={{ scale: 1.6, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
-                    className="w-24 h-24 sm:w-28 sm:h-28 rounded-full bg-black/75 backdrop-blur-sm border-2 border-white flex items-center justify-center shadow-2xl"
+                    className="w-28 h-28 sm:w-36 sm:h-36 rounded-full bg-black/80 backdrop-blur-sm border-[4px] border-[#FFB800] flex items-center justify-center shadow-[0_0_30px_rgba(255,184,0,0.8)]"
                   >
-                    <span className="text-white text-5xl sm:text-6xl font-black drop-shadow-[0_4px_16px_rgba(0,0,0,0.9)]">{countdown}</span>
+                    <span className="text-[#FFB800] font-pixel text-6xl sm:text-7xl font-bold drop-shadow-[0_4px_16px_rgba(0,0,0,0.9)]">{countdown}</span>
                   </motion.div>
                 </motion.div>
               )}
             </AnimatePresence>
 
-            {/* Overlay loading/proses foto dengan teks putih kontras */}
+            {/* Overlay loading/proses foto */}
             {isCapturing && (
-              <div className="absolute inset-0 bg-black/80 backdrop-blur-xs flex items-center justify-center z-30">
+              <div className="absolute inset-0 bg-black/85 backdrop-blur-xs flex items-center justify-center z-30">
                 <div className="text-center">
-                  <Spinner size="lg" className="text-white mb-2 mx-auto" />
-                  <p className="text-white font-semibold text-sm drop-shadow-md">Memproses foto...</p>
+                  <Spinner size="lg" className="text-[#FF5A36] mb-3 mx-auto" />
+                  <p className="font-pixel text-white text-base sm:text-lg font-bold drop-shadow-md">Memproses foto...</p>
                 </div>
               </div>
             )}
@@ -1047,31 +1211,31 @@ const PhotoCapturePage: React.FC = () => {
         </div>
 
         {/* Controls Card */}
-        <div className="lg:col-span-5 xl:col-span-4 bg-pb-surface border border-pb-border rounded-2xl p-4 sm:p-5 flex flex-col shadow-xs">
+        <div className="lg:col-span-5 xl:col-span-4 bg-[var(--pb-surface)] border-[2px] border-[var(--pb-border-strong)] rounded-[4px] p-5 sm:p-6 flex flex-col shadow-[3px_3px_0px_#000,5px_5px_0px_var(--pb-shadow-solid)]">
           {allDone ? (
             <>
-              <h3 className="text-pb-text font-semibold text-base mb-1">
-                Semua Frame Selesai
+              <h3 className="font-pixel text-[var(--pb-text)] text-base sm:text-lg font-bold mb-2">
+                Semua Frame Selesai!
               </h3>
-              <p className="text-pb-text-muted text-sm mb-6">
-                Foto final akan di-render sesuai template dan disimpan di galeri.
+              <p className="font-retro text-[var(--pb-text-secondary)] text-base sm:text-lg font-bold mb-6">
+                Foto final akan di-render otomatis sesuai template dan disimpan ke galeri.
               </p>
               <Button
                 variant="primary"
                 size="xl"
                 fullWidth
                 onClick={handleComplete}
-                leftIcon={<Check size={20} />}
+                leftIcon={<Check size={24} />}
               >
                 Generate Foto Final
               </Button>
             </>
           ) : phase === 'idle' ? (
             <>
-              <h3 className="text-pb-text font-semibold text-base mb-1">
+              <h3 className="font-pixel text-[var(--pb-text)] text-base sm:text-lg font-bold mb-2">
                 Siap untuk Foto {activeFrameIndex + 1}
               </h3>
-              <p className="text-pb-text-muted text-sm mb-6">
+              <p className="font-retro text-[var(--pb-text-secondary)] text-base sm:text-lg font-bold mb-6">
                 Kamera sudah berada di dalam bingkai. Posisikan subjek sesuai bingkai, lalu tekan
                 tombol untuk memulai hitung mundur.
               </p>
@@ -1081,23 +1245,23 @@ const PhotoCapturePage: React.FC = () => {
                 fullWidth
                 onClick={startCountdown}
                 disabled={!cameraActive}
-                leftIcon={<CameraIcon size={20} />}
+                leftIcon={<CameraIcon size={24} />}
               >
                 Potret
               </Button>
               {!cameraActive && (
-                <p className="text-amber-400 text-xs text-center mt-3">
+                <p className="font-retro text-amber-400 text-base font-bold text-center mt-3">
                   Aktifkan kamera terlebih dahulu.
                 </p>
               )}
             </>
           ) : (
             <>
-              <h3 className="text-pb-text font-semibold text-base mb-6 text-center">
+              <h3 className="font-pixel text-[var(--pb-text)] text-lg sm:text-xl font-bold mb-4 text-center">
                 Hitung Mundur...
               </h3>
-              <p className="text-pb-text-muted text-sm text-center">
-                Siapkan pose!
+              <p className="font-retro text-[#FFB800] text-2xl font-bold text-center animate-bounce">
+                Siapkan pose terbaik Anda!
               </p>
             </>
           )}
@@ -1105,39 +1269,39 @@ const PhotoCapturePage: React.FC = () => {
           <div className="flex-1" />
 
           {/* Status frame + retake */}
-          <div className="mt-6 pt-4 border-t border-pb-border">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-pb-text-secondary text-xs font-medium">Status Frame</p>
+          <div className="mt-6 pt-4 border-t-[2px] border-[var(--pb-border)]">
+            <div className="flex items-center justify-between mb-3">
+              <p className="font-retro text-[var(--pb-text-secondary)] text-base sm:text-lg font-bold">Status Frame</p>
               {completedCount > 0 && !allDone && (
                 <button
                   type="button"
                   onClick={handleRestartSession}
                   disabled={phase === 'countdown' || isCapturing}
-                  className="text-amber-400 hover:text-amber-300 text-xs flex items-center gap-1 transition-colors font-medium"
+                  className="font-retro text-amber-400 hover:text-amber-300 text-sm sm:text-base flex items-center gap-1.5 transition-colors font-bold cursor-pointer"
                 >
-                  <RotateCcw size={12} />
+                  <RotateCcw size={14} />
                   Ulangi dari Awal
                 </button>
               )}
             </div>
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-2.5">
               {Array.from({ length: totalFrames }, (_, i) => {
                 const isActive = i === activeFrameIndex && !allDone
                 const hasPhoto = !!frameImages[i]
                 return (
                   <div
                     key={i}
-                    className="flex items-center justify-between bg-pb-bg border border-pb-border rounded-lg px-3 py-2"
+                    className="flex items-center justify-between bg-[var(--pb-bg)] border-[2px] border-[var(--pb-border-strong)] rounded-[4px] px-3.5 py-2.5 shadow-[1px_1px_0px_var(--pb-shadow-solid)]"
                   >
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2.5">
                       {isActive ? (
-                        <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+                        <span className="w-3 h-3 rounded-full bg-[#00FFCC] animate-pulse border border-black" />
                       ) : hasPhoto ? (
-                        <Check size={14} className="text-green-400" />
+                        <Check size={16} className="text-green-400 stroke-[3]" />
                       ) : (
-                        <span className="w-2 h-2 rounded-full bg-pb-border-light" />
+                        <span className="w-3 h-3 rounded-full bg-[var(--pb-border)] border border-black" />
                       )}
-                      <span className="text-pb-text text-sm">Foto {i + 1}</span>
+                      <span className="font-retro text-[var(--pb-text)] text-base sm:text-lg font-bold">Foto {i + 1}</span>
                     </div>
                     {hasPhoto && (
                       <Button
@@ -1145,7 +1309,7 @@ const PhotoCapturePage: React.FC = () => {
                         size="sm"
                         onClick={() => handleRetakeFrame(i)}
                         disabled={phase === 'countdown' || isCapturing}
-                        leftIcon={<RotateCcw size={13} />}
+                        leftIcon={<RotateCcw size={14} />}
                       >
                         Ulangi
                       </Button>
@@ -1157,15 +1321,15 @@ const PhotoCapturePage: React.FC = () => {
           </div>
 
           {/* Pilihan folder penyimpanan */}
-          <div className="mt-6 pt-4 border-t border-pb-border">
-            <label className="block text-pb-text-secondary text-xs font-medium mb-1.5 flex items-center gap-1.5">
-              <FolderPlus size={13} />
+          <div className="mt-6 pt-4 border-t-[2px] border-[var(--pb-border)]">
+            <label className="block font-retro text-[var(--pb-text-secondary)] text-base sm:text-lg font-bold mb-2 flex items-center gap-2">
+              <FolderPlus size={18} className="text-[#FF5A36]" />
               Simpan Hasil ke Folder
             </label>
             {foldersQuery.isLoading ? (
-              <div className="flex items-center gap-2 bg-pb-bg border border-pb-border rounded-lg px-3 py-2.5">
+              <div className="flex items-center gap-2 bg-[var(--pb-bg)] border-[2px] border-[var(--pb-border-strong)] rounded-[4px] px-4 py-3">
                 <Spinner size="sm" className="text-pb-text" />
-                <span className="text-pb-text-muted text-xs">Memuat folder...</span>
+                <span className="font-retro text-[var(--pb-text-muted)] text-base">Memuat folder...</span>
               </div>
             ) : (
               <select
@@ -1174,9 +1338,9 @@ const PhotoCapturePage: React.FC = () => {
                   handleChangeFolder(e.target.value === '' ? null : Number(e.target.value))
                 }
                 disabled={isSavingFolder || allDone}
-                className="w-full bg-pb-bg border border-pb-border rounded-lg px-3 py-2.5
-                  text-pb-text text-sm focus:outline-none focus:ring-1 focus:border-pb-border-strong focus:ring-white/10
-                  disabled:opacity-50 [&>option]:bg-pb-bg"
+                className="w-full bg-[var(--pb-bg)] border-[2px] border-[var(--pb-border-strong)] rounded-[4px] px-4 py-2.5
+                  font-retro text-base sm:text-lg font-bold text-[var(--pb-text)] focus:outline-none focus:border-[#FFB800] shadow-[2px_2px_0px_var(--pb-shadow-solid)]
+                  disabled:opacity-50 [&>option]:bg-[var(--pb-bg)]"
               >
                 <option value="">Galeri (Tanpa Folder)</option>
                 {(foldersQuery.data ?? []).map((folder) => (
@@ -1187,28 +1351,20 @@ const PhotoCapturePage: React.FC = () => {
               </select>
             )}
             {folderName && (
-              <p className="text-green-400 text-xs mt-1.5">
+              <p className="font-retro text-green-400 text-sm sm:text-base font-bold mt-2">
                 Hasil foto akan disimpan ke: {folderName}
               </p>
             )}
           </div>
-
-          {/* Template info */}
-          {template && (
-            <div className="mt-6 pt-4 border-t border-pb-border">
-              <p className="text-pb-text-muted text-xs mb-1">Template</p>
-              <p className="text-pb-text text-sm font-medium truncate">{template.name}</p>
-            </div>
-          )}
         </div>
       </div>
 
       <Button
         variant="ghost"
         size="md"
-        className="mt-4"
+        className="mt-6"
         onClick={() => navigate('/photo')}
-        leftIcon={<ArrowLeft size={16} />}
+        leftIcon={<ArrowLeft size={18} />}
       >
         Kembali
       </Button>

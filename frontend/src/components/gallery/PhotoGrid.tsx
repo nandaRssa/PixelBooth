@@ -1,5 +1,5 @@
 import React from 'react'
-import { CheckSquare, FolderInput, ImageIcon, Square, Trash2, X } from 'lucide-react'
+import { CheckSquare, FolderInput, ImageIcon, Printer, Square, Trash2, X } from 'lucide-react'
 import type { Photo } from '@/types'
 import PhotoCard from './PhotoCard'
 import { Button } from '@/components/ui/Button'
@@ -26,6 +26,7 @@ interface PhotoGridProps {
   onSelectAll: () => void
   onBulkMove: () => void
   onBulkDelete: () => void
+  onBulkPrint?: () => void
   isBulkActionPending: boolean
 }
 
@@ -45,11 +46,12 @@ const PhotoGrid: React.FC<PhotoGridProps> = ({
   onSelectAll,
   onBulkMove,
   onBulkDelete,
+  onBulkPrint,
   isBulkActionPending,
 }) => {
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-20">
+      <div className="flex items-center justify-center min-h-[60vh]">
         <Spinner size="lg" className="text-pb-text" />
       </div>
     )
@@ -100,6 +102,18 @@ const PhotoGrid: React.FC<PhotoGridProps> = ({
 
             {/* Baris 2: Tombol Aksi Massal */}
             <div className="flex items-center gap-2">
+              {onBulkPrint && (
+                <Button
+                  variant="primary"
+                  size="sm"
+                  className="flex-1 sm:flex-initial text-xs !bg-[#FFB800] hover:!bg-[#FFC933] !text-black !border-black font-bold shadow-[2px_2px_0px_#000]"
+                  onClick={onBulkPrint}
+                  disabled={selectedIds.size === 0 || isBulkActionPending}
+                  leftIcon={<Printer size={14} className="stroke-[2.5]" />}
+                >
+                  Print ({selectedIds.size})
+                </Button>
+              )}
               <Button
                 variant="secondary"
                 size="sm"
@@ -147,7 +161,7 @@ const PhotoGrid: React.FC<PhotoGridProps> = ({
         )}
       </div>
 
-      {/* Grid: 3 kolom di mobile (iPhone 14 dsb), 3-5 kolom di tablet & desktop */}
+      {/* Grid: 3-5 kolom konsisten dengan template dan photo */}
       <div className="grid grid-cols-3 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 2xl:grid-cols-5 gap-2 sm:gap-4 lg:gap-5">
         {photos.map((photo) => (
           <PhotoCard
