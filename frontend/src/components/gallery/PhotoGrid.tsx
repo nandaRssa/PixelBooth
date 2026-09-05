@@ -1,5 +1,5 @@
 import React from 'react'
-import { CheckSquare, FolderInput, ImageIcon, Printer, Square, Trash2, X } from 'lucide-react'
+import { CheckSquare, Download, FolderInput, ImageIcon, Printer, Square, Trash2, X } from 'lucide-react'
 import type { Photo } from '@/types'
 import PhotoCard from './PhotoCard'
 import { Button } from '@/components/ui/Button'
@@ -27,7 +27,9 @@ interface PhotoGridProps {
   onBulkMove: () => void
   onBulkDelete: () => void
   onBulkPrint?: () => void
+  onBulkDownload?: () => void
   isBulkActionPending: boolean
+  isBulkDownloading?: boolean
 }
 
 const PhotoGrid: React.FC<PhotoGridProps> = ({
@@ -47,7 +49,9 @@ const PhotoGrid: React.FC<PhotoGridProps> = ({
   onBulkMove,
   onBulkDelete,
   onBulkPrint,
+  onBulkDownload,
   isBulkActionPending,
+  isBulkDownloading = false,
 }) => {
   if (isLoading) {
     return (
@@ -101,14 +105,26 @@ const PhotoGrid: React.FC<PhotoGridProps> = ({
             </div>
 
             {/* Baris 2: Tombol Aksi Massal */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+              {onBulkDownload && (
+                <Button
+                  variant="primary"
+                  size="sm"
+                  className="flex-1 sm:flex-initial text-xs !bg-[#00FFCC] hover:!bg-[#33FFD6] !text-black !border-black font-bold shadow-[2px_2px_0px_#000]"
+                  onClick={onBulkDownload}
+                  disabled={selectedIds.size === 0 || isBulkActionPending || isBulkDownloading}
+                  leftIcon={<Download size={14} className="stroke-[2.5]" />}
+                >
+                  {isBulkDownloading ? 'Mengunduh...' : `Unduh (${selectedIds.size})`}
+                </Button>
+              )}
               {onBulkPrint && (
                 <Button
                   variant="primary"
                   size="sm"
                   className="flex-1 sm:flex-initial text-xs !bg-[#FFB800] hover:!bg-[#FFC933] !text-black !border-black font-bold shadow-[2px_2px_0px_#000]"
                   onClick={onBulkPrint}
-                  disabled={selectedIds.size === 0 || isBulkActionPending}
+                  disabled={selectedIds.size === 0 || isBulkActionPending || isBulkDownloading}
                   leftIcon={<Printer size={14} className="stroke-[2.5]" />}
                 >
                   Print ({selectedIds.size})
@@ -119,7 +135,7 @@ const PhotoGrid: React.FC<PhotoGridProps> = ({
                 size="sm"
                 className="flex-1 sm:flex-initial text-xs"
                 onClick={onBulkMove}
-                disabled={selectedIds.size === 0 || isBulkActionPending}
+                disabled={selectedIds.size === 0 || isBulkActionPending || isBulkDownloading}
                 leftIcon={<FolderInput size={14} />}
               >
                 Pindahkan
@@ -129,7 +145,7 @@ const PhotoGrid: React.FC<PhotoGridProps> = ({
                 size="sm"
                 className="flex-1 sm:flex-initial text-xs"
                 onClick={onBulkDelete}
-                disabled={selectedIds.size === 0 || isBulkActionPending}
+                disabled={selectedIds.size === 0 || isBulkActionPending || isBulkDownloading}
                 leftIcon={<Trash2 size={14} />}
               >
                 Hapus {selectedIds.size > 0 ? `(${selectedIds.size})` : ''}
@@ -138,7 +154,7 @@ const PhotoGrid: React.FC<PhotoGridProps> = ({
                 type="button"
                 onClick={() => setSelectionMode(false)}
                 className="hidden sm:flex w-8 h-8 rounded-xl bg-pb-elevated border border-pb-border
-                  text-pb-text-muted hover:text-pb-text hover:bg-pb-border-light transition-colors items-center justify-center shrink-0"
+                  text-pb-text-muted hover:text-pb-text hover:bg-pb-border-light transition-colors items-center justify-center shrink-0 cursor-pointer"
                 title="Keluar dari mode pilih"
               >
                 <X size={15} />
