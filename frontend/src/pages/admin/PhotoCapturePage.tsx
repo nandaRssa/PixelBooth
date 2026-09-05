@@ -261,9 +261,26 @@ const PhotoCapturePage: React.FC = () => {
     }, 1000)
   }
 
-  // ===== Remote Bluetooth Shutter Listener =====
+  const cancelCountdown = () => {
+    if (countdownRef.current) {
+      clearInterval(countdownRef.current)
+      countdownRef.current = null
+    }
+    captureTriggeredRef.current = false
+    setCountdown(null)
+    setPhase('idle')
+    toast.info('Hitung mundur dibatalkan.')
+  }
+
+  // ===== Remote Bluetooth Shutter & Shortcut Listener =====
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.code === 'Escape' && phase === 'countdown') {
+        e.preventDefault()
+        cancelCountdown()
+        return
+      }
+
       if (
         (e.code === 'Space' ||
           e.code === 'Enter' ||
@@ -432,8 +449,16 @@ const PhotoCapturePage: React.FC = () => {
     try {
       completingRef.current = false
       delete localCapturesRef.current[frameIndex + 1]
-      const updated = await sessionApi.retake(session.id, frameIndex + 1)
-      setSession(updated)
+      // Optimistic update frame & captures
+      setSession((prev) =>
+        prev
+          ? {
+              ...prev,
+              current_frame: frameIndex + 1,
+              captures: (prev.captures || []).filter((c) => c.frame_number !== frameIndex + 1),
+            }
+          : prev
+      )
       setAllDone(false)
       setResultPhoto(null)
       setShowRetakeOptions(false)
@@ -442,6 +467,9 @@ const PhotoCapturePage: React.FC = () => {
         startCamera()
       }
       toast.info(`Kamera kembali ke Foto ${frameIndex + 1}.`)
+
+      const updated = await sessionApi.retake(session.id, frameIndex + 1)
+      setSession((prev) => (prev ? { ...prev, ...updated } : updated))
     } catch {
       toast.error('Gagal memulai pengambilan ulang.')
     }
@@ -453,8 +481,15 @@ const PhotoCapturePage: React.FC = () => {
     try {
       completingRef.current = false
       localCapturesRef.current = {}
-      const updated = await sessionApi.restart(session.id)
-      setSession(updated)
+      setSession((prev) =>
+        prev
+          ? {
+              ...prev,
+              current_frame: 1,
+              captures: [],
+            }
+          : prev
+      )
       setAllDone(false)
       setResultPhoto(null)
       setShowRetakeOptions(false)
@@ -463,6 +498,9 @@ const PhotoCapturePage: React.FC = () => {
         startCamera()
       }
       toast.info('Sesi diulangi dari awal (Foto 1).')
+
+      const updated = await sessionApi.restart(session.id)
+      setSession((prev) => (prev ? { ...prev, ...updated } : updated))
     } catch {
       toast.error('Gagal mengulangi sesi dari awal.')
     }
@@ -1052,9 +1090,6 @@ const PhotoCapturePage: React.FC = () => {
           ) : (
             <CameraStatusBadge status="disconnected" />
           )}
-          <Button variant="secondary" size="md" onClick={handleCancel} leftIcon={<X size={18} />}>
-            Batalkan Sesi
-          </Button>
         </div>
       </div>
 
@@ -1183,7 +1218,7 @@ const PhotoCapturePage: React.FC = () => {
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
-                  className="absolute z-30 flex items-center justify-center pointer-events-none"
+                  className="absolute z-30 flex flex-col items-center justify-center pointer-events-none"
                   style={slotPosition(activeSlot)}
                 >
                   <motion.div
@@ -1232,12 +1267,16 @@ const PhotoCapturePage: React.FC = () => {
             </>
           ) : phase === 'idle' ? (
             <>
-              <h3 className="font-pixel text-[var(--pb-text)] text-base sm:text-lg font-bold mb-2">
-                Siap untuk Foto {activeFrameIndex + 1}
-              </h3>
-              <p className="font-retro text-[var(--pb-text-secondary)] text-base sm:text-lg font-bold mb-6">
-                Kamera sudah berada di dalam bingkai. Posisikan subjek sesuai bingkai, lalu tekan
-                tombol untuk memulai hitung mundur.
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="font-pixel text-[var(--pb-text)] text-base sm:text-lg font-bold">
+                  Siap untuk Foto {activeFrameIndex + 1}
+                </h3>
+                <span className="font-retro text-xs sm:text-sm px-2.5 py-0.5 rounded-full bg-[#00FFCC]/15 border border-[#00FFCC]/40 text-[#00FFCC] font-bold">
+                  Frame {activeFrameIndex + 1} / {totalFrames}
+                </span>
+              </div>
+              <p className="font-retro text-[var(--pb-text-secondary)] text-base sm:text-lg font-bold mb-4">
+                Posisikan subjek sesuai bingkai yang menyala, lalu tekan tombol potret untuk memulai hitung mundur.
               </p>
               <Button
                 variant="primary"
@@ -1246,9 +1285,58 @@ const PhotoCapturePage: React.FC = () => {
                 onClick={startCountdown}
                 disabled={!cameraActive}
                 leftIcon={<CameraIcon size={24} />}
+                className="mb-4"
               >
-                Potret
+                Potret Foto {activeFrameIndex + 1}
               </Button>
+
+              {/* Panel Minimalis Ulangi Foto (Hanya Ulangi dari Awal & Foto 1..N) */}
+              {completedCount > 0 && (
+                <div className="border-[2px] border-amber-500/60 bg-amber-500/10 rounded-[4px] p-3 mb-3 shadow-[2px_2px_0px_#000]">
+                  <p className="font-pixel text-amber-400 text-xs font-bold flex items-center gap-1.5 uppercase tracking-wider mb-2.5">
+                    <RotateCcw size={13} className="stroke-[2.5]" />
+                    Ulangi Foto:
+                  </p>
+
+                  {/* 1. Ulangi dari Awal */}
+                  <button
+                    type="button"
+                    onClick={handleRestartSession}
+                    className="w-full flex items-center justify-center gap-2 py-2 px-3 mb-2.5 rounded-[4px]
+                      bg-amber-500 hover:bg-amber-400 active:translate-x-[1px] active:translate-y-[1px] text-black border-[2px] border-black
+                      font-retro text-sm font-bold uppercase transition-all shadow-[2px_2px_0px_#000] cursor-pointer"
+                  >
+                    <RotateCcw size={15} className="stroke-[2.5]" />
+                    Ulangi dari Awal
+                  </button>
+
+                  {/* 2. Pilihan Ulangi Foto (Hanya foto yang sudah berhasil diambil) */}
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {Array.from({ length: totalFrames }, (_, i) => {
+                      if (!frameImages[i]) return null
+                      const isCurrent = i === activeFrameIndex
+                      return (
+                        <button
+                          key={i}
+                          type="button"
+                          onClick={() => handleRetakeFrame(i)}
+                          disabled={isCurrent}
+                          className={`flex-1 min-w-[70px] flex items-center justify-center gap-1 py-1.5 px-2 rounded-[4px] border-[2px] font-retro text-xs sm:text-sm font-bold transition-all shadow-[1px_1px_0px_#000] cursor-pointer ${
+                            isCurrent
+                              ? 'bg-[#00FFCC]/20 text-[#00FFCC] border-[#00FFCC] cursor-default opacity-80'
+                              : 'bg-[var(--pb-surface)] hover:bg-amber-500 hover:text-black text-amber-300 border-amber-400 active:translate-x-[1px] active:translate-y-[1px]'
+                          }`}
+                          title={isCurrent ? `Foto ${i + 1} sedang aktif` : `Ulangi Foto ${i + 1}`}
+                        >
+                          <RotateCcw size={12} />
+                          <span>Foto {i + 1}</span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+
               {!cameraActive && (
                 <p className="font-retro text-amber-400 text-base font-bold text-center mt-3">
                   Aktifkan kamera terlebih dahulu.
@@ -1257,68 +1345,16 @@ const PhotoCapturePage: React.FC = () => {
             </>
           ) : (
             <>
-              <h3 className="font-pixel text-[var(--pb-text)] text-lg sm:text-xl font-bold mb-4 text-center">
-                Hitung Mundur...
+              <h3 className="font-pixel text-[var(--pb-text)] text-lg sm:text-xl font-bold mb-3 text-center">
+                Hitung Mundur Foto {activeFrameIndex + 1}...
               </h3>
-              <p className="font-retro text-[#FFB800] text-2xl font-bold text-center animate-bounce">
+              <p className="font-retro text-[#FFB800] text-2xl font-bold text-center animate-bounce mb-2">
                 Siapkan pose terbaik Anda!
               </p>
             </>
           )}
 
           <div className="flex-1" />
-
-          {/* Status frame + retake */}
-          <div className="mt-6 pt-4 border-t-[2px] border-[var(--pb-border)]">
-            <div className="flex items-center justify-between mb-3">
-              <p className="font-retro text-[var(--pb-text-secondary)] text-base sm:text-lg font-bold">Status Frame</p>
-              {completedCount > 0 && !allDone && (
-                <button
-                  type="button"
-                  onClick={handleRestartSession}
-                  disabled={phase === 'countdown' || isCapturing}
-                  className="font-retro text-amber-400 hover:text-amber-300 text-sm sm:text-base flex items-center gap-1.5 transition-colors font-bold cursor-pointer"
-                >
-                  <RotateCcw size={14} />
-                  Ulangi dari Awal
-                </button>
-              )}
-            </div>
-            <div className="flex flex-col gap-2.5">
-              {Array.from({ length: totalFrames }, (_, i) => {
-                const isActive = i === activeFrameIndex && !allDone
-                const hasPhoto = !!frameImages[i]
-                return (
-                  <div
-                    key={i}
-                    className="flex items-center justify-between bg-[var(--pb-bg)] border-[2px] border-[var(--pb-border-strong)] rounded-[4px] px-3.5 py-2.5 shadow-[1px_1px_0px_var(--pb-shadow-solid)]"
-                  >
-                    <div className="flex items-center gap-2.5">
-                      {isActive ? (
-                        <span className="w-3 h-3 rounded-full bg-[#00FFCC] animate-pulse border border-black" />
-                      ) : hasPhoto ? (
-                        <Check size={16} className="text-green-400 stroke-[3]" />
-                      ) : (
-                        <span className="w-3 h-3 rounded-full bg-[var(--pb-border)] border border-black" />
-                      )}
-                      <span className="font-retro text-[var(--pb-text)] text-base sm:text-lg font-bold">Foto {i + 1}</span>
-                    </div>
-                    {hasPhoto && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleRetakeFrame(i)}
-                        disabled={phase === 'countdown' || isCapturing}
-                        leftIcon={<RotateCcw size={14} />}
-                      >
-                        Ulangi
-                      </Button>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-          </div>
 
           {/* Pilihan folder penyimpanan */}
           <div className="mt-6 pt-4 border-t-[2px] border-[var(--pb-border)]">

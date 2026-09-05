@@ -137,7 +137,7 @@ export async function printPhotos(
           <style>
             @page {
               size: ${pageCssSize};
-              margin: 0mm;
+              margin: 0 !important;
             }
             *, *::before, *::after {
               box-sizing: border-box;
@@ -147,23 +147,25 @@ export async function printPhotos(
             html, body {
               margin: 0 !important;
               padding: 0 !important;
-              width: 100%;
-              height: 100%;
+              width: 100% !important;
               background: #ffffff !important;
               -webkit-print-color-adjust: exact !important;
               print-color-adjust: exact !important;
               color-adjust: exact !important;
             }
             .print-page {
-              width: 100vw;
-              height: 100vh;
+              width: 100%;
+              min-height: 100%;
               page-break-inside: avoid;
               break-inside: avoid;
               page-break-after: always;
               break-after: page;
               display: flex;
+              flex-direction: column;
               align-items: center;
-              justify-content: center;
+              justify-content: flex-start;
+              padding-top: 0 !important;
+              margin-top: 0 !important;
               overflow: hidden;
               background: #ffffff;
             }
@@ -173,45 +175,57 @@ export async function printPhotos(
             }
             .print-img {
               display: block;
+              margin-top: 0 !important;
+              margin-left: auto;
+              margin-right: auto;
               image-rendering: -webkit-optimize-contrast;
               image-rendering: high-quality;
             }
             .print-img.cover {
               width: 100%;
-              height: 100%;
+              height: auto;
+              max-height: 100vh;
               object-fit: cover;
+              object-position: top center;
             }
             .print-img.contain {
               max-width: 100%;
-              max-height: 100%;
+              max-height: 100vh;
               width: auto;
               height: auto;
               object-fit: contain;
+              object-position: top center;
             }
             /* Layout 2-Up Side by Side untuk Strip 2x6 di Kertas 4R */
             .two-up-page {
-              display: flex;
-              flex-direction: row;
-              width: 100vw;
-              height: 100vh;
+              display: flex !important;
+              flex-direction: row !important;
+              align-items: flex-start !important;
+              justify-content: center !important;
+              width: 100%;
+              min-height: 100%;
               padding: 0;
+              margin: 0 auto;
             }
             .strip-item {
               flex: 1;
-              height: 100%;
+              height: auto;
+              max-height: 100vh;
               overflow: hidden;
               display: flex;
-              align-items: center;
+              align-items: flex-start;
               justify-content: center;
             }
             .strip-item .print-img {
               width: 100%;
-              height: 100%;
+              height: auto;
+              max-height: 100vh;
               object-fit: ${fitMode === 'contain' ? 'contain' : 'cover'};
+              object-position: top center;
             }
             .strip-divider {
               width: 1px;
-              height: 100%;
+              height: 152mm;
               background: transparent;
               border-right: 1px dashed rgba(0, 0, 0, 0.15);
             }

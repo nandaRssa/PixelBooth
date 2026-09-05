@@ -173,18 +173,18 @@ export const PrintModal: React.FC<PrintModalProps> = ({
                   <div className="w-full relative aspect-[3/4] bg-black/60 border-[3px] border-black rounded-[4px] shadow-[4px_4px_0px_var(--pb-shadow-solid)] overflow-hidden flex items-center justify-center">
                     {twoUpStrip ? (
                       <div className="w-full h-full flex flex-row p-1 gap-1">
-                        <div className="flex-1 h-full overflow-hidden flex items-center justify-center bg-zinc-900 border-r border-dashed border-zinc-700">
+                        <div className="flex-1 h-full overflow-hidden flex items-start justify-center bg-zinc-900 border-r border-dashed border-zinc-700">
                           <img
                             src={getStorageUrl(currentPhoto.url)}
                             alt="Strip 1"
-                            className={`w-full h-full ${fitMode === 'cover' ? 'object-cover' : 'object-contain'}`}
+                            className={`w-full h-full ${fitMode === 'cover' ? 'object-cover object-top' : 'object-contain object-top'}`}
                           />
                         </div>
-                        <div className="flex-1 h-full overflow-hidden flex items-center justify-center bg-zinc-900">
+                        <div className="flex-1 h-full overflow-hidden flex items-start justify-center bg-zinc-900">
                           <img
                             src={getStorageUrl(currentPhoto.url)}
                             alt="Strip 2"
-                            className={`w-full h-full ${fitMode === 'cover' ? 'object-cover' : 'object-contain'}`}
+                            className={`w-full h-full ${fitMode === 'cover' ? 'object-cover object-top' : 'object-contain object-top'}`}
                           />
                         </div>
                       </div>
@@ -192,7 +192,7 @@ export const PrintModal: React.FC<PrintModalProps> = ({
                       <img
                         src={getStorageUrl(currentPhoto.url)}
                         alt={currentPhoto.title || 'Preview Foto'}
-                        className={`w-full h-full ${fitMode === 'cover' ? 'object-cover' : 'object-contain'}`}
+                        className={`w-full h-full ${fitMode === 'cover' ? 'object-cover object-top' : 'object-contain object-top'}`}
                       />
                     )}
 

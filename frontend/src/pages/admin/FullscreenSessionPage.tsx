@@ -223,9 +223,26 @@ const FullscreenSessionPage: React.FC = () => {
     }, 1000)
   }
 
-  // ===== Remote Bluetooth Shutter Listener =====
+  const cancelCountdown = () => {
+    if (countdownRef.current) {
+      clearInterval(countdownRef.current)
+      countdownRef.current = null
+    }
+    captureTriggeredRef.current = false
+    setCountdown(null)
+    setPhase('idle')
+    toast.info('Hitung mundur dibatalkan.')
+  }
+
+  // ===== Remote Bluetooth Shutter & Shortcut Listener =====
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.code === 'Escape' && phase === 'countdown') {
+        e.preventDefault()
+        cancelCountdown()
+        return
+      }
+
       if (
         (e.code === 'Space' ||
           e.code === 'Enter' ||
@@ -521,17 +538,29 @@ const FullscreenSessionPage: React.FC = () => {
     if (!session || phase === 'countdown' || isCapturing || isRetaking) return
     setIsRetaking(true)
     try {
+      completingRef.current = false
       delete localCapturesRef.current[frameIndex + 1]
-      const updated = await sessionApi.retake(session.id, frameIndex + 1)
-      setSession(updated)
+      // Optimistic update
+      setSession((prev) =>
+        prev
+          ? {
+              ...prev,
+              current_frame: frameIndex + 1,
+              captures: (prev.captures || []).filter((c) => c.frame_number !== frameIndex + 1),
+            }
+          : prev
+      )
       setAllDone(false)
       setResultPhoto(null)
-      completingRef.current = false
       setShowRetakePanel(false)
       setPhase('idle')
       if (!cameraActive) {
         startCamera()
       }
+      toast.info(`Kamera kembali ke Foto ${frameIndex + 1}.`)
+
+      const updated = await sessionApi.retake(session.id, frameIndex + 1)
+      setSession((prev) => (prev ? { ...prev, ...updated } : updated))
     } catch {
       toast.error('Gagal memulai pengambilan ulang.')
     } finally {
@@ -544,18 +573,28 @@ const FullscreenSessionPage: React.FC = () => {
     if (!session || phase === 'countdown' || isCapturing || isRetaking) return
     setIsRetaking(true)
     try {
+      completingRef.current = false
       localCapturesRef.current = {}
-      const updated = await sessionApi.restart(session.id)
-      setSession(updated)
+      setSession((prev) =>
+        prev
+          ? {
+              ...prev,
+              current_frame: 1,
+              captures: [],
+            }
+          : prev
+      )
       setAllDone(false)
       setResultPhoto(null)
-      completingRef.current = false
       setShowRetakePanel(false)
       setPhase('idle')
       if (!cameraActive) {
         startCamera()
       }
       toast.info('Sesi diulangi dari awal (Foto 1).')
+
+      const updated = await sessionApi.restart(session.id)
+      setSession((prev) => (prev ? { ...prev, ...updated } : updated))
     } catch {
       toast.error('Gagal mengulangi sesi dari awal.')
     } finally {
@@ -723,7 +762,7 @@ const FullscreenSessionPage: React.FC = () => {
 
           {/* Countdown besar di tengah (z-30 agar selalu tampil di atas layer desain) */}
           {phase === 'countdown' && countdown !== null && countdown > 0 && (
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-30">
+            <div className="absolute inset-0 flex flex-col items-center justify-center z-30 pointer-events-none">
               <div className="w-28 h-28 sm:w-36 sm:h-36 rounded-full bg-black/75 backdrop-blur-sm border-2 border-white flex items-center justify-center shadow-[0_0_40px_rgba(0,0,0,0.8)]">
                 <span
                   className="text-white font-black leading-none drop-shadow-[0_4px_24px_rgba(0,0,0,0.9)]"
@@ -766,134 +805,145 @@ const FullscreenSessionPage: React.FC = () => {
 
       {/* ===== Retake panel minimalis (muncul saat ada frame selesai & belum allDone) ===== */}
       {completedCount > 0 && !allDone && (
-        <div className="shrink-0 flex items-center justify-center gap-2 px-4 pb-1">
-          {/* Toggle button */}
-          <button
-            type="button"
-            onClick={() => setShowRetakePanel((v) => !v)}
-            aria-label="Ulangi foto"
-            title="Ulangi foto"
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
-              showRetakePanel
-                ? 'bg-white/20 text-white'
-                : 'bg-white/10 hover:bg-white/15 text-white/70'
-            }`}
-          >
-            <RotateCcw size={12} />
-            Ulangi
-          </button>
-
-          {/* Chip tiap frame yang sudah difoto + Ulangi dari Awal */}
+        <div className="shrink-0 relative z-40 flex flex-col items-center justify-center gap-2 px-4 pb-1">
+          {/* Panel Minimalis Ulangi Foto (Hanya Ulangi dari Awal & Foto 1..N) */}
           {showRetakePanel && (
-            <>
+            <div className="flex flex-col items-center gap-2 p-3 rounded-xl bg-black/95 backdrop-blur-md border border-amber-500/60 shadow-[0_0_20px_rgba(0,0,0,0.8)] animate-in fade-in zoom-in-95 max-w-sm w-full">
+              <p className="font-pixel text-amber-400 text-xs font-bold uppercase tracking-wider self-start">
+                Ulangi Foto:
+              </p>
+
+              {/* 1. Ulangi dari Awal */}
               <button
                 type="button"
                 onClick={handleRestartSession}
                 disabled={isRetaking || phase === 'countdown' || isCapturing}
-                className="flex items-center gap-1 px-3 py-1.5 rounded-full
-                  bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30
-                  text-xs font-semibold transition-colors disabled:opacity-40"
+                className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-[4px]
+                  bg-amber-500 hover:bg-amber-400 text-black border border-black
+                  font-retro text-sm font-bold uppercase transition-all shadow-[2px_2px_0px_#000] cursor-pointer disabled:opacity-40"
               >
-                {isRetaking ? <RotateCcw size={12} className="animate-spin" /> : <RotateCcw size={12} />}
-                Semua
+                <RotateCcw size={15} className="stroke-[2.5]" />
+                Ulangi dari Awal
               </button>
 
-              {Array.from({ length: totalFrames }, (_, i) => {
-                const hasPhoto = !!frameImages[i]
-                if (!hasPhoto) return null
-                const isBusy = isRetaking || phase === 'countdown' || isCapturing
-                return (
-                  <button
-                    key={i}
-                    type="button"
-                    onClick={() => handleRetakeFrame(i)}
-                    disabled={isBusy}
-                    aria-label={`Ulangi foto ${i + 1}`}
-                    title={`Ulangi foto ${i + 1}`}
-                    className="flex items-center justify-center w-9 h-9 rounded-full
-                      bg-white/15 hover:bg-amber-400/30 active:bg-amber-400/50
-                      text-white text-xs font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                  >
-                    {isRetaking ? <RotateCcw size={14} className="animate-spin" /> : i + 1}
-                  </button>
-                )
-              })}
-            </>
+              {/* 2. Pilihan Ulangi Foto (Hanya foto yang sudah berhasil diambil) */}
+              <div className="flex items-center gap-1.5 flex-wrap w-full">
+                {Array.from({ length: totalFrames }, (_, i) => {
+                  if (!frameImages[i]) return null
+                  const isCurrent = i === activeFrameIndex
+                  return (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => handleRetakeFrame(i)}
+                      disabled={isRetaking || phase === 'countdown' || isCapturing || isCurrent}
+                      className={`flex-1 min-w-[65px] flex items-center justify-center gap-1 py-1.5 px-2 rounded-[4px] border-[2px] font-retro text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+                        isCurrent
+                          ? 'bg-[#00FFCC]/20 text-[#00FFCC] border-[#00FFCC] cursor-default opacity-80'
+                          : 'bg-white/10 hover:bg-amber-500 hover:text-black text-amber-300 border-amber-400'
+                      }`}
+                    >
+                      <RotateCcw size={12} />
+                      <span>Foto {i + 1}</span>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
           )}
         </div>
       )}
 
       {/* ===== Indikator progres minimal ===== */}
       {!allDone && (
-        <div className="shrink-0 flex justify-center pb-1 pointer-events-none">
+        <div className="shrink-0 relative z-30 flex justify-center pb-1 pointer-events-none">
           <span className="px-3 py-1 rounded-full bg-white/10 backdrop-blur-sm text-white/90 text-xs font-medium tracking-wide">
-            {completedCount} / {totalFrames}
+            Foto {activeFrameIndex + 1} / {totalFrames} (Selesai {completedCount})
           </span>
         </div>
       )}
 
-      {/* ===== Kontrol minimalis (touch friendly) ===== */}
-      <div
-        className="shrink-0 flex items-center justify-center gap-6 sm:gap-10 px-6 pt-2"
-        style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}
-      >
-        {/* Exit */}
-        <button
-          type="button"
-          onClick={handleExit}
-          aria-label="Keluar sesi"
-          title="Keluar sesi"
-          className="flex items-center justify-center w-14 h-14 rounded-full
-            bg-white/10 active:bg-white/25 hover:bg-white/20 text-white transition-colors"
+      {/* ===== Kontrol minimalis saat sesi berlangsung (touch friendly) ===== */}
+      {!allDone && (
+        <div
+          className="shrink-0 relative z-40 flex items-center justify-center gap-5 sm:gap-8 px-6 pt-2"
+          style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}
         >
-          <X size={26} />
-        </button>
-
-        {/* Shutter */}
-        <button
-          type="button"
-          onClick={startCountdown}
-          disabled={!cameraActive || allDone || phase === 'countdown' || isCapturing}
-          aria-label="Ambil foto"
-          className={`relative w-20 h-20 rounded-full flex items-center justify-center transition-transform ${
-            cameraActive && !allDone
-              ? 'active:scale-95'
-              : 'opacity-40 cursor-not-allowed'
-          }`}
-        >
-          <span className="absolute inset-0 rounded-full border-4 border-white" />
-          <span className="w-14 h-14 rounded-full bg-white" />
-        </button>
-
-        {/* Folder — icon + native select overlay (ramah touchscreen) */}
-        <div className="relative">
-          <div
+          {/* Exit */}
+          <button
+            type="button"
+            onClick={handleExit}
+            aria-label="Keluar sesi"
+            title="Keluar sesi"
             className="flex items-center justify-center w-14 h-14 rounded-full
-              bg-white/10 text-white pointer-events-none"
-            aria-hidden
+              bg-white/10 active:bg-white/25 hover:bg-white/20 text-white transition-colors cursor-pointer"
           >
-            <FolderOpen size={24} />
-          </div>
-          <select
-            value={session.folder_id ?? ''}
-            onChange={(e) => handleChangeFolder(e.target.value === '' ? null : Number(e.target.value))}
-            disabled={false}
-            aria-label="Pilih folder penyimpanan"
-            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer [&>option]:bg-neutral-900 [&>option]:text-white"
-          >
-            <option value="" className="bg-neutral-900 text-white">Galeri (Tanpa Folder)</option>
-            {(foldersQuery.data ?? []).map((f) => (
-              <option key={f.id} value={f.id} className="bg-neutral-900 text-white">
-                {f.name}
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
+            <X size={26} />
+          </button>
 
-      {/* ===== Overlay selesai ===== */}
+          {/* Shutter */}
+          <button
+            type="button"
+            onClick={startCountdown}
+            disabled={!cameraActive || allDone || phase === 'countdown' || isCapturing}
+            aria-label="Ambil foto"
+            className={`relative w-20 h-20 rounded-full flex items-center justify-center transition-transform cursor-pointer ${
+              cameraActive && !allDone
+                ? 'active:scale-95'
+                : 'opacity-40 cursor-not-allowed'
+            }`}
+          >
+            <span className="absolute inset-0 rounded-full border-4 border-white" />
+            <span className="w-14 h-14 rounded-full bg-white" />
+          </button>
+
+          {/* Retake Button (Saat ada foto yang sudah diambil) */}
+          {completedCount > 0 && !allDone && (
+            <button
+              type="button"
+              onClick={() => setShowRetakePanel((v) => !v)}
+              aria-label="Ulangi foto"
+              title="Opsi ulangi foto"
+              className={`flex items-center justify-center w-14 h-14 rounded-full transition-all border-2 cursor-pointer ${
+                showRetakePanel
+                  ? 'bg-amber-500 border-amber-400 text-black shadow-[0_0_15px_rgba(245,158,11,0.6)]'
+                  : 'bg-amber-500/20 hover:bg-amber-500/30 border-amber-500/50 text-amber-300'
+              }`}
+            >
+              <RotateCcw size={22} className={isRetaking ? 'animate-spin' : ''} />
+            </button>
+          )}
+
+          {/* Folder — icon + native select overlay (ramah touchscreen) */}
+          <div className="relative">
+            <div
+              className="flex items-center justify-center w-14 h-14 rounded-full
+                bg-white/10 text-white pointer-events-none"
+              aria-hidden
+            >
+              <FolderOpen size={24} />
+            </div>
+            <select
+              value={session.folder_id ?? ''}
+              onChange={(e) => handleChangeFolder(e.target.value === '' ? null : Number(e.target.value))}
+              disabled={false}
+              aria-label="Pilih folder penyimpanan"
+              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer [&>option]:bg-neutral-900 [&>option]:text-white"
+            >
+              <option value="" className="bg-neutral-900 text-white">Galeri (Tanpa Folder)</option>
+              {(foldersQuery.data ?? []).map((f) => (
+                <option key={f.id} value={f.id} className="bg-neutral-900 text-white">
+                  {f.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+      )}
+
+      {/* ===== Overlay selesai (menggantikan tombol sesi foto dengan 6 tombol aksi) ===== */}
       {allDone && (
-        <div className="absolute inset-0 z-20 bg-black/90 flex flex-col items-center justify-center gap-6 p-6 overflow-y-auto">
+        <div className="fixed inset-0 z-50 bg-black/95 flex flex-col items-center justify-center gap-5 p-6 overflow-y-auto animate-in fade-in">
           {resultPhoto?.url ? (
             <img
               src={getStorageUrl(resultPhoto.url)}
